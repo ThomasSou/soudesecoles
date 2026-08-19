@@ -40,6 +40,7 @@ export default function EspaceAdherentPage() {
   const [error, setError] = useState("");
   const [accessToken, setAccessToken] = useState(null);
   const [userEmail, setUserEmail] = useState("");
+  const [estAdmin, setEstAdmin] = useState(false);
 
   async function fetchFamilyData(supabase) {
     const [familyRes, parentsRes, childrenRes, purchasesRes, membershipRes] = await Promise.all([
@@ -81,6 +82,13 @@ export default function EspaceAdherentPage() {
       setAccessToken(session.access_token);
       setUserEmail(session.user?.email || "");
 
+      // Les membres du bureau voient un accès au back-office.
+      fetch("/api/admin/moi", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+        .then((r) => setEstAdmin(r.ok))
+        .catch(() => setEstAdmin(false));
+
       await fetchFamilyData(supabase);
       setLoading(false);
     }
@@ -118,12 +126,22 @@ export default function EspaceAdherentPage() {
     <section className="max-w-3xl mx-auto px-4 sm:px-6 py-14">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold text-sou-blue">Mon espace famille</h1>
-        <button
-          onClick={handleLogout}
-          className="text-sm text-slate-500 hover:text-sou-blue underline"
-        >
-          Se déconnecter
-        </button>
+        <div className="flex items-center gap-4">
+          {estAdmin && (
+            <a
+              href="/admin"
+              className="text-sm font-semibold text-sou-blue hover:text-sou-gold"
+            >
+              Back-office →
+            </a>
+          )}
+          <button
+            onClick={handleLogout}
+            className="text-sm text-slate-500 hover:text-sou-blue underline"
+          >
+            Se déconnecter
+          </button>
+        </div>
       </div>
 
       {error && <p className="text-red-600 text-sm mb-6">{error}</p>}
