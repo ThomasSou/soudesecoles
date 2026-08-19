@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../lib/supabaseClient";
 
+const EMPTY_CHILD = { firstName: "", lastName: "", classLevel: "" };
+
 export default function EspaceAdherentPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -11,6 +13,26 @@ export default function EspaceAdherentPage() {
   const [children, setChildren] = useState([]);
   const [membership, setMembership] = useState(null);
   const [error, setError] = useState("");
+  const [accessToken, setAccessToken] = useState(null);
+
+  async function fetchFamilyData(supabase) {
+    const [familyRes, childrenRes, membershipRes] = await Promise.all([
+      supabase.from("families").select("*").maybeSingle(),
+      supabase.from("children").select("*").order("first_name"),
+      supabase
+        .from("memberships")
+        .select("*")
+        .order("school_year", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    if (familyRes.error) setError(familyRes.error.message);
+
+    setFamily(familyRes.data);
+    setChildren(childrenRes.data || []);
+    setMembership(membershipRes.data);
+  }
 
   useEffect(() => {
     const supabase = createClient();
@@ -25,22 +47,34 @@ export default function EspaceAdherentPage() {
         return;
       }
 
-      const [familyRes, childrenRes, membershipRes] = await Promise.all([
-        supabase.from("families").select("*").maybeSingle(),
-        supabase.from("children").select("*").order("first_name"),
-        supabase
-          .from("memberships")
-          .select("*")
-          .order("school_year", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ]);
+      setAccessToken(session.access_token);
 
-      if (familyRes.error) setError(familyRes.error.message);
+      // Si une inscription etait en attente de confirmation d'e-mail, on la
+      // finalise maintenant que la personne est authentifiee.
+      let pending = null;
+      try {
+        const raw = window.localStorage.getItem("pending_family_signup");
+        if (raw) pending = JSON.parse(raw);
+      } catch (e) {
+        pending = null;
+      }
 
-      setFamily(familyRes.data);
-      setChildren(childrenRes.data || []);
-      setMembership(membershipRes.data);
+      if (pending) {
+        try {
+          await fetch("/api/inscription-famille", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              accessToken: session.access_token,
+              ...pending,
+            }),
+          });
+        } finally {
+          window.localStorage.removeItem("pending_family_signup");
+        }
+      }
+
+      await fetchFamilyData(supabase);
       setLoading(false);
     }
 
@@ -78,10 +112,15 @@ export default function EspaceAdherentPage() {
       {error && <p className="text-red-600 text-sm mb-6">{error}</p>}
 
       {!family && !error && (
-        <p className="text-slate-600">
-          Votre fiche famille n'a pas encore été trouvée. Contactez le bureau
-          si le problème persiste.
-        </p>
+        <CompleterProfilForm
+          accessToken={accessToken}
+          onDone={async () => {
+            setLoading(true);
+            const supabase = createClient();
+            await fetchFamilyData(supabase);
+            setLoading(false);
+          }}
+        />
       )}
 
       {family && (
@@ -144,5 +183,99 @@ export default function EspaceAdherentPage() {
         </div>
       )}
     </section>
+  );
+}
+
+function CompleterProfilForm({ accessToken, onDone }) {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [city, setCity] = useState("");
+  const [children, setChildren] = useState([{ ...EMPTY_CHILD }]);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  function updateChild(index, field, value) {
+    setChildren((prev) =>
+      prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
+    );
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    setFormError("");
+
+    const res = await fetch("/api/inscription-famille", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        accessToken,
+        firstName,
+        lastName,
+        phone,
+        addressLine,
+        postalCode,
+        city,
+        children,
+      }),
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      setFormError(result.error || "Une erreur est survenue.");
+      setSubmitting(false);
+      return;
+    }
+
+    onDone();
+  }
+
+  return (
+    <div className="border border-slate-200 rounded-xl p-6">
+      <h2 className="font-semibold text-sou-blue mb-1">Compléter mon profil famille</h2>
+      <p className="text-sm text-slate-500 mb-6">
+        Merci de renseigner vos coordonnées et vos enfants scolarisés pour
+        activer votre espace.
+      </p>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <input placeholder="Prénom" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
+          <input placeholder="Nom" value={lastName} onChange={(e) => setLastName(e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
+          <input placeholder="Téléphone" value={phone} onChange={(e) => setPhone(e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
+          <input placeholder="Adresse" value={addressLine} onChange={(e) => setAddressLine(e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
+          <input placeholder="Code postal" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
+          <input placeholder="Ville" value={city} onChange={(e) => setCity(e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
+        </div>
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-slate-600">Enfants scolarisés</p>
+          {children.map((child, i) => (
+            <div key={i} className="grid gap-3 sm:grid-cols-3">
+              <input placeholder="Prénom" value={child.firstName} onChange={(e) => updateChild(i, "firstName", e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
+              <input placeholder="Nom" value={child.lastName} onChange={(e) => updateChild(i, "lastName", e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
+              <input placeholder="Classe" value={child.classLevel} onChange={(e) => updateChild(i, "classLevel", e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setChildren((prev) => [...prev, { ...EMPTY_CHILD }])}
+            className="text-sm text-sou-blue underline"
+          >
+            + Ajouter un enfant
+          </button>
+        </div>
+        {formError && <p className="text-red-600 text-sm">{formError}</p>}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="bg-sou-blue text-white font-semibold px-6 py-2.5 rounded-full hover:bg-sou-gold transition-colors disabled:opacity-60"
+        >
+          {submitting ? "Enregistrement..." : "Enregistrer"}
+        </button>
+      </form>
+    </div>
   );
 }

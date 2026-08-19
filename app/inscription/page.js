@@ -56,9 +56,28 @@ export default function InscriptionPage() {
       const accessToken = data?.session?.access_token;
 
       if (!accessToken) {
-        // Confirmation email requise avant de pouvoir continuer.
+        // Confirmation email requise : on garde les infos saisies pour
+        // finaliser la creation de la fiche famille juste apres la
+        // premiere connexion (voir app/espace-adherent/page.js).
+        try {
+          window.localStorage.setItem(
+            "pending_family_signup",
+            JSON.stringify({
+              firstName,
+              lastName,
+              phone,
+              addressLine,
+              postalCode,
+              city,
+              children,
+            })
+          );
+        } catch (storageErr) {
+          // localStorage indisponible (navigation privee, etc.) : tant pis,
+          // la personne devra saisir a nouveau ces infos.
+        }
         setError(
-          "Compte cree. Merci de confirmer votre adresse e-mail (voir votre boite de reception), puis connectez-vous pour terminer votre inscription."
+          "Compte cree. Merci de confirmer votre adresse e-mail (voir votre boite de reception), puis connectez-vous : vos informations seront enregistrees automatiquement."
         );
         setLoading(false);
         return;
