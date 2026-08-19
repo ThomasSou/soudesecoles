@@ -79,17 +79,6 @@ export const PARTNERS = [
       "Spécialistes du débouchage de canalisations, du curage et du nettoyage haute pression, intervenant notamment sur le secteur Beaujolais - Val de Saône.",
     website: "https://www.maitres-deboucheurs.com/",
   },
-  {
-    slug: "flandin",
-    name: "Flandin Opticien",
-    file: "flandin.jpg",
-    tier: "Bronze",
-    description:
-      "Opticien de proximité à Montmerle-sur-Saône depuis 2012 : lunettes de vue et de soleil, lentilles, réparations et ajustages, conseil personnalisé.",
-    address: "18 rue de Lyon, 01090 Montmerle-sur-Saône",
-    phone: "04 74 69 44 19",
-    email: "flandin.opticien@orange.fr",
-  },
 ];
 
 export const TIER_ORDER = ["Gold", "Silver", "Bronze"];
