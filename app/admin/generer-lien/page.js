@@ -1,45 +1,94 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 // Page admin temporaire (non listee dans la navigation) : permet de generer
 // un lien d'activation/reinitialisation directement, sans passer par l'envoi
 // d'e-mail Supabase (utile tant que le probleme de lien grille avant lecture
 // n'est pas resolu, et tant qu'aucun fournisseur SMTP n'est configure).
-// Protegee par le jeton ADMIN_IMPORT_TOKEN, saisi ici et jamais stocke.
+// Protegee par le jeton ADMIN_IMPORT_TOKEN.
+//
+// Si l'URL contient ?token=...&email=..., la generation se fait automatiquement
+// et redirige directement vers le lien d'activation (un seul clic depuis un
+// lien tout pret, pas besoin de remplir le formulaire).
 export default function GenererLienPage() {
-  const [adminToken, setAdminToken] = useState("");
-  const [email, setEmail] = useState("");
+  return (
+    <Suspense fallback={null}>
+      <GenererLienForm />
+    </Suspense>
+  );
+}
+
+function GenererLienForm() {
+  const searchParams = useSearchParams();
+  const urlToken = searchParams.get("token") || "";
+  const urlEmail = searchParams.get("email") || "";
+
+  const [adminToken, setAdminToken] = useState(urlToken);
+  const [email, setEmail] = useState(urlEmail);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [link, setLink] = useState("");
+  const [autoRedirecting, setAutoRedirecting] = useState(false);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function generate(token, mail) {
     setError("");
     setLink("");
     setLoading(true);
-
     try {
       const res = await fetch("/api/admin-generate-link", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-token": adminToken,
+          "x-admin-token": token,
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: mail }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "Erreur inconnue.");
-      } else {
-        setLink(data.link);
+        return null;
       }
+      setLink(data.link);
+      return data.link;
     } catch (err) {
       setError(err.message);
+      return null;
     } finally {
       setLoading(false);
     }
+  }
+
+  useEffect(() => {
+    if (urlToken && urlEmail) {
+      setAutoRedirecting(true);
+      generate(urlToken, urlEmail).then((generatedLink) => {
+        if (generatedLink) {
+          window.location.href = generatedLink;
+        } else {
+          setAutoRedirecting(false);
+        }
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    await generate(adminToken, email);
+  }
+
+  if (autoRedirecting) {
+    return (
+      <section className="max-w-md mx-auto px-4 sm:px-6 py-20 text-center text-slate-500">
+        {error ? (
+          <p className="text-red-600 text-sm">{error}</p>
+        ) : (
+          "Génération du lien, redirection en cours..."
+        )}
+      </section>
+    );
   }
 
   return (
