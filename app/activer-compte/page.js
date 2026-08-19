@@ -35,16 +35,41 @@ export default function ActiverComptePage() {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+    // Le client Supabase traite le hash de l'URL (access_token/refresh_token)
+    // de facon asynchrone au chargement : un appel immediat a getSession()
+    // peut donc renvoyer "pas de session" alors qu'elle est en cours
+    // d'etablissement. On ecoute plutot onAuthStateChange, avec getSession()
+    // en filet de securite et un delai d'attente avant d'afficher une erreur.
+    let resolved = false;
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session && !resolved) {
+        resolved = true;
         setStatus("pret");
-      } else {
+      }
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && !resolved) {
+        resolved = true;
+        setStatus("pret");
+      }
+    });
+
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
         setErrorMsg(
           "Ce lien d'invitation n'est plus valide. Contactez le Sou des Écoles pour recevoir une nouvelle invitation."
         );
         setStatus("erreur");
       }
-    });
+    }, 5000);
+
+    return () => {
+      listener.subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   async function handleSubmit(e) {
