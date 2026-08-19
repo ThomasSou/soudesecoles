@@ -10,14 +10,16 @@ export default function EspaceAdherentPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [family, setFamily] = useState(null);
+  const [parents, setParents] = useState([]);
   const [children, setChildren] = useState([]);
   const [membership, setMembership] = useState(null);
   const [error, setError] = useState("");
   const [accessToken, setAccessToken] = useState(null);
 
   async function fetchFamilyData(supabase) {
-    const [familyRes, childrenRes, membershipRes] = await Promise.all([
+    const [familyRes, parentsRes, childrenRes, membershipRes] = await Promise.all([
       supabase.from("families").select("*").maybeSingle(),
+      supabase.from("parents").select("*").order("first_name"),
       supabase.from("children").select("*").order("first_name"),
       supabase
         .from("memberships")
@@ -30,6 +32,7 @@ export default function EspaceAdherentPage() {
     if (familyRes.error) setError(familyRes.error.message);
 
     setFamily(familyRes.data);
+    setParents(parentsRes.data || []);
     setChildren(childrenRes.data || []);
     setMembership(membershipRes.data);
   }
@@ -124,6 +127,36 @@ export default function EspaceAdherentPage() {
                 Dernière adhésion enregistrée : {membership.school_year}
                 {membership.amount ? ` — ${membership.amount} €` : ""}
               </p>
+            )}
+          </div>
+
+          <div className="border border-slate-200 rounded-xl p-6">
+            <h2 className="font-semibold text-sou-blue mb-3">Parents</h2>
+            {parents.length === 0 ? (
+              <p className="text-slate-500 text-sm">Aucun parent enregistré pour le moment.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {parents.map((parent) => (
+                  <li key={parent.id} className="py-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>
+                        {parent.first_name} {parent.last_name}
+                      </span>
+                      <span
+                        className={
+                          isAdherent ? "text-green-700 font-medium" : "text-slate-500"
+                        }
+                      >
+                        {isAdherent ? "Adhérent" : "Non adhérent"}
+                      </span>
+                    </div>
+                    <div className="text-slate-500">
+                      {parent.email}
+                      {parent.phone ? ` — ${parent.phone}` : ""}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 
