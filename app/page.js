@@ -16,7 +16,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24 grid gap-10 sm:grid-cols-2 items-center">
           <div>
             <p className="uppercase tracking-wide text-sou-gold font-semibold text-sm mb-3">
-              Depuis 1978
+              Depuis 1903
             </p>
             <h1 className="text-4xl sm:text-5xl font-bold text-sou-blue leading-tight">
               Le Sou des Écoles de Montmerle-Lurcy
@@ -82,13 +82,13 @@ export default function HomePage() {
       <section className="bg-slate-50 border-y border-slate-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 grid gap-8 sm:grid-cols-3">
           <div>
-            <p className="text-3xl font-bold text-sou-gold">1978</p>
+            <p className="text-3xl font-bold text-sou-gold">1903</p>
             <p className="text-slate-600 mt-1">Année de création de l'association</p>
           </div>
           <div>
             <p className="text-3xl font-bold text-sou-gold">Toutes les classes</p>
             <p className="text-slate-600 mt-1">
-              De la petite section au CM2, adhérents ou non
+              De la petite section au CM2
             </p>
           </div>
           <div>

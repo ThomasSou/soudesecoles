@@ -51,7 +51,7 @@ export function Footer() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-8 sm:grid-cols-3 text-sm">
         <div>
           <p className="font-bold text-white mb-2">Sou des Écoles Laïques Montmerle-Lurcy</p>
-          <p>Association loi 1901 — depuis 1978</p>
+          <p>Association loi 1901 — depuis 1903</p>
           <p>Mairie, 01090 Montmerle-sur-Saône</p>
         </div>
         <div>
