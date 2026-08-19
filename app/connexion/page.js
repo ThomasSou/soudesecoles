@@ -65,9 +65,18 @@ export default function ConnexionPage() {
         </button>
 
         <p className="text-sm text-slate-500 text-center">
-          Vous n'avez pas encore reçu vos identifiants ?{" "}
+          <Link
+            href="/mot-de-passe-oublie"
+            className="text-sou-blue underline"
+          >
+            Mot de passe oublié ?
+          </Link>
+        </p>
+
+        <p className="text-sm text-slate-500 text-center">
+          Vous n'avez pas encore de compte ?{" "}
           <Link href="/inscription" className="text-sou-blue underline">
-            Faire une demande d'accès
+            Créer mon espace famille
           </Link>
         </p>
       </form>
