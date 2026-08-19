@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "../lib/supabaseClient";
 
-const EMPTY_CHILD = { firstName: "", lastName: "", classLevel: "" };
+const EMPTY_CHILD = { firstName: "", lastName: "", classLevel: "", teacherName: "" };
 
 export default function DemandeInscriptionPage() {
   const [firstName, setFirstName] = useState("");
@@ -97,11 +97,12 @@ export default function DemandeInscriptionPage() {
             </button>
           </div>
           {children.map((child, i) => (
-            <div key={i} className="grid gap-3 sm:grid-cols-3 items-center">
+            <div key={i} className="grid gap-3 sm:grid-cols-2 border border-slate-100 rounded-lg p-3">
               <input placeholder="Prénom de l'enfant" value={child.firstName} onChange={(e) => updateChild(i, "firstName", e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
               <input placeholder="Nom de l'enfant" value={child.lastName} onChange={(e) => updateChild(i, "lastName", e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
+              <input placeholder="Classe (ex: CE1)" value={child.classLevel} onChange={(e) => updateChild(i, "classLevel", e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
               <div className="flex gap-2">
-                <input placeholder="Classe (ex: CE1)" value={child.classLevel} onChange={(e) => updateChild(i, "classLevel", e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2 flex-1" />
+                <input placeholder="Nom du maître / de la maîtresse" value={child.teacherName} onChange={(e) => updateChild(i, "teacherName", e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2 flex-1" />
                 {children.length > 1 && (
                   <button type="button" onClick={() => removeChild(i)} className="text-slate-400 hover:text-red-500 px-2" aria-label="Supprimer cet enfant">
                     ✕

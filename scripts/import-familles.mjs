@@ -17,7 +17,7 @@
  *       { "firstName": "Jean", "lastName": "Dupont", "email": "jean.dupont@mail.com", "phone": "0600000000" }
  *     ],
  *     "children": [
- *       { "firstName": "Léo", "lastName": "Dupont", "classLevel": "CE1" }
+ *       { "firstName": "Léo", "lastName": "Dupont", "classLevel": "CE1", "teacherName": "Mme Martin" }
  *     ]
  *   }
  * ]
@@ -116,6 +116,7 @@ for (const fam of families) {
       first_name: c.firstName,
       last_name: c.lastName,
       class_level: c.classLevel || null,
+      teacher_name: c.teacherName || null,
       school_year: fam.schoolYear || process.env.NEXT_PUBLIC_SCHOOL_YEAR || "2026-2027",
     }));
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../lib/supabaseClient";
 
-const EMPTY_CHILD = { firstName: "", lastName: "", classLevel: "" };
+const EMPTY_CHILD = { firstName: "", lastName: "", classLevel: "", teacherName: "" };
 
 export default function EspaceAdherentPage() {
   const router = useRouter();
@@ -140,7 +140,10 @@ export default function EspaceAdherentPage() {
                     <span>
                       {child.first_name} {child.last_name}
                     </span>
-                    <span className="text-slate-500">{child.class_level}</span>
+                    <span className="text-slate-500">
+                      {child.class_level}
+                      {child.teacher_name ? ` — ${child.teacher_name}` : ""}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -228,10 +231,11 @@ function CompleterProfilForm({ accessToken, onDone }) {
         <div className="space-y-3">
           <p className="text-sm font-medium text-slate-600">Enfants scolarisés</p>
           {children.map((child, i) => (
-            <div key={i} className="grid gap-3 sm:grid-cols-3">
+            <div key={i} className="grid gap-3 sm:grid-cols-2 border border-slate-100 rounded-lg p-3">
               <input placeholder="Prénom" value={child.firstName} onChange={(e) => updateChild(i, "firstName", e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
               <input placeholder="Nom" value={child.lastName} onChange={(e) => updateChild(i, "lastName", e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
               <input placeholder="Classe" value={child.classLevel} onChange={(e) => updateChild(i, "classLevel", e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
+              <input placeholder="Nom du maître / de la maîtresse" value={child.teacherName} onChange={(e) => updateChild(i, "teacherName", e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2" />
             </div>
           ))}
           <button

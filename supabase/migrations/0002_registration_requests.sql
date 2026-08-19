@@ -28,3 +28,6 @@ create policy "public peut soumettre une demande d'inscription" on registration_
 -- Pas de policy de lecture : la consultation des demandes se fait pour
 -- l'instant via le Table Editor Supabase (compte bureau), en attendant le
 -- back-office admin de la Phase 2.
+
+-- Ajout du nom du maitre/de la maitresse sur chaque enfant.
+alter table children add column if not exists teacher_name text;

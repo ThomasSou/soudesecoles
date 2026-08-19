@@ -76,6 +76,7 @@ export async function POST(request) {
       first_name: c.firstName,
       last_name: c.lastName,
       class_level: c.classLevel || null,
+      teacher_name: c.teacherName || null,
       school_year: schoolYear,
     }));
 
