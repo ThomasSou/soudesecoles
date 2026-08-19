@@ -28,7 +28,7 @@ export function Header() {
           ))}
         </nav>
         <Link
-          href="/contact"
+          href="/espace-adherent"
           className="hidden sm:inline-block bg-sou-blue text-white text-sm font-semibold px-4 py-2 rounded-full hover:bg-sou-gold transition-colors"
         >
           Espace adhérent
