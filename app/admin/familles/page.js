@@ -159,7 +159,17 @@ function ListeFamilles({ token }) {
                 </div>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-slate-100">
+              <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-4 items-center">
+                <BoutonCotisation
+                  famille={f}
+                  annee={annee}
+                  aJour={aJour}
+                  token={token}
+                  onDone={charger}
+                />
+              </div>
+
+              <div className="mt-3">
                 {ouvert === f.id ? (
                   <FormulaireParent
                     familyId={f.id}
@@ -268,5 +278,57 @@ function FormulaireParent({ familyId, token, onDone, onCancel }) {
         </button>
       </div>
     </form>
+  );
+}
+
+
+function BoutonCotisation({ famille, annee, aJour, token, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function basculer() {
+    setBusy(true);
+    setError("");
+    const res = await fetch("/api/admin/adhesions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        familyId: famille.id,
+        schoolYear: annee,
+        amount: aJour ? null : 20,
+        paid: !aJour,
+      }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) {
+      setError(data.error || "Erreur.");
+      return;
+    }
+    onDone();
+  }
+
+  return (
+    <div>
+      <button
+        onClick={basculer}
+        disabled={busy}
+        className={`text-sm font-semibold px-4 py-1.5 rounded-full transition-colors disabled:opacity-60 ${
+          aJour
+            ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            : "bg-green-600 text-white hover:bg-green-700"
+        }`}
+      >
+        {busy
+          ? "..."
+          : aJour
+          ? `Annuler la cotisation ${annee}`
+          : `Encaisser la cotisation ${annee} (20 €)`}
+      </button>
+      {error && <p className="text-red-600 text-xs mt-1">{error}</p>}
+    </div>
   );
 }
