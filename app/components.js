@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { PARTNERS } from "./partenaires/data";
 
 const NAV_LINKS = [
   { href: "/", label: "Accueil" },
@@ -48,6 +49,29 @@ export function Header() {
 export function Footer() {
   return (
     <footer className="bg-sou-blue text-slate-200 mt-20">
+      <div className="bg-white border-b border-slate-200">
+        <Link
+          href="/partenaires"
+          aria-label="Voir la page de nos partenaires"
+          className="block max-w-6xl mx-auto px-4 sm:px-6 py-6 group"
+        >
+          <p className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400 mb-4 group-hover:text-sou-blue transition-colors">
+            Merci à nos partenaires
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4">
+            {PARTNERS.map((p) => (
+              <div key={p.slug} className="relative w-24 h-12 sm:w-28 sm:h-14 grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
+                <Image
+                  src={`/partenaires/${p.file}`}
+                  alt={`Logo ${p.name}`}
+                  fill
+                  className="object-contain"
+                />
+              </div>
+            ))}
+          </div>
+        </Link>
+      </div>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-8 sm:grid-cols-3 text-sm">
         <div>
           <p className="font-bold text-white mb-2">Sou des Écoles Laïques Montmerle-Lurcy</p>

@@ -8,6 +8,7 @@ export const PARTNERS = [
   { slug: "millesime", name: "Millésimes et Cuvées", file: "millesime.jpg", tier: "Bronze" },
   { slug: "emilejob", name: "Emile Job", file: "emilejob.jpg", tier: "Bronze" },
   { slug: "maitresdeboucheurs", name: "Les Maîtres Déboucheurs", file: "maitresdeboucheurs.jpg", tier: "Bronze" },
+  { slug: "flandin", name: "Flandin Opticien", file: "flandin.jpg", tier: "Bronze" },
 ];
 
 export const TIER_ORDER = ["Gold", "Silver", "Bronze"];
