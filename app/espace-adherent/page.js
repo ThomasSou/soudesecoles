@@ -6,27 +6,46 @@ import { createClient } from "../lib/supabaseClient";
 
 const EMPTY_CHILD = { firstName: "", lastName: "", classLevel: "", teacherName: "" };
 
+const PAYMENT_LABELS = {
+  helloasso: "HelloAsso",
+  sumup: "Carte bancaire",
+  especes: "Espèces",
+  cheque: "Chèque",
+};
+
+function formatPurchaseDate(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export default function EspaceAdherentPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [family, setFamily] = useState(null);
   const [parents, setParents] = useState([]);
   const [children, setChildren] = useState([]);
-  const [membership, setMembership] = useState(null);
+  const [purchases, setPurchases] = useState([]);
+  const [memberships, setMemberships] = useState([]);
   const [error, setError] = useState("");
   const [accessToken, setAccessToken] = useState(null);
 
   async function fetchFamilyData(supabase) {
-    const [familyRes, parentsRes, childrenRes, membershipRes] = await Promise.all([
+    const [familyRes, parentsRes, childrenRes, purchasesRes, membershipRes] = await Promise.all([
       supabase.from("families").select("*").maybeSingle(),
       supabase.from("parents").select("*").order("first_name"),
       supabase.from("children").select("*").order("first_name"),
       supabase
+        .from("purchases")
+        .select("*")
+        .order("purchased_at", { ascending: false }),
+      supabase
         .from("memberships")
         .select("*")
-        .order("school_year", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+        .order("school_year", { ascending: false }),
     ]);
 
     if (familyRes.error) setError(familyRes.error.message);
@@ -34,7 +53,8 @@ export default function EspaceAdherentPage() {
     setFamily(familyRes.data);
     setParents(parentsRes.data || []);
     setChildren(childrenRes.data || []);
-    setMembership(membershipRes.data);
+    setPurchases(purchasesRes.data || []);
+    setMemberships(membershipRes.data || []);
   }
 
   useEffect(() => {
@@ -74,6 +94,10 @@ export default function EspaceAdherentPage() {
   }
 
   const isAdherent = family?.status_current_year === "adherent";
+  const purchasesTotal = purchases.reduce(
+    (sum, p) => sum + (p.amount != null ? Number(p.amount) : 0),
+    0
+  );
 
   return (
     <section className="max-w-3xl mx-auto px-4 sm:px-6 py-14">
@@ -122,11 +146,33 @@ export default function EspaceAdherentPage() {
                 </a>
               </div>
             )}
-            {membership && (
-              <p className="text-sm text-slate-500 mt-3">
-                Dernière adhésion enregistrée : {membership.school_year}
-                {membership.amount ? ` — ${membership.amount} €` : ""}
-              </p>
+            {memberships.length > 0 && (
+              <div className="mt-5 pt-4 border-t border-slate-100">
+                <p className="text-sm font-medium text-slate-600 mb-2">
+                  Historique des adhésions
+                </p>
+                <ul className="divide-y divide-slate-100">
+                  {memberships.map((m) => (
+                    <li key={m.id} className="py-2 flex justify-between text-sm">
+                      <span className="text-slate-700">
+                        {m.school_year}
+                        {m.paid_at ? (
+                          <span className="text-slate-400 text-xs ml-2">
+                            payée le {formatPurchaseDate(m.paid_at)}
+                          </span>
+                        ) : (
+                          <span className="text-amber-600 text-xs ml-2">
+                            en attente de paiement
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-slate-600 whitespace-nowrap">
+                        {m.amount != null ? `${Number(m.amount).toFixed(2)} €` : "—"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
 
@@ -180,6 +226,42 @@ export default function EspaceAdherentPage() {
                   </li>
                 ))}
               </ul>
+            )}
+          </div>
+
+          <div className="border border-slate-200 rounded-xl p-6">
+            <h2 className="font-semibold text-sou-blue mb-3">
+              Historique de mes achats
+            </h2>
+            {purchases.length === 0 ? (
+              <p className="text-slate-500 text-sm">
+                Aucun achat enregistré pour le moment. Vos participations aux
+                manifestations (loto, vide-greniers, ventes...) apparaîtront ici.
+              </p>
+            ) : (
+              <>
+                <ul className="divide-y divide-slate-100">
+                  {purchases.map((p) => (
+                    <li key={p.id} className="py-3 flex justify-between gap-4 text-sm">
+                      <div>
+                        <p className="text-slate-700">{p.label}</p>
+                        <p className="text-slate-400 text-xs mt-0.5">
+                          {formatPurchaseDate(p.purchased_at)}
+                          {p.school_year ? ` — ${p.school_year}` : ""}
+                          {p.payment_method ? ` — ${PAYMENT_LABELS[p.payment_method] || p.payment_method}` : ""}
+                        </p>
+                      </div>
+                      <span className="whitespace-nowrap font-medium text-slate-700">
+                        {p.amount != null ? `${Number(p.amount).toFixed(2)} €` : "—"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex justify-between pt-3 mt-1 border-t border-slate-200 text-sm font-semibold text-sou-blue">
+                  <span>Total</span>
+                  <span>{purchasesTotal.toFixed(2)} €</span>
+                </div>
+              </>
             )}
           </div>
 
