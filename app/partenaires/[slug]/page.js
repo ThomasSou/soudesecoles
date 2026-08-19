@@ -41,7 +41,7 @@ export default function PartnerPage({ params }) {
         )}
 
         {(partner.address || partner.phone || partner.email || partner.website) && (
-          <div className="w-full max-w-md border-t border-slate-100 pt-4 mt-2 space-y-1 text-sm text-slate-600">
+          <div className="w-full max-w-md border-t border-slate-100 pt-4 mt-2 space-y-1 text-sm text-slate-600 text-center">
             {partner.address && <p>{partner.address}</p>}
             {partner.phone && (
               <p>

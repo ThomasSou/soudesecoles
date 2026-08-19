@@ -22,9 +22,11 @@ export const PARTNERS = [
     file: "diennet.jpg",
     tier: "Silver",
     description:
-      "Maison familiale de charcuterie fondée en 1898 à Montmerle, aujourd'hui dirigée par Jérôme Diennet. Jambons, saucissons et terrines sont fabriqués selon des recettes transmises de génération en génération.",
-    address: "Marché couvert, 01090 Montmerle-sur-Saône",
-    website: "http://www.charcuterie-diennet.fr/",
+      "Maison familiale de charcuterie fondée en 1898 à Montmerle, aujourd'hui dirigée par Jérôme Diennet. Jambons, saucissons et terrines sont fabriqués selon des recettes transmises de génération en génération. Présents sur le marché couvert de Montmerle tous les dimanches.",
+    address: "2385 rue de Mâcon, 01090 Montmerle-sur-Saône",
+    phone: "04 74 69 66 40",
+    email: "contact@charcuterie-diennet.com",
+    website: "http://charcuterie-diennet.com/",
   },
   {
     slug: "nicod",
@@ -47,6 +49,8 @@ export const PARTNERS = [
       "Supermarché de proximité au cœur de Montmerle-sur-Saône, avec un large choix de produits frais, bio et régionaux.",
     address: "4 rue du Marché, 01090 Montmerle-sur-Saône",
     phone: "04 37 55 71 41",
+    email: "spar.montmerle@gmail.com",
+    website: "https://www.facebook.com/p/SPAR-Montmerle-sS-100093797624123/",
   },
   {
     slug: "millesime",
@@ -57,6 +61,7 @@ export const PARTNERS = [
       "Caviste indépendant tenu par Stéphane : vins en vrac et en bouteille, bières, whiskies, rhums et spiritueux. Une salle de réception accueille des soirées dégustation mensuelles, avec terrasse ouverte l'été.",
     address: "27 rue de Lyon, 01090 Montmerle-sur-Saône",
     email: "millesimesetcuvees@orange.fr",
+    website: "https://www.facebook.com/people/Mill%C3%A9simes-Et-Cuv%C3%A9es/100057519075258/",
   },
   {
     slug: "emilejob",

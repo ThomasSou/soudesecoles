@@ -2,6 +2,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { PARTNERS } from "./partenaires/data";
 
+const BANNER_SIZES = {
+  Gold: "w-40 h-20 sm:w-48 sm:h-24",
+  Silver: "w-28 h-14 sm:w-32 sm:h-16",
+  Bronze: "w-16 h-8 sm:w-20 sm:h-10",
+};
+
 const NAV_LINKS = [
   { href: "/", label: "Accueil" },
   { href: "/evenements", label: "Événements" },
@@ -53,14 +59,17 @@ export function Footer() {
         <Link
           href="/partenaires"
           aria-label="Voir la page de nos partenaires"
-          className="block max-w-6xl mx-auto px-4 sm:px-6 py-6 group"
+          className="block max-w-6xl mx-auto px-4 sm:px-6 py-6"
         >
-          <p className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400 mb-4 group-hover:text-sou-blue transition-colors">
+          <p className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400 mb-4">
             Merci à nos partenaires
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4">
+          <div className="flex flex-wrap items-end justify-center gap-x-10 gap-y-5">
             {PARTNERS.map((p) => (
-              <div key={p.slug} className="relative w-24 h-12 sm:w-28 sm:h-14 grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
+              <div
+                key={p.slug}
+                className={`relative ${BANNER_SIZES[p.tier] || BANNER_SIZES.Bronze}`}
+              >
                 <Image
                   src={`/partenaires/${p.file}`}
                   alt={`Logo ${p.name}`}
