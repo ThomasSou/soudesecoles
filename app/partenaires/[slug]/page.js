@@ -30,10 +30,47 @@ export default function PartnerPage({ params }) {
           />
         </div>
         <h1 className="text-2xl font-bold text-sou-blue">{partner.name}</h1>
-        <p className="text-slate-500 text-sm max-w-md">
-          Plus d'informations sur ce partenaire seront bientôt disponibles ici
-          (présentation, activité, lien vers leur site).
-        </p>
+
+        {partner.description ? (
+          <p className="text-slate-600 max-w-xl">{partner.description}</p>
+        ) : (
+          <p className="text-slate-500 text-sm max-w-md">
+            Plus d'informations sur ce partenaire seront bientôt disponibles ici
+            (présentation, activité, lien vers leur site).
+          </p>
+        )}
+
+        {(partner.address || partner.phone || partner.email || partner.website) && (
+          <div className="w-full max-w-md border-t border-slate-100 pt-4 mt-2 space-y-1 text-sm text-slate-600">
+            {partner.address && <p>{partner.address}</p>}
+            {partner.phone && (
+              <p>
+                <a href={`tel:${partner.phone.replace(/\s/g, "")}`} className="hover:text-sou-blue">
+                  {partner.phone}
+                </a>
+              </p>
+            )}
+            {partner.email && (
+              <p>
+                <a href={`mailto:${partner.email}`} className="hover:text-sou-blue">
+                  {partner.email}
+                </a>
+              </p>
+            )}
+            {partner.website && (
+              <p>
+                <a
+                  href={partner.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block mt-2 bg-sou-blue text-white font-semibold px-5 py-2 rounded-full hover:bg-sou-gold transition-colors"
+                >
+                  Voir leur site
+                </a>
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );
