@@ -29,10 +29,10 @@ export default function HomePage() {
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
-                href="/contact"
+                href="/inscription"
                 className="bg-sou-blue text-white font-semibold px-6 py-3 rounded-full hover:bg-sou-gold transition-colors"
               >
-                Adhérer à l'association
+                Créer mon espace famille
               </Link>
               <Link
                 href="/evenements"
