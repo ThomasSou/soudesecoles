@@ -38,6 +38,7 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://soumontmerle.netlify.app";
 const SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
 const filePath = process.argv[2];
 
@@ -80,7 +81,8 @@ for (const fam of families) {
 
   for (const parent of fam.parents || []) {
     const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
-      parent.email
+      parent.email,
+      { redirectTo: `${SITE_URL}/activer-compte` }
     );
 
     if (inviteError) {

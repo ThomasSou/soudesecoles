@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "../../lib/supabaseServerAdmin";
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://soumontmerle.netlify.app";
+
 // Route temporaire, protegee par un jeton partage (ADMIN_IMPORT_TOKEN),
 // utilisee UNE FOIS pour tester le mecanisme d'import + invitation avec
 // les familles du bureau. A supprimer une fois le test valide (le vrai
@@ -38,7 +40,9 @@ export async function POST(request) {
     logs.push(`Famille creee : ${fam.parents?.[0]?.lastName} (${family.id})`);
 
     for (const parent of fam.parents || []) {
-      const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(parent.email);
+      const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(parent.email, {
+        redirectTo: `${SITE_URL}/activer-compte`,
+      });
       if (inviteError) {
         logs.push(`  Parent ${parent.firstName} ${parent.lastName} (${parent.email}) NON invite : ${inviteError.message}`);
         parentsSkipped++;
