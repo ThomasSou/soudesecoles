@@ -49,31 +49,6 @@ export default function EspaceAdherentPage() {
 
       setAccessToken(session.access_token);
 
-      // Si une inscription etait en attente de confirmation d'e-mail, on la
-      // finalise maintenant que la personne est authentifiee.
-      let pending = null;
-      try {
-        const raw = window.localStorage.getItem("pending_family_signup");
-        if (raw) pending = JSON.parse(raw);
-      } catch (e) {
-        pending = null;
-      }
-
-      if (pending) {
-        try {
-          await fetch("/api/inscription-famille", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              accessToken: session.access_token,
-              ...pending,
-            }),
-          });
-        } finally {
-          window.localStorage.removeItem("pending_family_signup");
-        }
-      }
-
       await fetchFamilyData(supabase);
       setLoading(false);
     }

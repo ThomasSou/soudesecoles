@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "../../lib/supabaseServerAdmin";
 
-// Route serveur appelee juste apres l'inscription (supabase.auth.signUp).
-// Recoit le token d'acces du nouvel utilisateur, verifie son identite,
+// Route de secours : utilisee uniquement quand une personne est deja
+// authentifiee (compte cree via invitation admin ou demande approuvee) mais
+// que sa fiche famille n'existe pas encore cote base (ex. compte cree
+// manuellement sans passer par le script d'import). Le parcours normal
+// est l'import admin (scripts/import-familles.mjs), qui cree la famille
+// ET invite le parent par e-mail en une seule etape.
+// Recoit le token d'acces de la personne connectee, verifie son identite,
 // puis cree la famille + le parent + les enfants avec la cle service role
 // (les policies RLS ne permettent pas l'ecriture directe depuis le navigateur,
 // ce qui evite qu'un utilisateur puisse s'inserer dans une famille arbitraire).

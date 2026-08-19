@@ -65,9 +65,9 @@ export default function ConnexionPage() {
         </button>
 
         <p className="text-sm text-slate-500 text-center">
-          Pas encore de compte ?{" "}
+          Vous n'avez pas encore reçu vos identifiants ?{" "}
           <Link href="/inscription" className="text-sou-blue underline">
-            Créer un compte famille
+            Faire une demande d'accès
           </Link>
         </p>
       </form>
