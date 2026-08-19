@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import QRCode from "qrcode";
 import { createClient } from "../lib/supabaseClient";
+import {
+  currentSchoolYear,
+  findCurrentMembership,
+  isMembershipValid,
+} from "../lib/anneeScolaire";
 
 const EMPTY_CHILD = { firstName: "", lastName: "", classLevel: "", teacherName: "" };
 
@@ -93,7 +99,9 @@ export default function EspaceAdherentPage() {
     );
   }
 
-  const isAdherent = family?.status_current_year === "adherent";
+  const anneeEnCours = currentSchoolYear();
+  const adhesionEnCours = findCurrentMembership(memberships);
+  const isAdherent = isMembershipValid(adhesionEnCours);
   const purchasesTotal = purchases.reduce(
     (sum, p) => sum + (p.amount != null ? Number(p.amount) : 0),
     0
@@ -131,12 +139,13 @@ export default function EspaceAdherentPage() {
             <h2 className="font-semibold text-sou-blue mb-3">Statut d'adhésion</h2>
             {isAdherent ? (
               <p className="text-green-700 font-medium">
-                ✓ Famille adhérente pour l'année en cours
+                ✓ Famille adhérente pour l'année scolaire {anneeEnCours}
               </p>
             ) : (
               <div>
                 <p className="text-slate-600 mb-3">
-                  Vous n'êtes pas encore adhérent pour cette année scolaire.
+                  Vous n'êtes pas encore adhérent pour l'année scolaire{" "}
+                  {anneeEnCours}.
                 </p>
                 <a
                   href="/contact"
@@ -175,6 +184,15 @@ export default function EspaceAdherentPage() {
               </div>
             )}
           </div>
+
+          {isAdherent && adhesionEnCours && (
+            <CarteAdhesion
+              membership={adhesionEnCours}
+              family={family}
+              parents={parents}
+              anneeEnCours={anneeEnCours}
+            />
+          )}
 
           <div className="border border-slate-200 rounded-xl p-6">
             <h2 className="font-semibold text-sou-blue mb-3">Parents</h2>
@@ -370,6 +388,64 @@ function CompleterProfilForm({ accessToken, onDone }) {
           {submitting ? "Enregistrement..." : "Enregistrer"}
         </button>
       </form>
+    </div>
+  );
+}
+
+
+function CarteAdhesion({ membership, family, parents, anneeEnCours }) {
+  const [qrDataUrl, setQrDataUrl] = useState("");
+
+  useEffect(() => {
+    if (!membership?.qr_code_token) return;
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "";
+    const url = `${origin}/verifier-adhesion/${membership.qr_code_token}`;
+    QRCode.toDataURL(url, { width: 320, margin: 1 })
+      .then(setQrDataUrl)
+      .catch(() => setQrDataUrl(""));
+  }, [membership]);
+
+  const nomFamille =
+    parents && parents.length > 0
+      ? parents.map((p) => `${p.first_name || ""} ${p.last_name || ""}`.trim()).join(" & ")
+      : "Famille adhérente";
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-sou-blue/20">
+      <div className="bg-sou-blue text-white px-6 py-4">
+        <p className="text-xs uppercase tracking-wide text-white/70">
+          Carte d&apos;adhésion
+        </p>
+        <p className="text-lg font-bold">Sou des Écoles Montmerle-Lurcy</p>
+      </div>
+      <div className="p-6 flex flex-col sm:flex-row gap-6 items-center">
+        <div className="flex-1 text-center sm:text-left">
+          <p className="text-xl font-bold text-sou-blue">{nomFamille}</p>
+          <p className="text-slate-600 text-sm mt-1">
+            {family?.postal_code} {family?.city}
+          </p>
+          <p className="mt-4 inline-block bg-green-50 text-green-700 text-sm font-semibold px-3 py-1.5 rounded-full">
+            ✓ À jour — année {anneeEnCours}
+          </p>
+          <p className="text-xs text-slate-400 mt-3">
+            Valable jusqu&apos;au 31 août {anneeEnCours.split("-")[1]}
+          </p>
+        </div>
+        {qrDataUrl && (
+          <div className="text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={qrDataUrl}
+              alt="QR code de la carte d'adhésion"
+              className="w-40 h-40"
+            />
+            <p className="text-xs text-slate-400 mt-1">
+              À présenter lors des manifestations
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
