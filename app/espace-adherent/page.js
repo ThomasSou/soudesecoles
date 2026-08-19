@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
+import FormulaireContact from "../formulaire-contact";
 import { createClient } from "../lib/supabaseClient";
 import {
   currentSchoolYear,
@@ -38,6 +39,7 @@ export default function EspaceAdherentPage() {
   const [memberships, setMemberships] = useState([]);
   const [error, setError] = useState("");
   const [accessToken, setAccessToken] = useState(null);
+  const [userEmail, setUserEmail] = useState("");
 
   async function fetchFamilyData(supabase) {
     const [familyRes, parentsRes, childrenRes, purchasesRes, membershipRes] = await Promise.all([
@@ -77,6 +79,7 @@ export default function EspaceAdherentPage() {
       }
 
       setAccessToken(session.access_token);
+      setUserEmail(session.user?.email || "");
 
       await fetchFamilyData(supabase);
       setLoading(false);
@@ -99,6 +102,10 @@ export default function EspaceAdherentPage() {
     );
   }
 
+  const moi = parents.find((p) => p.email === userEmail);
+  const nomAdherent = moi
+    ? `${moi.first_name || ""} ${moi.last_name || ""}`.trim()
+    : "";
   const anneeEnCours = currentSchoolYear();
   const adhesionEnCours = findCurrentMembership(memberships);
   const isAdherent = isMembershipValid(adhesionEnCours);
@@ -291,6 +298,23 @@ export default function EspaceAdherentPage() {
               {family.postal_code} {family.city}
             </p>
           </div>
+
+          <div className="border border-slate-200 rounded-xl p-6">
+            <h2 className="font-semibold text-sou-blue mb-1">
+              Nous contacter
+            </h2>
+            <p className="text-sm text-slate-500 mb-5">
+              Une question, une remarque, une envie de donner un coup de main ?
+              Écrivez-nous directement, nous vous répondons par e-mail.
+            </p>
+            <FormulaireContact
+              defaultName={nomAdherent}
+              defaultEmail={userEmail}
+              locked={Boolean(nomAdherent && userEmail)}
+              context="espace-adherent"
+              compact
+            />
+          </div>
         </div>
       )}
     </section>
@@ -441,7 +465,7 @@ function CarteAdhesion({ membership, family, parents, anneeEnCours }) {
               className="w-40 h-40"
             />
             <p className="text-xs text-slate-400 mt-1">
-              À présenter lors des manifestations
+              À présenter chez les partenaires participants et lors de nos manifestations
             </p>
           </div>
         )}

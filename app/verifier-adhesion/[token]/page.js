@@ -73,9 +73,9 @@ export default async function VerifierAdhesionPage({ params }) {
         />
       ) : !membership.paid_at ? (
         <Bandeau
-          couleur="amber"
-          titre="Adhésion non réglée"
-          message={`L'adhésion ${membership.school_year} est enregistrée mais le paiement n'a pas été constaté.`}
+          couleur="slate"
+          titre="Non cotisant"
+          message={`Cette famille n'est pas à jour de sa cotisation pour l'année scolaire ${membership.school_year}.`}
           famille={nomFamille}
         />
       ) : (
@@ -102,7 +102,7 @@ const COULEURS = {
   slate: "bg-slate-50 border-slate-200 text-slate-700",
 };
 
-const ICONES = { green: "✓", red: "✕", amber: "!", slate: "?" };
+const ICONES = { green: "✓", red: "✕", amber: "!", slate: "✕" };
 
 function Bandeau({ couleur, titre, message, famille, details }) {
   return (
