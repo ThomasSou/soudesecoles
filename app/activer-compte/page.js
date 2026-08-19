@@ -16,12 +16,9 @@ export default function ActiverComptePage() {
   useEffect(() => {
     const supabase = createClient();
     const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const params = new URLSearchParams(hash.replace(/^#/, ""));
 
-    // Supabase ajoute soit des jetons de session (lien valide), soit
-    // error=...&error_code=... (lien expire ou deja utilise) au hash de l'URL.
-    if (hash.includes("error=")) {
-      const params = new URLSearchParams(hash.replace(/^#/, ""));
-      const code = params.get("error_code");
+    function showInvalid(code) {
       if (code === "otp_expired") {
         setErrorMsg(
           "Ce lien d'invitation a expiré ou a déjà été utilisé. Contactez le Sou des Écoles pour recevoir une nouvelle invitation."
@@ -32,44 +29,49 @@ export default function ActiverComptePage() {
         );
       }
       setStatus("erreur");
+    }
+
+    // Supabase ajoute soit des jetons de session (lien valide), soit
+    // error=...&error_code=... (lien expire ou deja utilise) au hash de l'URL.
+    if (params.get("error") || params.get("error_code")) {
+      showInvalid(params.get("error_code"));
       return;
     }
 
-    // Le client Supabase traite le hash de l'URL (access_token/refresh_token)
-    // de facon asynchrone au chargement : un appel immediat a getSession()
-    // peut donc renvoyer "pas de session" alors qu'elle est en cours
-    // d'etablissement. On ecoute plutot onAuthStateChange, avec getSession()
-    // en filet de securite et un delai d'attente avant d'afficher une erreur.
-    let resolved = false;
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session && !resolved) {
-        resolved = true;
+    if (!accessToken || !refreshToken) {
+      // Pas de jetons dans l'URL : peut-être une session déjà active
+      // (rechargement de page après succès).
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          setStatus("pret");
+        } else {
+          showInvalid();
+        }
+      });
+      return;
+    }
+
+    // IMPORTANT : on n'utilise pas la détection automatique du hash par le
+    // SDK (detectSessionInUrl). @supabase/ssr force flowType="pkce", ce qui
+    // fait échouer silencieusement l'analyse des liens "implicit flow"
+    // (jetons dans le hash) générés par l'API admin (invitation /
+    // réinitialisation). On établit donc la session nous-mêmes avec les
+    // jetons présents dans l'URL : ça fonctionne quel que soit le flowType
+    // configuré sur le client.
+    supabase.auth
+      .setSession({ access_token: accessToken, refresh_token: refreshToken })
+      .then(({ data, error }) => {
+        if (error || !data.session) {
+          showInvalid();
+          return;
+        }
+        // Nettoie les jetons de l'URL une fois la session établie.
+        window.history.replaceState(null, "", window.location.pathname);
         setStatus("pret");
-      }
-    });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session && !resolved) {
-        resolved = true;
-        setStatus("pret");
-      }
-    });
-
-    const timeout = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        setErrorMsg(
-          "Ce lien d'invitation n'est plus valide. Contactez le Sou des Écoles pour recevoir une nouvelle invitation."
-        );
-        setStatus("erreur");
-      }
-    }, 5000);
-
-    return () => {
-      listener.subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
+      });
   }, []);
 
   async function handleSubmit(e) {
