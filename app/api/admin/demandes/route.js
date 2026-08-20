@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "../../../lib/adminAuth";
+import { requirePermission } from "../../../lib/adminAuth";
 import { CONTACT_EMAIL, sendMail } from "../../../lib/mail";
 
 const SITE_URL =
@@ -7,7 +7,7 @@ const SITE_URL =
 const SCHOOL_YEAR = process.env.NEXT_PUBLIC_SCHOOL_YEAR || "2025-2026";
 
 export async function GET(request) {
-  const auth = await requireAdmin(request);
+  const auth = await requirePermission(request, "demandes");
   if (auth.error) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
@@ -27,7 +27,7 @@ export async function GET(request) {
 // Valider = créer la famille + le parent + les enfants, puis inviter le parent
 // par e-mail (même mécanisme que l'import de début d'année).
 export async function POST(request) {
-  const auth = await requireAdmin(request);
+  const auth = await requirePermission(request, "demandes");
   if (auth.error) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }

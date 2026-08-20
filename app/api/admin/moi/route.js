@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "../../../lib/adminAuth";
 
-// Permet au front de savoir si l'utilisateur connecté fait partie du bureau.
+// Permet au front de savoir si l'utilisateur connecté fait partie du bureau,
+// et avec quels droits précis (permissions individuelles).
 export async function GET(request) {
   const auth = await requireAdmin(request);
   if (auth.error) {
@@ -12,7 +13,8 @@ export async function GET(request) {
     parent: {
       firstName: auth.parent.first_name,
       lastName: auth.parent.last_name,
-      role: auth.parent.role,
+      title: auth.parent.title,
+      permissions: auth.parent.permissions || {},
     },
   });
 }

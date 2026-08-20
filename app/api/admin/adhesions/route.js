@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "../../../lib/adminAuth";
+import { requirePermission } from "../../../lib/adminAuth";
 
 // Enregistre (ou met à jour) la cotisation d'une famille pour une année
 // scolaire donnée. Permet au bureau d'encaisser un chèque/espèces lors des
 // permanences ou manifestations sans passer par la base directement.
 export async function POST(request) {
-  const auth = await requireAdmin(request);
+  const auth = await requirePermission(request, "familles");
   if (auth.error) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }

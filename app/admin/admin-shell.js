@@ -6,16 +6,19 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "../lib/supabaseClient";
 
 const ONGLETS = [
-  { href: "/admin", label: "Tableau de bord" },
-  { href: "/admin/demandes", label: "Demandes d'inscription" },
-  { href: "/admin/familles", label: "Familles" },
-  { href: "/admin/enfants", label: "Enfants" },
-  { href: "/admin/messages", label: "Messages reçus" },
+  { href: "/admin", label: "Tableau de bord", perm: null },
+  { href: "/admin/demandes", label: "Demandes d'inscription", perm: "demandes" },
+  { href: "/admin/familles", label: "Familles", perm: "familles" },
+  { href: "/admin/enfants", label: "Enfants", perm: "familles" },
+  { href: "/admin/emails", label: "E-mails", perm: "emails" },
+  { href: "/admin/messages", label: "Messages reçus", perm: "messages" },
+  { href: "/admin/acces", label: "Accès", perm: "acces" },
 ];
 
 // Enveloppe commune au back-office : vérifie que l'utilisateur connecté fait
-// partie du bureau, puis affiche la navigation et le contenu.
-// `children` est une fonction qui reçoit le jeton d'accès.
+// partie du bureau, puis affiche la navigation (filtrée selon ses droits) et
+// le contenu. `children` est une fonction qui reçoit le jeton d'accès et le
+// parent connecté (avec ses permissions).
 export default function AdminShell({ title, children }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -79,17 +82,24 @@ export default function AdminShell({ title, children }) {
     );
   }
 
+  const perms = parent?.permissions || {};
+  const onglets = ONGLETS.filter((o) => !o.perm || perms[o.perm]);
+  const pageAutorisee = ONGLETS.find((o) => o.href === pathname);
+  const accesRefusePourCettePage =
+    pageAutorisee && pageAutorisee.perm && !perms[pageAutorisee.perm];
+
   return (
     <section className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
       <div className="flex flex-wrap items-baseline justify-between gap-2 mb-6">
         <h1 className="text-3xl font-bold text-sou-blue">{title}</h1>
         <p className="text-sm text-slate-500">
           Connecté en tant que {parent?.firstName} {parent?.lastName}
+          {parent?.title ? ` — ${parent.title}` : ""}
         </p>
       </div>
 
       <nav className="flex flex-wrap gap-1 border-b border-slate-200 mb-8">
-        {ONGLETS.map((o) => {
+        {onglets.map((o) => {
           const actif = pathname === o.href;
           return (
             <Link
@@ -107,7 +117,15 @@ export default function AdminShell({ title, children }) {
         })}
       </nav>
 
-      {children(accessToken)}
+      {accesRefusePourCettePage ? (
+        <p className="text-slate-500">
+          Vous n&apos;avez pas le droit d&apos;accéder à cette section. Un
+          membre du bureau ayant le droit « Gestion des accès » peut vous
+          l&apos;accorder depuis l&apos;onglet Accès.
+        </p>
+      ) : (
+        children(accessToken, parent)
+      )}
     </section>
   );
 }

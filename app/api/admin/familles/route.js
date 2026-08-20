@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "../../../lib/adminAuth";
+import { requirePermission } from "../../../lib/adminAuth";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || "https://soumontmerle.netlify.app";
 
 export async function GET(request) {
-  const auth = await requireAdmin(request);
+  const auth = await requirePermission(request, "familles");
   if (auth.error) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
@@ -42,7 +42,7 @@ export async function GET(request) {
 // Utilisé notamment pour les familles importées dont l'invitation initiale
 // avait échoué : on ne recrée pas la famille, on ajoute juste le compte.
 export async function POST(request) {
-  const auth = await requireAdmin(request);
+  const auth = await requirePermission(request, "familles");
   if (auth.error) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }

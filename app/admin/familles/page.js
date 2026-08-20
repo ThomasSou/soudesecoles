@@ -169,9 +169,14 @@ function ListeFamilles({ token }) {
                         <li key={p.id}>
                           {p.first_name} {p.last_name}
                           <span className="text-slate-400"> — {p.email}</span>
-                          {p.role !== "parent" && (
+                          {p.title && (
+                            <span className="text-slate-400 text-xs ml-1">
+                              ({p.title})
+                            </span>
+                          )}
+                          {p.is_admin && (
                             <span className="text-sou-blue text-xs ml-1">
-                              ({p.role})
+                              · back-office
                             </span>
                           )}
                         </li>
