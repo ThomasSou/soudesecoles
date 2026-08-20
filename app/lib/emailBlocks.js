@@ -13,6 +13,7 @@ export const SITE_URL = "https://soumontmerle.netlify.app";
 export const BLOCK_TYPES = [
   { type: "heading", label: "Titre" },
   { type: "paragraph", label: "Paragraphe" },
+  { type: "colonnes", label: "2 colonnes" },
   { type: "image", label: "Image" },
   { type: "button", label: "Bouton" },
   { type: "divider", label: "Séparateur" },
@@ -25,19 +26,49 @@ export const CHAMPS_FUSION = [
   { token: "{{nom}}", label: "Nom" },
 ];
 
-export const DEFAULT_RECIPIENT = {
-  firstName: "Camille",
-  lastName: "Gour",
-  adherent: true,
+// Couleurs de texte proposées dans l'éditeur (appliquées à tout le bloc).
+export const COULEURS_TEXTE = [
+  { key: "defaut", label: "Défaut", value: null },
+  { key: "bleu", label: "Bleu", value: BLUE },
+  { key: "dore", label: "Doré", value: GOLD },
+  { key: "rouge", label: "Rouge", value: "#DC2626" },
+  { key: "vert", label: "Vert", value: "#15803D" },
+];
+
+export const TAILLES_TEXTE = {
+  paragraph: [
+    { key: "sm", label: "Petit", px: 13 },
+    { key: "md", label: "Normal", px: 15 },
+    { key: "lg", label: "Grand", px: 18 },
+  ],
+  heading: [
+    { key: "sm", label: "Petit", px: 18 },
+    { key: "md", label: "Normal", px: 22 },
+    { key: "lg", label: "Grand", px: 28 },
+  ],
 };
+
+// Emojis courants proposés dans l'éditeur (insertion au curseur, comme les
+// champs de fusion).
+export const EMOJIS = [
+  "😀", "😊", "🎉", "🎈", "🎊", "👍", "❤️", "⭐", "✅", "📅",
+  "📍", "⏰", "🍽️", "🎵", "🎨", "⚽", "🎓", "📣", "🙏", "🌟",
+];
 
 export function newBlock(type) {
   const id = `b${Date.now()}${Math.round(Math.random() * 10000)}`;
   switch (type) {
     case "heading":
-      return { id, type, text: "Bonjour {{prenom}}," };
+      return { id, type, text: "Bonjour {{prenom}},", size: "md", color: null };
     case "paragraph":
-      return { id, type, text: "Votre texte ici. Vous pouvez faire plusieurs lignes." };
+      return { id, type, text: "Votre texte ici. Vous pouvez faire plusieurs lignes.", size: "md", color: null };
+    case "colonnes":
+      return {
+        id,
+        type,
+        gauche: { kind: "texte", text: "Texte de gauche", url: "", alt: "", link: "" },
+        droite: { kind: "texte", text: "Texte de droite", url: "", alt: "", link: "" },
+      };
     case "image":
       return { id, type, url: "", alt: "", link: "" };
     case "button":
@@ -98,23 +129,74 @@ function fusion(text, recipient) {
     .replace(/\{\{\s*nom\s*\}\}/gi, recipient.lastName || "");
 }
 
-function textToHtmlParagraphs(text, recipient) {
-  return escapeHtml(fusion(text, recipient))
+// Petite mise en forme "à la markdown" appliquée APRÈS échappement HTML
+// (les caractères *, [, ], ( ne sont pas touchés par escapeHtml, donc la
+// syntaxe survit à l'échappement) : **gras** et [texte](lien).
+function appliquerMiseEnForme(html) {
+  html = html.replace(
+    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+    (m, texte, url) => `<a href="${url}" style="color:${BLUE};text-decoration:underline;">${texte}</a>`
+  );
+  html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  return html;
+}
+
+// Retire la syntaxe de mise en forme pour la version texte brut.
+function retirerMiseEnForme(text) {
+  return String(text || "")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1 ($2)")
+    .replace(/\*\*([^*]+)\*\*/g, "$1");
+}
+
+function textToHtmlParagraphs(text, recipient, { size = "md", color } = {}) {
+  const px = (TAILLES_TEXTE.paragraph.find((t) => t.key === size) || TAILLES_TEXTE.paragraph[1]).px;
+  const couleur = color || "#334155";
+  return fusion(text, recipient)
     .split(/\n+/)
     .filter((line) => line.trim().length > 0)
-    .map((line) => `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#334155;">${line}</p>`)
+    .map(
+      (line) =>
+        `<p style="margin:0 0 14px;font-size:${px}px;line-height:1.6;color:${couleur};">${appliquerMiseEnForme(
+          escapeHtml(line)
+        )}</p>`
+    )
     .join("");
 }
 
 const SPACER_HEIGHTS = { sm: 12, md: 24, lg: 48 };
 const BUTTON_COLORS = { blue: BLUE, gold: GOLD };
 
+function colonneCelluleHtml(col) {
+  if (!col) return "";
+  let inner;
+  if (col.kind === "image") {
+    if (!col.url) return "";
+    inner = `<img src="${escapeHtml(col.url)}" alt="${escapeHtml(col.alt || "")}" style="max-width:100%;display:block;border-radius:8px;" />`;
+  } else {
+    inner = `<p style="margin:0;font-size:14px;line-height:1.5;color:#334155;">${appliquerMiseEnForme(
+      escapeHtml(col.text || "")
+    )}</p>`;
+  }
+  return col.link ? `<a href="${escapeHtml(col.link)}" style="text-decoration:none;color:inherit;display:block;">${inner}</a>` : inner;
+}
+
 function blockToHtml(block, recipient) {
   switch (block.type) {
-    case "heading":
-      return `<h2 style="margin:0 0 14px;font-size:22px;line-height:1.3;color:${BLUE};font-family:Georgia,'Times New Roman',serif;">${escapeHtml(fusion(block.text, recipient))}</h2>`;
+    case "heading": {
+      const px = (TAILLES_TEXTE.heading.find((t) => t.key === block.size) || TAILLES_TEXTE.heading[1]).px;
+      const couleur = block.color || BLUE;
+      return `<h2 style="margin:0 0 14px;font-size:${px}px;line-height:1.3;color:${couleur};font-family:Georgia,'Times New Roman',serif;">${appliquerMiseEnForme(
+        escapeHtml(fusion(block.text, recipient))
+      )}</h2>`;
+    }
     case "paragraph":
-      return textToHtmlParagraphs(block.text, recipient);
+      return textToHtmlParagraphs(block.text, recipient, { size: block.size, color: block.color });
+    case "colonnes":
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;"><tr>
+        <td width="48%" valign="top" style="width:48%;">${colonneCelluleHtml(block.gauche)}</td>
+        <td width="4%">&nbsp;</td>
+        <td width="48%" valign="top" style="width:48%;">${colonneCelluleHtml(block.droite)}</td>
+      </tr></table>`;
     case "image":
       if (!block.url) return "";
       // eslint-disable-next-line no-case-declarations
@@ -132,6 +214,13 @@ function blockToHtml(block, recipient) {
       return "";
   }
 }
+
+export const DEFAULT_RECIPIENT = {
+  firstName: "Camille",
+  lastName: "Gour",
+  adherent: true,
+  parentId: null,
+};
 
 // Bandeau de statut d'adhésion, ajouté automatiquement en bas de chaque
 // e-mail envoyé à une famille (pas un bloc éditable : toujours présent).
@@ -161,6 +250,16 @@ function partenairesHtml() {
   </td></tr></table>`;
 }
 
+// Lien de désinscription (obligatoire pour un envoi de masse). Sans
+// identifiant de destinataire connu (aperçu générique), le lien pointe vers
+// une page d'information plutôt que de désinscrire quelqu'un par erreur.
+function desabonnementHtml(recipient) {
+  const url = recipient.parentId
+    ? `${SITE_URL}/api/emails/desabonner?p=${recipient.parentId}`
+    : `${SITE_URL}/contact`;
+  return `<a href="${url}" style="color:#94a3b8;text-decoration:underline;">Se désinscrire de ces e-mails</a>`;
+}
+
 // HTML complet, prêt à envoyer (table-based, styles en ligne pour la
 // compatibilité avec les clients mail), personnalisé pour un destinataire
 // donné (champs de fusion + statut d'adhésion).
@@ -183,7 +282,7 @@ export function renderBlocksToHtml(blocks, { subject, recipient } = {}) {
             <tr>
               <td style="background:${BLUE};padding:18px 32px;">
                 <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-                  <td style="padding-right:12px;"><img src="${SITE_URL}/logo/logo.png" alt="Logo" width="36" height="36" style="display:block;border-radius:50%;" /></td>
+                  <td style="padding-right:12px;"><img src="${SITE_URL}/logo/logo-email.png" alt="Logo" width="36" height="36" style="display:block;" /></td>
                   <td><span style="color:#ffffff;font-size:16px;font-weight:bold;font-family:Georgia,'Times New Roman',serif;">Sou des Écoles Montmerle-Lurcy</span></td>
                 </tr></table>
               </td>
@@ -199,10 +298,11 @@ export function renderBlocksToHtml(blocks, { subject, recipient } = {}) {
             </tr>
             <tr>
               <td style="padding:20px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;">
-                <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5;">
+                <p style="margin:0 0 8px;font-size:12px;color:#94a3b8;line-height:1.5;">
                   Vous recevez cet e-mail en tant qu'adhérent ou contact du Sou des Écoles Laïques Montmerle-Lurcy.
                   Pour toute question, répondez directement à cet e-mail.
                 </p>
+                <p style="margin:0;font-size:12px;">${desabonnementHtml(dest)}</p>
               </td>
             </tr>
           </table>
@@ -222,8 +322,13 @@ export function renderBlocksToText(blocks, { recipient } = {}) {
 
   const corps = (blocks || [])
     .map((b) => {
-      if (b.type === "heading") return `${fusion(b.text, dest)}\n${"=".repeat((b.text || "").length)}`;
-      if (b.type === "paragraph") return fusion(b.text, dest);
+      if (b.type === "heading") return `${retirerMiseEnForme(fusion(b.text, dest))}\n${"=".repeat((b.text || "").length)}`;
+      if (b.type === "paragraph") return retirerMiseEnForme(fusion(b.text, dest));
+      if (b.type === "colonnes") {
+        const g = b.gauche?.kind === "texte" ? retirerMiseEnForme(b.gauche.text || "") : "";
+        const d = b.droite?.kind === "texte" ? retirerMiseEnForme(b.droite.text || "") : "";
+        return [g, d].filter(Boolean).join("   |   ");
+      }
       if (b.type === "button") return `${fusion(b.text, dest)} : ${b.url}`;
       if (b.type === "image") return b.url ? `[Image : ${b.url}]` : "";
       return "";
@@ -231,5 +336,9 @@ export function renderBlocksToText(blocks, { recipient } = {}) {
     .filter(Boolean)
     .join("\n\n");
 
-  return `${statut}\n\n${corps}`;
+  const desabo = dest.parentId
+    ? `${SITE_URL}/api/emails/desabonner?p=${dest.parentId}`
+    : `${SITE_URL}/contact`;
+
+  return `${statut}\n\n${corps}\n\n--\nSe désinscrire : ${desabo}`;
 }

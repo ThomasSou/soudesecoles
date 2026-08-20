@@ -11,12 +11,13 @@ export async function GET(request) {
   }
   const admin = auth.admin;
 
-  const [familiesRes, parentsRes, childrenRes, membershipsRes] =
+  const [familiesRes, parentsRes, childrenRes, membershipsRes, usersRes] =
     await Promise.all([
       admin.from("families").select("*").order("created_at"),
       admin.from("parents").select("*"),
       admin.from("children").select("*"),
       admin.from("memberships").select("*"),
+      admin.auth.admin.listUsers({ perPage: 1000 }),
     ]);
 
   if (familiesRes.error) {
@@ -26,9 +27,33 @@ export async function GET(request) {
     );
   }
 
+  // Une fiche `parents` existe des la creation/l'import de la famille,
+  // independamment du compte de connexion (auth.users) : ce n'est donc pas
+  // un bon indicateur pour savoir si l'invitation a abouti. On croise avec
+  // auth.users pour savoir si le compte a vraiment ete active (connexion
+  // effective au moins une fois), ce que listUsers() expose sans avoir
+  // besoin d'une requete SQL directe sur auth.users.
+  const usersByEmail = new Map(
+    (usersRes?.data?.users || []).map((u) => [
+      (u.email || "").toLowerCase(),
+      u,
+    ])
+  );
+
+  const decoreParent = (p) => {
+    const u = usersByEmail.get((p.email || "").toLowerCase());
+    return {
+      ...p,
+      authActivated: Boolean(u?.last_sign_in_at || u?.confirmed_at),
+      authInvitedAt: u?.invited_at || null,
+    };
+  };
+
   const familles = (familiesRes.data || []).map((f) => ({
     ...f,
-    parents: (parentsRes.data || []).filter((p) => p.family_id === f.id),
+    parents: (parentsRes.data || [])
+      .filter((p) => p.family_id === f.id)
+      .map(decoreParent),
     children: (childrenRes.data || []).filter((c) => c.family_id === f.id),
     memberships: (membershipsRes.data || []).filter(
       (m) => m.family_id === f.id

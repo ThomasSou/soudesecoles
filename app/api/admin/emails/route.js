@@ -95,8 +95,10 @@ function destinatairesDe(familles) {
   for (const f of familles) {
     for (const p of f.parents) {
       if (!p.email || vus.has(p.email.toLowerCase())) continue;
+      if (p.email_opt_out) continue; // désinscrit des e-mails
       vus.add(p.email.toLowerCase());
       destinataires.push({
+        parentId: p.id,
         email: p.email,
         firstName: p.first_name,
         lastName: p.last_name,

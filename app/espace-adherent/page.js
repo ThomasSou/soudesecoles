@@ -29,6 +29,163 @@ function formatPurchaseDate(iso) {
   });
 }
 
+const TARIFS_ADHESION = [
+  { id: "jaime", label: "J'aime", montant: 17 },
+  { id: "passionnement", label: "Passionnément", montant: 20 },
+  { id: "folie", label: "À la folie", montant: 25 },
+];
+const MONTANT_LIBRE_MIN = 17;
+
+// Paiement de la cotisation directement depuis l'espace adhérent : choix
+// d'une formule (ou montant libre), puis paiement HelloAsso affiché en
+// iframe sans quitter le site.
+function AdhesionPaiement({ accessToken, onPaid }) {
+  const [choix, setChoix] = useState("jaime");
+  const [montantLibre, setMontantLibre] = useState("");
+  const [etape, setEtape] = useState("choix"); // choix | paiement | verification
+  const [redirectUrl, setRedirectUrl] = useState(null);
+  const [erreur, setErreur] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+
+  const montant =
+    choix === "libre" ? Number(montantLibre) || 0 : TARIFS_ADHESION.find((t) => t.id === choix)?.montant || 0;
+
+  useEffect(() => {
+    function onMessage(event) {
+      if (!event.data || event.data.event !== "payment_completed") return;
+      verifier();
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function verifier() {
+    setEtape("verification");
+    try {
+      const res = await fetch("/api/espace-adherent/adhesion-statut", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      if (data.paid) {
+        await onPaid();
+      } else {
+        setEtape("paiement");
+      }
+    } catch {
+      setEtape("paiement");
+    }
+  }
+
+  async function demarrer() {
+    setErreur("");
+    if (choix === "libre" && montant < MONTANT_LIBRE_MIN) {
+      setErreur(`Le montant libre est de ${MONTANT_LIBRE_MIN} € minimum.`);
+      return;
+    }
+    setEnvoi(true);
+    try {
+      const res = await fetch("/api/espace-adherent/adherer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ amountEuros: montant }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
+      setRedirectUrl(data.redirectUrl);
+      setEtape("paiement");
+    } catch (err) {
+      setErreur(err.message);
+    } finally {
+      setEnvoi(false);
+    }
+  }
+
+  if (etape === "paiement" && redirectUrl) {
+    return (
+      <div>
+        <button
+          onClick={() => setEtape("choix")}
+          className="text-sm text-slate-500 mb-3"
+        >
+          ← Choisir une autre formule
+        </button>
+        <div className="border border-slate-200 rounded-xl overflow-hidden" style={{ height: "70vh" }}>
+          <iframe src={redirectUrl} title="Paiement HelloAsso" className="w-full h-full" allow="payment" />
+        </div>
+      </div>
+    );
+  }
+
+  if (etape === "verification") {
+    return (
+      <div className="text-sm text-slate-600">
+        <p className="mb-3">Vérification du paiement en cours...</p>
+        <button
+          onClick={verifier}
+          className="bg-sou-blue text-white text-sm font-semibold px-4 py-2 rounded-full"
+        >
+          Vérifier à nouveau
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="grid sm:grid-cols-3 gap-3 mb-3">
+        {TARIFS_ADHESION.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setChoix(t.id)}
+            className={`border rounded-xl p-4 text-left transition-colors ${
+              choix === t.id ? "border-sou-blue bg-sou-blue/5" : "border-slate-200"
+            }`}
+          >
+            <p className="font-semibold text-slate-800">{t.label}</p>
+            <p className="text-sou-blue font-bold mt-1">{t.montant} €</p>
+          </button>
+        ))}
+      </div>
+      <button
+        onClick={() => setChoix("libre")}
+        className={`w-full border rounded-xl p-4 text-left mb-4 transition-colors ${
+          choix === "libre" ? "border-sou-blue bg-sou-blue/5" : "border-slate-200"
+        }`}
+      >
+        <p className="font-semibold text-slate-800">Montant libre</p>
+        {choix === "libre" && (
+          <input
+            type="number"
+            min={MONTANT_LIBRE_MIN}
+            step="1"
+            autoFocus
+            placeholder={`${MONTANT_LIBRE_MIN} € minimum`}
+            value={montantLibre}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => setMontantLibre(e.target.value)}
+            className="mt-2 border border-slate-300 rounded-lg px-3 py-2 text-sm w-40"
+          />
+        )}
+        {choix !== "libre" && (
+          <p className="text-slate-400 text-sm mt-1">À partir de {MONTANT_LIBRE_MIN} €</p>
+        )}
+      </button>
+
+      {erreur && <p className="text-sm text-red-600 mb-3">{erreur}</p>}
+
+      <button
+        onClick={demarrer}
+        disabled={envoi}
+        className="bg-sou-blue text-white font-semibold px-5 py-2.5 rounded-full hover:bg-sou-gold transition-colors text-sm disabled:opacity-50"
+      >
+        {envoi ? "Préparation du paiement..." : `Payer ${montant ? montant + " €" : ""}`}
+      </button>
+      <p className="text-xs text-slate-400 mt-2">Paiement sécurisé HelloAsso, sans quitter le site.</p>
+    </div>
+  );
+}
+
 export default function EspaceAdherentPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -168,16 +325,14 @@ export default function EspaceAdherentPage() {
               </p>
             ) : (
               <div>
-                <p className="text-slate-600 mb-3">
+                <p className="text-slate-600 mb-4">
                   Vous n'êtes pas encore adhérent pour l'année scolaire{" "}
                   {anneeEnCours}.
                 </p>
-                <a
-                  href="/contact"
-                  className="inline-block bg-sou-blue text-white font-semibold px-5 py-2.5 rounded-full hover:bg-sou-gold transition-colors text-sm"
-                >
-                  Adhérer à l'association
-                </a>
+                <AdhesionPaiement
+                  accessToken={accessToken}
+                  onPaid={() => fetchFamilyData(createClient())}
+                />
               </div>
             )}
             {memberships.length > 0 && (

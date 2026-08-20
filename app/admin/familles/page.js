@@ -29,6 +29,47 @@ function nomFamille(f) {
     : "Famille sans nom";
 }
 
+function RenvoyerInvitation({ parentId, token, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function envoyer() {
+    setBusy(true);
+    setMessage("");
+    const res = await fetch("/api/admin/familles/renvoyer-invitation", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ parentId }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) {
+      setMessage(data.error || "Erreur.");
+      return;
+    }
+    setMessage("Invitation renvoyée.");
+    onDone();
+  }
+
+  if (message) {
+    return <span className="text-xs ml-1 text-slate-500">{message}</span>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={envoyer}
+      disabled={busy}
+      className="text-xs font-semibold text-sou-blue hover:text-sou-gold ml-1 disabled:opacity-60"
+    >
+      {busy ? "Envoi..." : "Renvoyer l'invitation"}
+    </button>
+  );
+}
+
 function ListeFamilles({ token }) {
   const [familles, setFamilles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +95,12 @@ function ListeFamilles({ token }) {
     return <p className="text-slate-500">Chargement des familles...</p>;
   }
 
-  const sansCompte = familles.filter((f) => f.parents.length === 0);
+  // Une famille est "sans compte actif" si aucun de ses parents n'a
+  // jamais activé son compte de connexion (authActivated), qu'il y ait
+  // ou non une fiche `parents` en base (celle-ci existe indépendamment).
+  const sansCompte = familles.filter(
+    (f) => f.parents.length === 0 || f.parents.every((p) => !p.authActivated)
+  );
   const parFiltre = filtre === "sans-compte" ? sansCompte : familles;
 
   const q = recherche.trim().toLowerCase();
@@ -82,8 +128,9 @@ function ListeFamilles({ token }) {
           </p>
           <p className="text-sm text-amber-700 mt-1">
             Ces familles existent en base (enfants, cotisation) mais aucun
-            parent ne peut se connecter : l&apos;invitation initiale n&apos;a
-            pas abouti. Ajoutez un parent pour envoyer l&apos;invitation.
+            parent n&apos;a encore activé son compte de connexion. Utilisez
+            &laquo;&nbsp;Renvoyer l&apos;invitation&nbsp;&raquo; si un parent
+            existe déjà, ou ajoutez-en un sinon.
           </p>
         </div>
       )}
@@ -148,9 +195,12 @@ function ListeFamilles({ token }) {
                   >
                     {aJour ? `À jour ${annee}` : "Non cotisant"}
                   </span>
-                  {f.parents.length === 0 && (
+                  {(f.parents.length === 0 ||
+                    f.parents.every((p) => !p.authActivated)) && (
                     <span className="text-xs font-semibold px-3 py-1 rounded-full bg-amber-50 text-amber-700">
-                      Aucun compte
+                      {f.parents.length === 0
+                        ? "Aucun compte"
+                        : "Invitation non activée"}
                     </span>
                   )}
                 </div>
@@ -178,6 +228,18 @@ function ListeFamilles({ token }) {
                             <span className="text-sou-blue text-xs ml-1">
                               · back-office
                             </span>
+                          )}
+                          {!p.authActivated && (
+                            <>
+                              <span className="text-amber-600 text-xs ml-1">
+                                · invitation non activée
+                              </span>
+                              <RenvoyerInvitation
+                                parentId={p.id}
+                                token={token}
+                                onDone={charger}
+                              />
+                            </>
                           )}
                         </li>
                       ))}

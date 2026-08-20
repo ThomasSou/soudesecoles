@@ -13,6 +13,7 @@ export async function GET(request) {
     parent: {
       firstName: auth.parent.first_name,
       lastName: auth.parent.last_name,
+      email: auth.parent.email,
       title: auth.parent.title,
       permissions: auth.parent.permissions || {},
     },
