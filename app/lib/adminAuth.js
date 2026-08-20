@@ -8,6 +8,7 @@ export const PERMISSIONS = [
   { key: "demandes", label: "Demandes d'inscription" },
   { key: "messages", label: "Messages reçus" },
   { key: "emails", label: "Envoi d'e-mails" },
+  { key: "boutique", label: "Boutique en ligne (produits et commandes)" },
   { key: "acces", label: "Gestion des accès et permissions du bureau" },
 ];
 

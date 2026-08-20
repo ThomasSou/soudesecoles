@@ -11,6 +11,7 @@ const ONGLETS = [
   { href: "/admin/familles", label: "Familles", perm: "familles" },
   { href: "/admin/enfants", label: "Enfants", perm: "familles" },
   { href: "/admin/emails", label: "E-mails", perm: "emails" },
+  { href: "/admin/boutique", label: "Boutique", perm: "boutique" },
   { href: "/admin/messages", label: "Messages reçus", perm: "messages" },
   { href: "/admin/acces", label: "Accès", perm: "acces" },
 ];

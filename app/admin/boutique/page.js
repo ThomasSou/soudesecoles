@@ -1,0 +1,329 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import AdminShell from "../admin-shell";
+
+const VIDE_PRODUIT = { name: "", description: "", priceEuros: "", category: "", active: true };
+
+function euros(cents) {
+  return (cents / 100).toFixed(2).replace(".", ",") + " €";
+}
+
+function ProduitForm({ initial, onSubmit, onCancel, accessToken }) {
+  const [form, setForm] = useState(initial || VIDE_PRODUIT);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState("");
+  const fileRef = useRef(null);
+
+  async function televerserImage(file) {
+    const reader = new FileReader();
+    const dataUrl = await new Promise((resolve, reject) => {
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const res = await fetch("/api/admin/boutique/image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ dataUrl, filename: file.name }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Échec de l'envoi de l'image.");
+    return data.url;
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setErreur("");
+    setEnvoi(true);
+    try {
+      let imageUrl = form.imageUrl;
+      const file = fileRef.current?.files?.[0];
+      if (file) imageUrl = await televerserImage(file);
+      await onSubmit({ ...form, imageUrl });
+    } catch (err) {
+      setErreur(err.message || "Une erreur est survenue.");
+    } finally {
+      setEnvoi(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+      {erreur && <p className="text-sm text-red-600">{erreur}</p>}
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-semibold text-slate-500">Nom</label>
+          <input
+            required
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-500">Prix (€)</label>
+          <input
+            required
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.priceEuros}
+            onChange={(e) => setForm({ ...form, priceEuros: e.target.value })}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-slate-500">Description</label>
+        <textarea
+          value={form.description || ""}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          rows={2}
+        />
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-semibold text-slate-500">Catégorie (ex: Foire 2026)</label>
+          <input
+            value={form.category || ""}
+            onChange={(e) => setForm({ ...form, category: e.target.value })}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-500">Image</label>
+          <input ref={fileRef} type="file" accept="image/*" className="w-full text-sm" />
+        </div>
+      </div>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={form.active !== false}
+          onChange={(e) => setForm({ ...form, active: e.target.checked })}
+        />
+        Visible dans la boutique
+      </label>
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={envoi}
+          className="bg-sou-blue text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50"
+        >
+          {envoi ? "Enregistrement..." : "Enregistrer"}
+        </button>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="text-sm text-slate-500 px-4 py-2">
+            Annuler
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}
+
+function BoutiqueAdmin({ accessToken }) {
+  const [produits, setProduits] = useState([]);
+  const [commandes, setCommandes] = useState([]);
+  const [ongletCommandes, setOngletCommandes] = useState(false);
+  const [nouveau, setNouveau] = useState(false);
+  const [enEdition, setEnEdition] = useState(null);
+  const [chargement, setChargement] = useState(true);
+
+  const charger = useCallback(async () => {
+    setChargement(true);
+    const [pRes, cRes] = await Promise.all([
+      fetch("/api/admin/boutique/produits", { headers: { Authorization: `Bearer ${accessToken}` } }),
+      fetch("/api/admin/boutique/commandes", { headers: { Authorization: `Bearer ${accessToken}` } }),
+    ]);
+    const pData = await pRes.json();
+    const cData = await cRes.json();
+    setProduits(pData.products || []);
+    setCommandes(cData.orders || []);
+    setChargement(false);
+  }, [accessToken]);
+
+  useEffect(() => {
+    charger();
+  }, [charger]);
+
+  async function creer(form) {
+    const res = await fetch("/api/admin/boutique/produits", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify(form),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    setNouveau(false);
+    charger();
+  }
+
+  async function modifier(id, form) {
+    const res = await fetch(`/api/admin/boutique/produits/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify(form),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    setEnEdition(null);
+    charger();
+  }
+
+  async function supprimer(id) {
+    if (!confirm("Supprimer ce produit ?")) return;
+    await fetch(`/api/admin/boutique/produits/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    charger();
+  }
+
+  if (chargement) return <p className="text-slate-500 text-sm">Chargement...</p>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2 text-sm font-semibold">
+        <button
+          onClick={() => setOngletCommandes(false)}
+          className={`px-3 py-1.5 rounded-full ${!ongletCommandes ? "bg-sou-blue text-white" : "bg-slate-100 text-slate-600"}`}
+        >
+          Produits
+        </button>
+        <button
+          onClick={() => setOngletCommandes(true)}
+          className={`px-3 py-1.5 rounded-full ${ongletCommandes ? "bg-sou-blue text-white" : "bg-slate-100 text-slate-600"}`}
+        >
+          Commandes ({commandes.length})
+        </button>
+      </div>
+
+      {!ongletCommandes ? (
+        <div className="space-y-4">
+          {!nouveau && (
+            <button
+              onClick={() => setNouveau(true)}
+              className="bg-sou-blue text-white text-sm font-semibold px-4 py-2 rounded-lg"
+            >
+              + Ajouter un produit
+            </button>
+          )}
+          {nouveau && (
+            <ProduitForm
+              accessToken={accessToken}
+              onSubmit={creer}
+              onCancel={() => setNouveau(false)}
+            />
+          )}
+
+          <div className="space-y-3">
+            {produits.map((p) =>
+              enEdition === p.id ? (
+                <ProduitForm
+                  key={p.id}
+                  accessToken={accessToken}
+                  initial={{
+                    name: p.name,
+                    description: p.description,
+                    priceEuros: (p.price_cents / 100).toString(),
+                    category: p.category,
+                    active: p.active,
+                    imageUrl: p.image_url,
+                  }}
+                  onSubmit={(form) => modifier(p.id, form)}
+                  onCancel={() => setEnEdition(null)}
+                />
+              ) : (
+                <div
+                  key={p.id}
+                  className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-4"
+                >
+                  {p.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.image_url} alt="" className="w-14 h-14 object-cover rounded-lg" />
+                  ) : (
+                    <div className="w-14 h-14 bg-slate-100 rounded-lg" />
+                  )}
+                  <div className="flex-1">
+                    <p className="font-semibold text-slate-800">
+                      {p.name}{" "}
+                      {!p.active && <span className="text-xs text-slate-400">(masqué)</span>}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {p.category || "Sans catégorie"} · {euros(p.price_cents)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setEnEdition(p.id)}
+                    className="text-sm text-sou-blue font-semibold"
+                  >
+                    Modifier
+                  </button>
+                  <button onClick={() => supprimer(p.id)} className="text-sm text-red-600">
+                    Supprimer
+                  </button>
+                </div>
+              )
+            )}
+            {produits.length === 0 && (
+              <p className="text-sm text-slate-500">Aucun produit pour le moment.</p>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {commandes.map((c) => (
+            <div key={c.id} className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-semibold text-slate-800">
+                    {c.buyer_first_name} {c.buyer_last_name}{" "}
+                    <span className="text-xs text-slate-400">({c.buyer_email})</span>
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {(c.items || []).map((it) => `${it.qty}x ${it.name}`).join(", ")}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold text-sou-blue">{euros(c.total_cents)}</p>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full ${
+                      c.status === "paid"
+                        ? "bg-green-100 text-green-700"
+                        : c.status === "failed" || c.status === "cancelled"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    {c.status === "paid" ? "Payée" : c.status === "pending" ? "En attente" : c.status}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+          {commandes.length === 0 && (
+            <p className="text-sm text-slate-500">Aucune commande pour le moment.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function AdminBoutiquePage() {
+  return (
+    <AdminShell title="Boutique">
+      {(accessToken) => (
+        <div>
+          <h1 className="text-2xl font-bold text-sou-blue mb-1">Boutique en ligne</h1>
+          <p className="text-slate-500 text-sm mb-6">
+            Produits proposés à la vente sur /boutique et suivi des commandes réglées via HelloAsso.
+          </p>
+          <BoutiqueAdmin accessToken={accessToken} />
+        </div>
+      )}
+    </AdminShell>
+  );
+}
