@@ -1,13 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
+import { EVENTS, formatEventDates, sortEvents } from "./evenements/data";
 
-const EVENTS_PREVIEW = [
-  { name: "Loto", period: "Hiver" },
-  { name: "Marché de Noël", period: "Décembre" },
-  { name: "Montmerle part en Live", period: "Mai" },
-  { name: "Vide-greniers", period: "Printemps" },
-  { name: "Fête de l'école", period: "Juin" },
-];
+const EVENTS_PREVIEW = sortEvents(EVENTS).slice(0, 5);
 
 export default function HomePage() {
   return (
@@ -59,19 +54,35 @@ export default function HomePage() {
           Nos prochains temps forts
         </h2>
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          {EVENTS_PREVIEW.map((e) => (
-            <div
-              key={e.name}
-              className="border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow"
-            >
-              <p className="font-semibold text-sou-blue">{e.name}</p>
-              <p className="text-sm text-slate-500 mt-1">{e.period}</p>
-            </div>
-          ))}
+          {EVENTS_PREVIEW.map((e) => {
+            const contenu = (
+              <>
+                <p className="font-semibold text-sou-blue">{e.name}</p>
+                <p className="text-sm text-slate-500 mt-1">
+                  {formatEventDates(e)}
+                </p>
+              </>
+            );
+            return e.hasPage ? (
+              <Link
+                key={e.slug}
+                href={`/evenements/${e.slug}`}
+                className="border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow"
+              >
+                {contenu}
+              </Link>
+            ) : (
+              <div
+                key={e.slug}
+                className="border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow"
+              >
+                {contenu}
+              </div>
+            );
+          })}
         </div>
         <p className="text-sm text-slate-500 mt-6">
-          Calendrier détaillé et dates précises bientôt disponibles sur la
-          page{" "}
+          Calendrier complet sur la page{" "}
           <Link href="/evenements" className="underline text-sou-blue">
             Événements
           </Link>

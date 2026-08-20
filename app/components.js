@@ -41,12 +41,18 @@ export function Header() {
           Espace adhérent
         </Link>
       </div>
-      <nav className="md:hidden flex overflow-x-auto gap-4 px-4 pb-3 text-sm font-medium text-slate-700">
+      <nav className="md:hidden flex items-center overflow-x-auto gap-4 px-4 pb-3 text-sm font-medium text-slate-700">
         {NAV_LINKS.map((l) => (
           <Link key={l.href} href={l.href} className="whitespace-nowrap hover:text-sou-blue">
             {l.label}
           </Link>
         ))}
+        <Link
+          href="/espace-adherent"
+          className="whitespace-nowrap shrink-0 bg-sou-blue text-white text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-sou-gold transition-colors"
+        >
+          Espace adhérent
+        </Link>
       </nav>
     </header>
   );
