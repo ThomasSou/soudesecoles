@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../lib/adminAuth";
 import { CONTACT_EMAIL, isMailConfigured, sendMail } from "../../../lib/mail";
 import { currentSchoolYear, isMembershipValid } from "../../../lib/anneeScolaire";
+import { renderBlocksToHtml, renderBlocksToText } from "../../../lib/emailBlocks";
 
 const MATERNELLE = ["PS", "MS", "GS", "TPS"];
 const ELEMENTAIRE = ["CP", "CE1", "CE2", "CM1", "CM2"];
@@ -12,41 +13,45 @@ function tokensDeClasse(classLevel) {
 
 // Calcule la liste des familles correspondant au segment demandé, à partir
 // des tables families/parents/children/memberships (mêmes données que
-// /api/admin/familles).
+// /api/admin/familles). Ajoute le statut d'adhésion (aJour) sur chaque
+// famille, réutilisé ensuite pour personnaliser chaque e-mail.
 function famillesCorrespondantes(familles, segment) {
   const annee = currentSchoolYear();
   const { scope, classes = [], niveaux = [], adherents = "tous" } = segment || {};
 
-  return familles.filter((f) => {
-    if (f.parents.length === 0) return false;
-
-    if (adherents !== "tous") {
+  return familles
+    .map((f) => {
       const adhesion = f.memberships.find((m) => m.school_year === annee);
-      const aJour = isMembershipValid(adhesion);
-      if (adherents === "adherents" && !aJour) return false;
-      if (adherents === "non_adherents" && aJour) return false;
-    }
+      return { ...f, aJour: isMembershipValid(adhesion) };
+    })
+    .filter((f) => {
+      if (f.parents.length === 0) return false;
 
-    if (scope === "toute") return true;
+      if (adherents !== "tous") {
+        if (adherents === "adherents" && !f.aJour) return false;
+        if (adherents === "non_adherents" && f.aJour) return false;
+      }
 
-    const classesEnfants = f.children.map((c) => c.class_level || "");
-    if (classes.length > 0) {
-      const ok = classesEnfants.some((cl) => classes.includes(cl));
-      if (ok) return true;
-    }
-    if (niveaux.length > 0) {
-      const ok = classesEnfants.some((cl) => {
-        const tokens = tokensDeClasse(cl);
-        if (niveaux.includes("maternelle") && tokens.some((t) => MATERNELLE.includes(t))) return true;
-        if (niveaux.includes("elementaire") && tokens.some((t) => ELEMENTAIRE.includes(t))) return true;
-        return false;
-      });
-      if (ok) return true;
-    }
-    // Aucun filtre classe/niveau coché : ne restreint pas sur ce critère.
-    if (classes.length === 0 && niveaux.length === 0) return true;
-    return false;
-  });
+      if (scope === "toute") return true;
+
+      const classesEnfants = f.children.map((c) => c.class_level || "");
+      if (classes.length > 0) {
+        const ok = classesEnfants.some((cl) => classes.includes(cl));
+        if (ok) return true;
+      }
+      if (niveaux.length > 0) {
+        const ok = classesEnfants.some((cl) => {
+          const tokens = tokensDeClasse(cl);
+          if (niveaux.includes("maternelle") && tokens.some((t) => MATERNELLE.includes(t))) return true;
+          if (niveaux.includes("elementaire") && tokens.some((t) => ELEMENTAIRE.includes(t))) return true;
+          return false;
+        });
+        if (ok) return true;
+      }
+      // Aucun filtre classe/niveau coché : ne restreint pas sur ce critère.
+      if (classes.length === 0 && niveaux.length === 0) return true;
+      return false;
+    });
 }
 
 function resumeSegment(segment) {
@@ -81,6 +86,9 @@ async function chargerFamilles(admin) {
   return familles;
 }
 
+// Un destinataire par parent (pas par famille) : le prénom qui apparaît
+// dans "Bonjour {{prenom}}" doit être celui de la personne qui reçoit
+// l'e-mail, pas celui de son conjoint.
 function destinatairesDe(familles) {
   const vus = new Set();
   const destinataires = [];
@@ -92,6 +100,7 @@ function destinatairesDe(familles) {
         email: p.email,
         firstName: p.first_name,
         lastName: p.last_name,
+        adherent: f.aJour,
       });
     }
   }
@@ -125,14 +134,17 @@ export async function GET(request) {
 }
 
 // Calcule un aperçu des destinataires (dryRun) ou envoie réellement le
-// message à toutes les familles du segment.
+// message à toutes les familles du segment. Le contenu (contentBlocks) est
+// rendu séparément pour chaque destinataire : champs de fusion (prénom,
+// nom) et bandeau d'adhésion personnalisés, logo et logos partenaires
+// ajoutés automatiquement (cf. app/lib/emailBlocks.js).
 export async function POST(request) {
   const auth = await requirePermission(request, "emails");
   if (auth.error) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const { segment, subject, message, html, contentBlocks, dryRun } = await request.json();
+  const { segment, subject, contentBlocks, dryRun } = await request.json();
 
   const familles = await chargerFamilles(auth.admin);
   const correspondantes = famillesCorrespondantes(familles, segment);
@@ -146,9 +158,10 @@ export async function POST(request) {
     });
   }
 
-  if (!subject?.trim() || !message?.trim()) {
+  const blocks = contentBlocks || [];
+  if (!subject?.trim() || blocks.length === 0) {
     return NextResponse.json(
-      { error: "Sujet et message obligatoires." },
+      { error: "Sujet et contenu obligatoires." },
       { status: 400 }
     );
   }
@@ -161,19 +174,22 @@ export async function POST(request) {
       const res = await sendMail({
         to: dest.email,
         subject,
-        text: message,
-        html,
+        text: renderBlocksToText(blocks, { recipient: dest }),
+        html: renderBlocksToHtml(blocks, { subject, recipient: dest }),
         replyTo: CONTACT_EMAIL,
       });
       if (res.sent) sentCount += 1;
     }
   }
 
+  // Aperçu générique (destinataire type) conservé pour l'historique / la
+  // reprise d'une campagne passée — l'e-mail réellement envoyé à chacun
+  // était personnalisé.
   await auth.admin.from("email_campaigns").insert({
     subject,
-    message,
-    html: html || null,
-    content_blocks: contentBlocks || [],
+    message: renderBlocksToText(blocks),
+    html: renderBlocksToHtml(blocks, { subject }),
+    content_blocks: blocks,
     segment: segment || {},
     segment_summary: resumeSegment(segment),
     recipients_count: destinataires.length,

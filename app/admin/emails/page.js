@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminShell from "../admin-shell";
 import {
   BLOCK_TYPES,
+  CHAMPS_FUSION,
+  DEFAULT_RECIPIENT,
   TEMPLATES,
   newBlock,
   renderBlocksToHtml,
@@ -34,6 +36,7 @@ function EnvoiEmails({ token }) {
   const [adherents, setAdherents] = useState("tous");
   const [subject, setSubject] = useState("");
   const [blocks, setBlocks] = useState(() => TEMPLATES[0].blocks());
+  const [previewAdherent, setPreviewAdherent] = useState(true);
 
   const [apercu, setApercu] = useState(null);
   const [busyApercu, setBusyApercu] = useState(false);
@@ -84,12 +87,23 @@ function EnvoiEmails({ token }) {
     setApercu(data);
   }
 
-  const html = useMemo(() => renderBlocksToHtml(blocks, { subject }), [blocks, subject]);
-  const text = useMemo(() => renderBlocksToText(blocks), [blocks]);
+  const previewRecipient = useMemo(
+    () => ({ ...DEFAULT_RECIPIENT, adherent: previewAdherent }),
+    [previewAdherent]
+  );
+  const html = useMemo(
+    () => renderBlocksToHtml(blocks, { subject, recipient: previewRecipient }),
+    [blocks, subject, previewRecipient]
+  );
+  const contenuVide = blocks.every((b) => {
+    if (b.type === "heading" || b.type === "paragraph") return !b.text?.trim();
+    if (b.type === "button" || b.type === "image") return !b.url?.trim();
+    return true;
+  });
 
   async function envoyer() {
-    if (!subject.trim() || !text.trim()) {
-      setError("Merci de renseigner le sujet et au moins un bloc de texte.");
+    if (!subject.trim() || contenuVide) {
+      setError("Merci de renseigner le sujet et au moins un bloc avec du contenu.");
       return;
     }
     setBusyEnvoi(true);
@@ -101,8 +115,6 @@ function EnvoiEmails({ token }) {
       body: JSON.stringify({
         segment: segment(),
         subject,
-        message: text,
-        html,
         contentBlocks: blocks,
       }),
     });
@@ -245,6 +257,11 @@ function EnvoiEmails({ token }) {
           </div>
         </div>
 
+        <p className="text-xs text-slate-500 mb-3">
+          Logo, statut d&apos;adhésion et logos des partenaires sont ajoutés automatiquement en haut et en bas de
+          chaque e-mail.
+        </p>
+
         <input
           type="text"
           placeholder="Sujet de l'e-mail"
@@ -257,7 +274,27 @@ function EnvoiEmails({ token }) {
           <EditeurBlocs blocks={blocks} setBlocks={setBlocks} token={token} />
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Aperçu</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Aperçu</p>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setPreviewAdherent(true)}
+                  className={`text-xs px-2.5 py-1 rounded-full border ${
+                    previewAdherent ? "border-sou-blue text-sou-blue" : "border-slate-300 text-slate-500"
+                  }`}
+                >
+                  Vue adhérent
+                </button>
+                <button
+                  onClick={() => setPreviewAdherent(false)}
+                  className={`text-xs px-2.5 py-1 rounded-full border ${
+                    !previewAdherent ? "border-sou-blue text-sou-blue" : "border-slate-300 text-slate-500"
+                  }`}
+                >
+                  Vue non-adhérent
+                </button>
+              </div>
+            </div>
             <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-100" style={{ height: 520 }}>
               <iframe title="Aperçu de l'e-mail" srcDoc={html} className="w-full h-full" style={{ border: "none" }} />
             </div>
@@ -394,8 +431,45 @@ function EditeurBlocs({ blocks, setBlocks, token }) {
   );
 }
 
+// Insère un champ de fusion ({{prenom}}, {{nom}}) à l'endroit du curseur
+// dans un input/textarea, plutôt qu'à la fin du texte.
+function inserer(ref, valeur, token, onChange) {
+  const el = ref.current;
+  if (!el) {
+    onChange({ text: `${valeur}${token}` });
+    return;
+  }
+  const start = el.selectionStart ?? valeur.length;
+  const end = el.selectionEnd ?? valeur.length;
+  const nouveau = `${valeur.slice(0, start)}${token}${valeur.slice(end)}`;
+  onChange({ text: nouveau });
+  requestAnimationFrame(() => {
+    el.focus();
+    const pos = start + token.length;
+    el.setSelectionRange(pos, pos);
+  });
+}
+
+function ChampsFusion({ inputRef, value, onChange }) {
+  return (
+    <div className="flex flex-wrap gap-1 mb-1.5">
+      {CHAMPS_FUSION.map((c) => (
+        <button
+          key={c.token}
+          type="button"
+          onClick={() => inserer(inputRef, value, c.token, onChange)}
+          className="text-[11px] px-2 py-0.5 rounded-full border border-slate-300 text-slate-500 hover:border-sou-blue hover:text-sou-blue"
+        >
+          + {c.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function BlocCard({ block, token, onChange, onRemove, onDuplicate, onUp, onDown }) {
   const fileInput = useRef(null);
+  const textInput = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
@@ -443,21 +517,29 @@ function BlocCard({ block, token, onChange, onRemove, onDuplicate, onUp, onDown 
       </div>
 
       {block.type === "heading" && (
-        <input
-          type="text"
-          value={block.text}
-          onChange={(e) => onChange({ text: e.target.value })}
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-        />
+        <div>
+          <ChampsFusion inputRef={textInput} value={block.text} onChange={onChange} />
+          <input
+            ref={textInput}
+            type="text"
+            value={block.text}
+            onChange={(e) => onChange({ text: e.target.value })}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
       )}
 
       {block.type === "paragraph" && (
-        <textarea
-          value={block.text}
-          onChange={(e) => onChange({ text: e.target.value })}
-          rows={3}
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-        />
+        <div>
+          <ChampsFusion inputRef={textInput} value={block.text} onChange={onChange} />
+          <textarea
+            ref={textInput}
+            value={block.text}
+            onChange={(e) => onChange({ text: e.target.value })}
+            rows={3}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
       )}
 
       {block.type === "image" && (
