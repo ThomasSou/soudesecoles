@@ -16,6 +16,7 @@ const COLONNES = [
   { key: "lastName", label: "Nom" },
   { key: "firstName", label: "Prénom" },
   { key: "classLevel", label: "Classe" },
+  { key: "teacherName", label: "Professeur" },
   { key: "familyName", label: "Famille" },
   { key: "aJour", label: "Cotisation" },
 ];
@@ -61,6 +62,7 @@ function ListeEnfants({ token }) {
         firstName: c.first_name || "",
         lastName: c.last_name || "",
         classLevel: c.class_level || "",
+        teacherName: c.teacher_name || "",
         schoolYear: c.school_year || "",
         familyName,
         familyId: f.id,
@@ -83,7 +85,8 @@ function ListeEnfants({ token }) {
         e.firstName.toLowerCase().includes(q) ||
         e.lastName.toLowerCase().includes(q) ||
         e.familyName.toLowerCase().includes(q) ||
-        e.classLevel.toLowerCase().includes(q)
+        e.classLevel.toLowerCase().includes(q) ||
+        e.teacherName.toLowerCase().includes(q)
       );
     });
   }, [enfants, recherche, classe]);
@@ -160,6 +163,7 @@ function ListeEnfants({ token }) {
                 <td className="px-4 py-2">{e.lastName}</td>
                 <td className="px-4 py-2">{e.firstName}</td>
                 <td className="px-4 py-2">{e.classLevel || "—"}</td>
+                <td className="px-4 py-2">{e.teacherName || "—"}</td>
                 <td className="px-4 py-2">{e.familyName}</td>
                 <td className="px-4 py-2">
                   <span
@@ -176,7 +180,7 @@ function ListeEnfants({ token }) {
             ))}
             {tries.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
                   Aucun enfant ne correspond à cette recherche.
                 </td>
               </tr>
