@@ -1,8 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import AdminShell from "../admin-shell";
 import { currentSchoolYear, isMembershipValid } from "../../lib/anneeScolaire";
+
+const PAYMENT_LABELS = {
+  cheque: "Chèque",
+  especes: "Espèces",
+  sumup: "Carte bancaire",
+  helloasso: "HelloAsso",
+};
 
 export default function AdminFamillesPage() {
   return (
@@ -12,11 +19,22 @@ export default function AdminFamillesPage() {
   );
 }
 
+function nomFamille(f) {
+  return f.parents.length > 0
+    ? f.parents
+        .map((p) => `${p.first_name || ""} ${p.last_name || ""}`.trim())
+        .join(" & ")
+    : f.children.length > 0
+    ? `Famille ${f.children[0].last_name}`
+    : "Famille sans nom";
+}
+
 function ListeFamilles({ token }) {
   const [familles, setFamilles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [ouvert, setOuvert] = useState(null);
   const [filtre, setFiltre] = useState("toutes");
+  const [recherche, setRecherche] = useState("");
 
   const charger = useCallback(async () => {
     if (!token) return;
@@ -37,8 +55,21 @@ function ListeFamilles({ token }) {
   }
 
   const sansCompte = familles.filter((f) => f.parents.length === 0);
-  const visibles =
-    filtre === "sans-compte" ? sansCompte : familles;
+  const parFiltre = filtre === "sans-compte" ? sansCompte : familles;
+
+  const q = recherche.trim().toLowerCase();
+  const visibles = !q
+    ? parFiltre
+    : parFiltre.filter((f) => {
+        const dansParents = f.parents.some((p) =>
+          `${p.first_name || ""} ${p.last_name || ""}`.toLowerCase().includes(q)
+        );
+        const dansEnfants = f.children.some((c) =>
+          `${c.first_name || ""} ${c.last_name || ""}`.toLowerCase().includes(q)
+        );
+        return dansParents || dansEnfants || nomFamille(f).toLowerCase().includes(q);
+      });
+
   const annee = currentSchoolYear();
 
   return (
@@ -56,6 +87,16 @@ function ListeFamilles({ token }) {
           </p>
         </div>
       )}
+
+      <div className="flex flex-wrap gap-3 mb-4">
+        <input
+          type="text"
+          placeholder="Rechercher une famille par nom de parent ou d'enfant..."
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+          className="flex-1 min-w-[260px] border border-slate-300 rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
 
       <div className="flex gap-2 mb-6">
         {[
@@ -76,18 +117,15 @@ function ListeFamilles({ token }) {
         ))}
       </div>
 
+      <p className="text-sm text-slate-500 mb-3">
+        {visibles.length} famille{visibles.length > 1 ? "s" : ""}
+      </p>
+
       <div className="space-y-4">
         {visibles.map((f) => {
           const adhesion = f.memberships.find((m) => m.school_year === annee);
           const aJour = isMembershipValid(adhesion);
-          const nom =
-            f.parents.length > 0
-              ? f.parents
-                  .map((p) => `${p.first_name || ""} ${p.last_name || ""}`.trim())
-                  .join(" & ")
-              : f.children.length > 0
-              ? `Famille ${f.children[0].last_name}`
-              : "Famille sans nom";
+          const nom = nomFamille(f);
 
           return (
             <div key={f.id} className="border border-slate-200 rounded-xl p-5">
@@ -159,10 +197,11 @@ function ListeFamilles({ token }) {
                 </div>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-4 items-center">
-                <BoutonCotisation
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                <EncaissementCotisation
                   famille={f}
                   annee={annee}
+                  adhesion={adhesion}
                   aJour={aJour}
                   token={token}
                   onDone={charger}
@@ -192,6 +231,11 @@ function ListeFamilles({ token }) {
             </div>
           );
         })}
+        {visibles.length === 0 && (
+          <p className="text-slate-400 italic">
+            Aucune famille ne correspond à cette recherche.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -281,12 +325,20 @@ function FormulaireParent({ familyId, token, onDone, onCancel }) {
   );
 }
 
-
-function BoutonCotisation({ famille, annee, aJour, token, onDone }) {
+// Encaissement d'une cotisation : recherche déjà faite au niveau de la liste
+// des familles (par nom de parent ou d'enfant). Ici on saisit juste le
+// montant reçu et le moyen de paiement (chèque en priorité, lors des
+// permanences), ce qui confirme l'adhésion de la famille pour l'année.
+function EncaissementCotisation({ famille, annee, adhesion, aJour, token, onDone }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [montant, setMontant] = useState("20");
+  const [moyen, setMoyen] = useState("cheque");
+  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  async function basculer() {
+  async function confirmer(e) {
+    e.preventDefault();
     setBusy(true);
     setError("");
     const res = await fetch("/api/admin/adhesions", {
@@ -298,9 +350,32 @@ function BoutonCotisation({ famille, annee, aJour, token, onDone }) {
       body: JSON.stringify({
         familyId: famille.id,
         schoolYear: annee,
-        amount: aJour ? null : 20,
-        paid: !aJour,
+        amount: montant,
+        paid: true,
+        paymentMethod: moyen,
+        note,
       }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) {
+      setError(data.error || "Erreur.");
+      return;
+    }
+    setOuvert(false);
+    onDone();
+  }
+
+  async function annuler() {
+    setBusy(true);
+    setError("");
+    const res = await fetch("/api/admin/adhesions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ familyId: famille.id, schoolYear: annee, paid: false }),
     });
     const data = await res.json();
     setBusy(false);
@@ -311,24 +386,92 @@ function BoutonCotisation({ famille, annee, aJour, token, onDone }) {
     onDone();
   }
 
-  return (
-    <div>
+  if (aJour) {
+    return (
+      <div>
+        <p className="text-sm text-slate-500">
+          Cotisation {annee} encaissée
+          {adhesion?.amount != null ? ` — ${Number(adhesion.amount).toFixed(2)} €` : ""}
+          {adhesion?.payment_method
+            ? ` par ${PAYMENT_LABELS[adhesion.payment_method] || adhesion.payment_method}`
+            : ""}
+          {adhesion?.note ? ` (${adhesion.note})` : ""}
+        </p>
+        <button
+          onClick={annuler}
+          disabled={busy}
+          className="mt-1 text-sm font-semibold text-slate-500 hover:text-red-600 disabled:opacity-60"
+        >
+          Annuler l&apos;encaissement
+        </button>
+        {error && <p className="text-red-600 text-xs mt-1">{error}</p>}
+      </div>
+    );
+  }
+
+  if (!ouvert) {
+    return (
       <button
-        onClick={basculer}
-        disabled={busy}
-        className={`text-sm font-semibold px-4 py-1.5 rounded-full transition-colors disabled:opacity-60 ${
-          aJour
-            ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            : "bg-green-600 text-white hover:bg-green-700"
-        }`}
+        onClick={() => setOuvert(true)}
+        className="text-sm font-semibold px-4 py-1.5 rounded-full bg-green-600 text-white hover:bg-green-700 transition-colors"
       >
-        {busy
-          ? "..."
-          : aJour
-          ? `Annuler la cotisation ${annee}`
-          : `Encaisser la cotisation ${annee} (20 €)`}
+        Encaisser la cotisation {annee}
       </button>
-      {error && <p className="text-red-600 text-xs mt-1">{error}</p>}
-    </div>
+    );
+  }
+
+  return (
+    <form onSubmit={confirmer} className="flex flex-wrap items-end gap-3">
+      <div>
+        <label className="block text-xs text-slate-500 mb-1">Montant reçu</label>
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          required
+          value={montant}
+          onChange={(e) => setMontant(e.target.value)}
+          className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-28"
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-slate-500 mb-1">Moyen de paiement</label>
+        <select
+          value={moyen}
+          onChange={(e) => setMoyen(e.target.value)}
+          className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="cheque">Chèque</option>
+          <option value="especes">Espèces</option>
+          <option value="sumup">Carte bancaire</option>
+          <option value="helloasso">HelloAsso</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs text-slate-500 mb-1">Note (optionnel)</label>
+        <input
+          type="text"
+          placeholder="ex : n° de chèque"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={busy}
+        className="bg-green-600 text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-green-700 transition-colors disabled:opacity-60"
+      >
+        {busy ? "Enregistrement..." : "Confirmer l'adhésion"}
+      </button>
+      <button
+        type="button"
+        onClick={() => setOuvert(false)}
+        className="text-sm text-slate-500 px-2 py-2"
+      >
+        Annuler
+      </button>
+      {error && <p className="text-red-600 text-xs w-full">{error}</p>}
+    </form>
   );
 }
