@@ -132,7 +132,7 @@ export async function POST(request) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const { segment, subject, message, dryRun } = await request.json();
+  const { segment, subject, message, html, contentBlocks, dryRun } = await request.json();
 
   const familles = await chargerFamilles(auth.admin);
   const correspondantes = famillesCorrespondantes(familles, segment);
@@ -162,6 +162,7 @@ export async function POST(request) {
         to: dest.email,
         subject,
         text: message,
+        html,
         replyTo: CONTACT_EMAIL,
       });
       if (res.sent) sentCount += 1;
@@ -171,6 +172,8 @@ export async function POST(request) {
   await auth.admin.from("email_campaigns").insert({
     subject,
     message,
+    html: html || null,
+    content_blocks: contentBlocks || [],
     segment: segment || {},
     segment_summary: resumeSegment(segment),
     recipients_count: destinataires.length,

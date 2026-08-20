@@ -1,7 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminShell from "../admin-shell";
+import {
+  BLOCK_TYPES,
+  TEMPLATES,
+  newBlock,
+  renderBlocksToHtml,
+  renderBlocksToText,
+} from "../../lib/emailBlocks";
 
 export default function AdminEmailsPage() {
   return (
@@ -26,7 +33,7 @@ function EnvoiEmails({ token }) {
   const [niveaux, setNiveaux] = useState([]);
   const [adherents, setAdherents] = useState("tous");
   const [subject, setSubject] = useState("");
-  const [message, setMessage] = useState("");
+  const [blocks, setBlocks] = useState(() => TEMPLATES[0].blocks());
 
   const [apercu, setApercu] = useState(null);
   const [busyApercu, setBusyApercu] = useState(false);
@@ -77,9 +84,12 @@ function EnvoiEmails({ token }) {
     setApercu(data);
   }
 
+  const html = useMemo(() => renderBlocksToHtml(blocks, { subject }), [blocks, subject]);
+  const text = useMemo(() => renderBlocksToText(blocks), [blocks]);
+
   async function envoyer() {
-    if (!subject.trim() || !message.trim()) {
-      setError("Merci de renseigner le sujet et le message.");
+    if (!subject.trim() || !text.trim()) {
+      setError("Merci de renseigner le sujet et au moins un bloc de texte.");
       return;
     }
     setBusyEnvoi(true);
@@ -88,7 +98,13 @@ function EnvoiEmails({ token }) {
     const res = await fetch("/api/admin/emails", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ segment: segment(), subject, message }),
+      body: JSON.stringify({
+        segment: segment(),
+        subject,
+        message: text,
+        html,
+        contentBlocks: blocks,
+      }),
     });
     const data = await res.json();
     setBusyEnvoi(false);
@@ -99,8 +115,14 @@ function EnvoiEmails({ token }) {
     setResultat(data);
     setApercu(null);
     setSubject("");
-    setMessage("");
+    setBlocks(TEMPLATES[0].blocks());
     charger();
+  }
+
+  function reprendreCampagne(c) {
+    setSubject(c.subject);
+    setBlocks(c.content_blocks && c.content_blocks.length > 0 ? c.content_blocks : [newBlock("paragraph")]);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   if (loading) {
@@ -207,23 +229,42 @@ function EnvoiEmails({ token }) {
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold text-sou-blue mb-4">Message</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h2 className="text-lg font-semibold text-sou-blue">Message</h2>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500">Commencer avec un modèle :</span>
+            {TEMPLATES.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setBlocks(t.blocks())}
+                className="text-xs px-2.5 py-1 rounded-full border border-slate-300 text-slate-600 hover:border-sou-blue hover:text-sou-blue"
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <input
           type="text"
-          placeholder="Sujet"
+          placeholder="Sujet de l'e-mail"
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-3"
-        />
-        <textarea
-          placeholder="Votre message..."
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={6}
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-4"
         />
 
-        {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <EditeurBlocs blocks={blocks} setBlocks={setBlocks} token={token} />
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Aperçu</p>
+            <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-100" style={{ height: 520 }}>
+              <iframe title="Aperçu de l'e-mail" srcDoc={html} className="w-full h-full" style={{ border: "none" }} />
+            </div>
+          </div>
+        </div>
+
+        {error && <p className="text-red-600 text-sm mt-4">{error}</p>}
 
         <button
           onClick={envoyer}
@@ -261,20 +302,261 @@ function EnvoiEmails({ token }) {
         ) : (
           <div className="space-y-3">
             {campagnes.map((c) => (
-              <div key={c.id} className="border border-slate-200 rounded-xl p-4 text-sm">
-                <p className="font-semibold text-sou-blue">{c.subject}</p>
-                <p className="text-slate-500">
-                  {c.segment_summary} — {c.sent_count}/{c.recipients_count} destinataire(s)
-                  {!c.mail_configured && " (brouillon, SMTP non configuré au moment de l'envoi)"}
-                </p>
-                <p className="text-slate-400 text-xs mt-1">
-                  {new Date(c.created_at).toLocaleString("fr-FR")}
-                </p>
+              <div key={c.id} className="border border-slate-200 rounded-xl p-4 text-sm flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-sou-blue">{c.subject}</p>
+                  <p className="text-slate-500">
+                    {c.segment_summary} — {c.sent_count}/{c.recipients_count} destinataire(s)
+                    {!c.mail_configured && " (brouillon, SMTP non configuré au moment de l'envoi)"}
+                  </p>
+                  <p className="text-slate-400 text-xs mt-1">
+                    {new Date(c.created_at).toLocaleString("fr-FR")}
+                  </p>
+                </div>
+                <button
+                  onClick={() => reprendreCampagne(c)}
+                  className="text-xs font-semibold text-sou-blue hover:text-sou-gold whitespace-nowrap"
+                >
+                  Reprendre
+                </button>
               </div>
             ))}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function EditeurBlocs({ blocks, setBlocks, token }) {
+  function update(id, patch) {
+    setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  }
+  function remove(id) {
+    setBlocks((prev) => prev.filter((b) => b.id !== id));
+  }
+  function duplicate(id) {
+    setBlocks((prev) => {
+      const i = prev.findIndex((b) => b.id === id);
+      if (i === -1) return prev;
+      const copie = { ...prev[i], id: `b${Date.now()}${Math.round(Math.random() * 10000)}` };
+      return [...prev.slice(0, i + 1), copie, ...prev.slice(i + 1)];
+    });
+  }
+  function move(id, direction) {
+    setBlocks((prev) => {
+      const i = prev.findIndex((b) => b.id === id);
+      const j = i + direction;
+      if (i === -1 || j < 0 || j >= prev.length) return prev;
+      const copie = [...prev];
+      [copie[i], copie[j]] = [copie[j], copie[i]];
+      return copie;
+    });
+  }
+  function add(type) {
+    setBlocks((prev) => [...prev, newBlock(type)]);
+  }
+
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Contenu (blocs)</p>
+
+      <div className="space-y-3 mb-4">
+        {blocks.map((b, i) => (
+          <BlocCard
+            key={b.id}
+            block={b}
+            token={token}
+            onChange={(patch) => update(b.id, patch)}
+            onRemove={() => remove(b.id)}
+            onDuplicate={() => duplicate(b.id)}
+            onUp={i > 0 ? () => move(b.id, -1) : null}
+            onDown={i < blocks.length - 1 ? () => move(b.id, 1) : null}
+          />
+        ))}
+        {blocks.length === 0 && (
+          <p className="text-slate-400 italic text-sm">Ajoutez un bloc pour commencer.</p>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {BLOCK_TYPES.map((t) => (
+          <button
+            key={t.type}
+            onClick={() => add(t.type)}
+            className="text-xs px-3 py-1.5 rounded-full border border-slate-300 text-slate-600 hover:border-sou-blue hover:text-sou-blue"
+          >
+            + {t.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BlocCard({ block, token, onChange, onRemove, onDuplicate, onUp, onDown }) {
+  const fileInput = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+
+  async function uploadFile(file) {
+    setUploading(true);
+    setUploadError("");
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const res = await fetch("/api/admin/emails/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ dataUrl: reader.result, filename: file.name }),
+      });
+      const data = await res.json();
+      setUploading(false);
+      if (!res.ok) {
+        setUploadError(data.error || "Envoi impossible.");
+        return;
+      }
+      onChange({ url: data.url });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  const label = BLOCK_TYPES.find((t) => t.type === block.type)?.label || block.type;
+
+  return (
+    <div className="border border-slate-200 rounded-xl p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</span>
+        <div className="flex items-center gap-1 text-slate-400">
+          <button disabled={!onUp} onClick={onUp} className="px-1.5 disabled:opacity-30 hover:text-sou-blue" title="Monter">
+            ↑
+          </button>
+          <button disabled={!onDown} onClick={onDown} className="px-1.5 disabled:opacity-30 hover:text-sou-blue" title="Descendre">
+            ↓
+          </button>
+          <button onClick={onDuplicate} className="px-1.5 hover:text-sou-blue" title="Dupliquer">
+            ⧉
+          </button>
+          <button onClick={onRemove} className="px-1.5 hover:text-red-600" title="Supprimer">
+            ✕
+          </button>
+        </div>
+      </div>
+
+      {block.type === "heading" && (
+        <input
+          type="text"
+          value={block.text}
+          onChange={(e) => onChange({ text: e.target.value })}
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+        />
+      )}
+
+      {block.type === "paragraph" && (
+        <textarea
+          value={block.text}
+          onChange={(e) => onChange({ text: e.target.value })}
+          rows={3}
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+        />
+      )}
+
+      {block.type === "image" && (
+        <div className="space-y-2">
+          {block.url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={block.url} alt="" className="max-h-32 rounded-lg border border-slate-200" />
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              disabled={uploading}
+              className="text-xs px-3 py-1.5 rounded-full border border-slate-300 text-slate-600 hover:border-sou-blue hover:text-sou-blue disabled:opacity-60"
+            >
+              {uploading ? "Envoi..." : "Choisir une image"}
+            </button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && uploadFile(e.target.files[0])}
+            />
+          </div>
+          {uploadError && <p className="text-red-600 text-xs">{uploadError}</p>}
+          <input
+            type="text"
+            placeholder="ou collez une URL d'image"
+            value={block.url}
+            onChange={(e) => onChange({ url: e.target.value })}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          />
+          <input
+            type="text"
+            placeholder="Lien au clic (optionnel)"
+            value={block.link}
+            onChange={(e) => onChange({ link: e.target.value })}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+      )}
+
+      {block.type === "button" && (
+        <div className="space-y-2">
+          <input
+            type="text"
+            placeholder="Texte du bouton"
+            value={block.text}
+            onChange={(e) => onChange({ text: e.target.value })}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          />
+          <input
+            type="text"
+            placeholder="Lien"
+            value={block.url}
+            onChange={(e) => onChange({ url: e.target.value })}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          />
+          <div className="flex gap-2">
+            {[
+              { key: "blue", label: "Bleu" },
+              { key: "gold", label: "Doré" },
+            ].map((c) => (
+              <button
+                key={c.key}
+                onClick={() => onChange({ color: c.key })}
+                className={`text-xs px-3 py-1 rounded-full border ${
+                  block.color === c.key ? "border-sou-blue text-sou-blue" : "border-slate-300 text-slate-500"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {block.type === "divider" && <p className="text-xs text-slate-400 italic">Ligne de séparation.</p>}
+
+      {block.type === "spacer" && (
+        <div className="flex gap-2">
+          {[
+            { key: "sm", label: "Petit" },
+            { key: "md", label: "Moyen" },
+            { key: "lg", label: "Grand" },
+          ].map((s) => (
+            <button
+              key={s.key}
+              onClick={() => onChange({ size: s.key })}
+              className={`text-xs px-3 py-1 rounded-full border ${
+                block.size === s.key ? "border-sou-blue text-sou-blue" : "border-slate-300 text-slate-500"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
