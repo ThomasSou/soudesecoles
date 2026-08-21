@@ -1,5 +1,6 @@
 import { createAdminClient } from "../../lib/supabaseServerAdmin";
 import { currentSchoolYear } from "../../lib/anneeScolaire";
+import PanneauAvantage from "./panneau-avantage";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +88,8 @@ export default async function VerifierAdhesionPage({ params }) {
           details="Une nouvelle adhésion est nécessaire."
         />
       )}
+
+      {membership && <PanneauAvantage familyId={membership.family_id} token={token} />}
 
       <p className="text-center text-xs text-slate-400 mt-8">
         Sou des Écoles Laïques Montmerle-Lurcy
