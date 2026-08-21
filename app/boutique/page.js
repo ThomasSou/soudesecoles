@@ -8,8 +8,14 @@ function euros(cents) {
   return (cents / 100).toFixed(2).replace(".", ",") + " €";
 }
 
+function formatDateFermeture(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+}
+
 export default function BoutiquePage() {
   const [produits, setProduits] = useState([]);
+  const [boutiqueActiveId, setBoutiqueActiveId] = useState(null);
   const [panier, setPanier] = useState({}); // { productId: qty }
   const [moi, setMoi] = useState(null); // parent connecté, ou null
   const [accessToken, setAccessToken] = useState(null);
@@ -25,7 +31,15 @@ export default function BoutiquePage() {
   useEffect(() => {
     fetch("/api/boutique/produits")
       .then((r) => r.json())
-      .then((d) => setProduits(d.products || []));
+      .then((d) => {
+        const liste = d.products || [];
+        setProduits(liste);
+        const premiereBoutique = liste
+          .map((p) => p.boutiques)
+          .filter(Boolean)
+          .sort((a, b) => (a.position || 0) - (b.position || 0))[0];
+        if (premiereBoutique) setBoutiqueActiveId(premiereBoutique.id);
+      });
 
     (async () => {
       const supabase = createClient();
@@ -64,15 +78,26 @@ export default function BoutiquePage() {
     if (res.ok) setStatutCommande(data.order);
   }
 
+  const boutiques = useMemo(() => {
+    const parId = new Map();
+    for (const p of produits) {
+      if (p.boutiques && !parId.has(p.boutiques.id)) parId.set(p.boutiques.id, p.boutiques);
+    }
+    return Array.from(parId.values()).sort((a, b) => (a.position || 0) - (b.position || 0));
+  }, [produits]);
+
+  const boutiqueActive = boutiques.find((b) => b.id === boutiqueActiveId) || null;
+
   const categories = useMemo(() => {
     const groupes = new Map();
     for (const p of produits) {
+      if (boutiqueActiveId && p.boutique_id !== boutiqueActiveId) continue;
       const cat = p.category || "Boutique";
       if (!groupes.has(cat)) groupes.set(cat, []);
       groupes.get(cat).push(p);
     }
     return Array.from(groupes.entries());
-  }, [produits]);
+  }, [produits, boutiqueActiveId]);
 
   const lignesPanier = useMemo(() => {
     return Object.entries(panier)
@@ -138,7 +163,33 @@ export default function BoutiquePage() {
       <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
         {etape === "catalogue" && (
           <div className="grid lg:grid-cols-3 gap-10">
-            <div className="lg:col-span-2 space-y-10">
+            <div className="lg:col-span-2 space-y-6">
+              {boutiques.length > 1 && (
+                <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-4">
+                  {boutiques.map((b) => (
+                    <button
+                      key={b.id}
+                      onClick={() => setBoutiqueActiveId(b.id)}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+                        boutiqueActiveId === b.id
+                          ? "bg-sou-blue text-white"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {b.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {boutiqueActive?.description && (
+                <p className="text-slate-500 text-sm">{boutiqueActive.description}</p>
+              )}
+              {boutiqueActive?.date_fermeture && (
+                <p className="text-amber-600 text-xs font-medium">
+                  Commandes ouvertes jusqu&apos;au {formatDateFermeture(boutiqueActive.date_fermeture)}
+                </p>
+              )}
+              <div className="space-y-10">
               {categories.length === 0 && (
                 <p className="text-slate-500">Aucun produit disponible pour le moment.</p>
               )}
@@ -177,6 +228,7 @@ export default function BoutiquePage() {
                   </div>
                 </div>
               ))}
+              </div>
             </div>
 
             <div>

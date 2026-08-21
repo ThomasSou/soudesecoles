@@ -52,7 +52,7 @@ export async function POST(request) {
   const productIds = items.map((it) => it.productId).filter(Boolean);
   const { data: products, error: productsError } = await admin
     .from("shop_products")
-    .select("id, name, price_cents, active")
+    .select("id, name, price_cents, active, boutiques(active, date_fermeture)")
     .in("id", productIds);
 
   if (productsError) {
@@ -62,11 +62,15 @@ export async function POST(request) {
   const productById = new Map((products || []).map((p) => [p.id, p]));
   const orderItems = [];
   let totalCents = 0;
+  const maintenant = new Date();
 
   for (const it of items) {
     const product = productById.get(it.productId);
     const qty = Math.max(1, Math.min(50, Number(it.qty) || 0));
-    if (!product || !product.active || qty <= 0) {
+    const boutiqueOuverte =
+      product?.boutiques?.active &&
+      (!product.boutiques.date_fermeture || new Date(product.boutiques.date_fermeture) >= maintenant);
+    if (!product || !product.active || !boutiqueOuverte || qty <= 0) {
       return NextResponse.json({ error: "Un des articles du panier n'est plus disponible." }, { status: 400 });
     }
     orderItems.push({ productId: product.id, name: product.name, unitPriceCents: product.price_cents, qty });

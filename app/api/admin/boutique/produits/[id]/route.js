@@ -18,6 +18,7 @@ export async function PATCH(request, { params }) {
   }
   if (body?.imageUrl !== undefined) patch.image_url = body.imageUrl || null;
   if (body?.category !== undefined) patch.category = body.category?.trim() || null;
+  if (body?.boutiqueId !== undefined) patch.boutique_id = body.boutiqueId || null;
   if (body?.active !== undefined) patch.active = Boolean(body.active);
   if (body?.position !== undefined) patch.position = Number(body.position) || 0;
 
