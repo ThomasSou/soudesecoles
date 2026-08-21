@@ -36,9 +36,10 @@ const TARIFS_ADHESION = [
 ];
 const MONTANT_LIBRE_MIN = 17;
 
-// Paiement de la cotisation directement depuis l'espace adhérent : choix
-// d'une formule (ou montant libre), puis paiement HelloAsso affiché en
-// iframe sans quitter le site.
+// Paiement de la cotisation depuis l'espace adhérent : choix d'une formule
+// (ou montant libre), puis redirection vers la page de paiement HelloAsso.
+// HelloAsso refuse d'être affiché dans une fenêtre intégrée (iframe), d'où
+// la redirection en pleine page ; le retour se fait via returnUrl.
 function AdhesionPaiement({ accessToken, onPaid }) {
   const [choix, setChoix] = useState("jaime");
   const [montantLibre, setMontantLibre] = useState("");
@@ -50,13 +51,18 @@ function AdhesionPaiement({ accessToken, onPaid }) {
   const montant =
     choix === "libre" ? Number(montantLibre) || 0 : TARIFS_ADHESION.find((t) => t.id === choix)?.montant || 0;
 
+  // Retour depuis HelloAsso après un paiement en pleine page : on nettoie
+  // l'URL puis on vérifie auprès de HelloAsso que le paiement est bien passé.
   useEffect(() => {
-    function onMessage(event) {
-      if (!event.data || event.data.event !== "payment_completed") return;
+    const params = new URLSearchParams(window.location.search);
+    const retour = params.get("adhesion");
+    if (retour === "retour") {
+      window.history.replaceState(null, "", window.location.pathname);
       verifier();
+    } else if (retour === "erreur") {
+      window.history.replaceState(null, "", window.location.pathname);
+      setErreur("Le paiement n'a pas abouti. Vous pouvez réessayer.");
     }
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -94,6 +100,9 @@ function AdhesionPaiement({ accessToken, onPaid }) {
       if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
       setRedirectUrl(data.redirectUrl);
       setEtape("paiement");
+      // HelloAsso interdit l'affichage en iframe : on quitte le site le temps
+      // du paiement, le retour est assuré par returnUrl.
+      window.location.href = data.redirectUrl;
     } catch (err) {
       setErreur(err.message);
     } finally {
@@ -110,8 +119,17 @@ function AdhesionPaiement({ accessToken, onPaid }) {
         >
           ← Choisir une autre formule
         </button>
-        <div className="border border-slate-200 rounded-xl overflow-hidden" style={{ height: "70vh" }}>
-          <iframe src={redirectUrl} title="Paiement HelloAsso" className="w-full h-full" allow="payment" />
+        <div className="border border-slate-200 rounded-xl p-6 text-sm text-slate-600">
+          <p className="mb-3">Redirection vers le paiement sécurisé HelloAsso...</p>
+          <a
+            href={redirectUrl}
+            className="inline-block bg-sou-blue text-white font-semibold px-5 py-2.5 rounded-full"
+          >
+            Continuer vers le paiement
+          </a>
+          <p className="mt-3 text-xs text-slate-400">
+            Si rien ne se passe, cliquez sur le bouton ci-dessus.
+          </p>
         </div>
       </div>
     );

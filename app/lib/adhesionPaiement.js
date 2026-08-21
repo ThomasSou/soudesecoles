@@ -1,5 +1,5 @@
 // Paiement en ligne de la cotisation, directement depuis l'espace adhérent
-// (paiement HelloAsso en iframe, sans redirection vers un site externe).
+// (paiement HelloAsso en pleine page, retour via returnUrl).
 import { createAdminClient } from "./supabaseServerAdmin";
 import { getCheckoutIntent, checkoutIntentIsPaid } from "./helloasso";
 

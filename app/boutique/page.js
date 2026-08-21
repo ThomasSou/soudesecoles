@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "../components";
 import { createClient } from "../lib/supabaseClient";
 
@@ -20,7 +20,6 @@ export default function BoutiquePage() {
   const [erreur, setErreur] = useState("");
   const [envoi, setEnvoi] = useState(false);
   const [statutCommande, setStatutCommande] = useState(null);
-  const iframeRef = useRef(null);
 
   // Catalogue + identification facultative de l'acheteur connecté.
   useEffect(() => {
@@ -57,16 +56,6 @@ export default function BoutiquePage() {
       verifierCommande(commande);
     }
   }, []);
-
-  // Écoute la notification de fin de paiement envoyée par l'iframe HelloAsso.
-  useEffect(() => {
-    function onMessage(event) {
-      if (!event.data || event.data.event !== "payment_completed") return;
-      if (orderId) verifierCommande(orderId);
-    }
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [orderId]);
 
   async function verifierCommande(id) {
     setEtape("confirme");
@@ -129,6 +118,9 @@ export default function BoutiquePage() {
       setOrderId(data.orderId);
       setRedirectUrl(data.redirectUrl);
       setEtape("paiement");
+      // HelloAsso interdit l'affichage en iframe : on quitte le site le temps
+      // du paiement, le retour est assuré par returnUrl (?commande=...).
+      window.location.href = data.redirectUrl;
     } catch (err) {
       setErreur(err.message);
     } finally {
@@ -256,14 +248,17 @@ export default function BoutiquePage() {
             <button onClick={() => setEtape("catalogue")} className="text-sm text-slate-500 mb-4">
               ← Retour au panier
             </button>
-            <div className="border border-slate-200 rounded-xl overflow-hidden" style={{ height: "80vh" }}>
-              <iframe
-                ref={iframeRef}
-                src={redirectUrl}
-                title="Paiement HelloAsso"
-                className="w-full h-full"
-                allow="payment"
-              />
+            <div className="border border-slate-200 rounded-xl p-6 text-sm text-slate-600 max-w-md">
+              <p className="mb-3">Redirection vers le paiement sécurisé HelloAsso...</p>
+              <a
+                href={redirectUrl}
+                className="inline-block bg-sou-blue text-white font-semibold px-5 py-2.5 rounded-full"
+              >
+                Continuer vers le paiement
+              </a>
+              <p className="mt-3 text-xs text-slate-400">
+                Si rien ne se passe, cliquez sur le bouton ci-dessus.
+              </p>
             </div>
           </div>
         )}
