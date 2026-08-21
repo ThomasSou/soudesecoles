@@ -105,8 +105,21 @@ export function Footer() {
           <p>Facebook · Instagram (bientôt)</p>
         </div>
       </div>
-      <div className="border-t border-white/10 py-4 text-center text-xs text-slate-400">
-        © {new Date().getFullYear()} Sou des Écoles Montmerle-Lurcy — site en construction
+      <div className="border-t border-white/10 py-4 text-center text-xs text-slate-400 space-y-2">
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+          <Link href="/mentions-legales" className="hover:text-white transition-colors">
+            Mentions légales
+          </Link>
+          <span aria-hidden="true">·</span>
+          <Link href="/confidentialite" className="hover:text-white transition-colors">
+            Confidentialité et données personnelles
+          </Link>
+          <span aria-hidden="true">·</span>
+          <Link href="/contact" className="hover:text-white transition-colors">
+            Contact
+          </Link>
+        </div>
+        <p>© {new Date().getFullYear()} Sou des Écoles Montmerle-Lurcy — site en construction</p>
       </div>
     </footer>
   );

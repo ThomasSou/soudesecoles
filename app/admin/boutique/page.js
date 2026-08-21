@@ -172,6 +172,48 @@ function BoutiqueAdmin({ accessToken }) {
     charger();
   }
 
+  // Deplace un produit d'un cran vers le haut ou vers le bas en echangeant
+  // sa position avec celle de son voisin. L'ordre affiche cote public suit
+  // la colonne position, donc l'echange suffit.
+  // La liste est triee par categorie puis par position : un produit ne peut
+  // donc etre deplace qu'a l'interieur de sa propre categorie.
+  function peutDeplacer(index, direction) {
+    const voisin = index + direction;
+    if (voisin < 0 || voisin >= produits.length) return false;
+    return (produits[index].category || "") === (produits[voisin].category || "");
+  }
+
+  async function deplacer(index, direction) {
+    if (!peutDeplacer(index, direction)) return;
+    const voisin = index + direction;
+
+    const a = produits[index];
+    const b = produits[voisin];
+
+    // Reordonnancement optimiste : on inverse les deux lignes tout de suite
+    // pour que le clic soit ressenti comme immediat.
+    const copie = [...produits];
+    copie[index] = b;
+    copie[voisin] = a;
+    setProduits(copie);
+
+    const majPosition = (produit, position) =>
+      fetch(`/api/admin/boutique/produits/${produit.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ position }),
+      });
+
+    // Les positions enregistrees peuvent etre identiques ou mal espacees
+    // (produits importes). On reecrit donc l'index de chaque ligne plutot
+    // que d'echanger deux valeurs qui pourraient etre egales.
+    await Promise.all(copie.map((prod, i) => majPosition(prod, i)));
+    await charger();
+  }
+
   async function supprimer(id) {
     if (!confirm("Supprimer ce produit ?")) return;
     await fetch(`/api/admin/boutique/produits/${id}`, {
@@ -219,7 +261,7 @@ function BoutiqueAdmin({ accessToken }) {
           )}
 
           <div className="space-y-3">
-            {produits.map((p) =>
+            {produits.map((p, index) =>
               enEdition === p.id ? (
                 <ProduitForm
                   key={p.id}
@@ -240,6 +282,28 @@ function BoutiqueAdmin({ accessToken }) {
                   key={p.id}
                   className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-4"
                 >
+                  <div className="flex flex-col gap-1">
+                    <button
+                      type="button"
+                      onClick={() => deplacer(index, -1)}
+                      disabled={!peutDeplacer(index, -1)}
+                      title="Monter"
+                      aria-label={`Monter ${p.name}`}
+                      className="w-7 h-6 rounded border border-slate-200 text-slate-600 leading-none disabled:opacity-30 hover:bg-slate-50"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deplacer(index, 1)}
+                      disabled={!peutDeplacer(index, 1)}
+                      title="Descendre"
+                      aria-label={`Descendre ${p.name}`}
+                      className="w-7 h-6 rounded border border-slate-200 text-slate-600 leading-none disabled:opacity-30 hover:bg-slate-50"
+                    >
+                      ↓
+                    </button>
+                  </div>
                   {p.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={p.image_url} alt="" className="w-14 h-14 object-cover rounded-lg" />

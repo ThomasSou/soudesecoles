@@ -8,7 +8,7 @@ import { currentSchoolYear } from "./anneeScolaire";
 
 export const BLUE = "#1F3864";
 export const GOLD = "#B08D57";
-export const SITE_URL = "https://soumontmerle.netlify.app";
+export const SITE_URL = "https://sou-montmerle.fr";
 
 export const BLOCK_TYPES = [
   { type: "heading", label: "Titre" },
@@ -263,6 +263,15 @@ function desabonnementHtml(recipient) {
 // HTML complet, prêt à envoyer (table-based, styles en ligne pour la
 // compatibilité avec les clients mail), personnalisé pour un destinataire
 // donné (champs de fusion + statut d'adhésion).
+// Pixel de mesure d'ouverture. On n'y met que l'objet de l'envoi : il permet
+// de distinguer les campagnes entre elles, sans jamais identifier le lecteur.
+// Rappel : beaucoup de messageries bloquent les images, le compteur est donc
+// un minimum et non un chiffre exact.
+function mesureOuvertureHtml(subject) {
+  const envoi = encodeURIComponent((subject || "Sans objet").slice(0, 120));
+  return `<img src="${SITE_URL}/api/emails/pixel?e=${envoi}" alt="" width="1" height="1" style="display:block;width:1px;height:1px;border:0;" />`;
+}
+
 export function renderBlocksToHtml(blocks, { subject, recipient } = {}) {
   const dest = { ...DEFAULT_RECIPIENT, ...(recipient || {}) };
   const body = (blocks || []).map((b) => blockToHtml(b, dest)).join("\n");
@@ -309,6 +318,7 @@ export function renderBlocksToHtml(blocks, { subject, recipient } = {}) {
         </td>
       </tr>
     </table>
+    ${mesureOuvertureHtml(subject)}
   </body>
 </html>`;
 }
