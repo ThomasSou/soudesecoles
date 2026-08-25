@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
-
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://soumontmerle.netlify.app";
+import { envoyerInvitation } from "../../../../lib/invitations";
 
 // Renvoie une invitation à un parent qui a déjà une fiche `parents` mais dont
 // le compte de connexion (auth.users) n'a jamais été activé (lien précédent
-// expiré, perdu dans les spams, jamais cliqué...). On rappelle simplement
-// inviteUserByEmail : pour un compte auth déjà existant mais non confirmé,
-// Supabase régénère un nouveau lien à usage unique au lieu d'échouer avec
-// "already registered" (qui ne survient que si le compte est déjà confirmé).
+// expiré, perdu dans les spams, jamais cliqué...). Pour un compte auth déjà
+// existant mais non confirmé, un nouveau lien à usage unique est régénéré au
+// lieu d'échouer avec "already registered" (qui ne survient que si le
+// compte est déjà confirmé).
 export async function POST(request) {
   const auth = await requirePermission(request, "familles");
   if (auth.error) {
@@ -24,7 +22,7 @@ export async function POST(request) {
 
   const { data: parent, error: parentError } = await admin
     .from("parents")
-    .select("id, email")
+    .select("id, email, first_name, last_name")
     .eq("id", parentId)
     .maybeSingle();
 
@@ -32,10 +30,12 @@ export async function POST(request) {
     return NextResponse.json({ error: "Parent introuvable." }, { status: 404 });
   }
 
-  const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(
-    parent.email,
-    { redirectTo: `${SITE_URL}/activer-compte` }
-  );
+  const { error: inviteError } = await envoyerInvitation(admin, {
+    email: parent.email,
+    firstName: parent.first_name,
+    lastName: parent.last_name,
+    parentId: parent.id,
+  });
 
   if (inviteError) {
     if (/already been registered/i.test(inviteError.message)) {

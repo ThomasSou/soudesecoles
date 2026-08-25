@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../lib/adminAuth";
 import { CONTACT_EMAIL, sendMail } from "../../../lib/mail";
+import { envoyerInvitation } from "../../../lib/invitations";
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://soumontmerle.netlify.app";
 const SCHOOL_YEAR = process.env.NEXT_PUBLIC_SCHOOL_YEAR || "2025-2026";
 
 export async function GET(request) {
@@ -77,10 +76,11 @@ export async function POST(request) {
     return NextResponse.json({ error: familyError.message }, { status: 500 });
   }
 
-  const { data: invited, error: inviteError } =
-    await admin.auth.admin.inviteUserByEmail(demande.email, {
-      redirectTo: `${SITE_URL}/activer-compte`,
-    });
+  const { data: invited, error: inviteError } = await envoyerInvitation(admin, {
+    email: demande.email,
+    firstName: demande.first_name,
+    lastName: demande.last_name,
+  });
 
   if (inviteError) {
     // On annule la famille créée pour ne pas laisser de ligne orpheline.

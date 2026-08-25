@@ -19,6 +19,22 @@ export default function AdminFamillesPage() {
   );
 }
 
+function formatDate(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+}
+
+// Résume l'état de l'invitation d'un parent à partir des données croisées
+// avec auth.users (authActivated) et, quand Sender est configuré, avec le
+// suivi ouverture/clic/rebond de la table invitations.
+function statutInvitation(p) {
+  if (p.invitationRebondLe) return { texte: "e-mail rejeté (rebond)", couleur: "text-red-600" };
+  if (p.invitationCliqueeLe) return { texte: `lien cliqué le ${formatDate(p.invitationCliqueeLe)}`, couleur: "text-slate-500" };
+  if (p.invitationOuverteLe) return { texte: `e-mail ouvert le ${formatDate(p.invitationOuverteLe)}`, couleur: "text-amber-600" };
+  if (p.invitationEnvoyeeLe) return { texte: `invitation envoyée le ${formatDate(p.invitationEnvoyeeLe)}`, couleur: "text-amber-600" };
+  return { texte: "invitation non activée", couleur: "text-amber-600" };
+}
+
 function nomFamille(f) {
   return f.parents.length > 0
     ? f.parents
@@ -231,8 +247,8 @@ function ListeFamilles({ token }) {
                           )}
                           {!p.authActivated && (
                             <>
-                              <span className="text-amber-600 text-xs ml-1">
-                                · invitation non activée
+                              <span className={`text-xs ml-1 ${statutInvitation(p).couleur}`}>
+                                · {statutInvitation(p).texte}
                               </span>
                               <RenvoyerInvitation
                                 parentId={p.id}

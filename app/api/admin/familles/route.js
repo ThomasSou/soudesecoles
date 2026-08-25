@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../lib/adminAuth";
-
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://soumontmerle.netlify.app";
+import { envoyerInvitation } from "../../../lib/invitations";
 
 export async function GET(request) {
   const auth = await requirePermission(request, "familles");
@@ -11,13 +9,17 @@ export async function GET(request) {
   }
   const admin = auth.admin;
 
-  const [familiesRes, parentsRes, childrenRes, membershipsRes, usersRes] =
+  const [familiesRes, parentsRes, childrenRes, membershipsRes, usersRes, invitationsRes] =
     await Promise.all([
       admin.from("families").select("*").order("created_at"),
       admin.from("parents").select("*"),
       admin.from("children").select("*"),
       admin.from("memberships").select("*"),
       admin.auth.admin.listUsers({ perPage: 1000 }),
+      admin
+        .from("invitations")
+        .select("email, sent_at, opened_at, clicked_at, bounced_at")
+        .order("sent_at", { ascending: false }),
     ]);
 
   if (familiesRes.error) {
@@ -40,12 +42,27 @@ export async function GET(request) {
     ])
   );
 
+  // Dernier envoi via Sender pour chaque adresse (le premier rencontré,
+  // puisque la liste est triée du plus récent au plus ancien) : donne la
+  // visibilité ouverte/cliquée demandée, en plus du statut "compte activé"
+  // ci-dessus. Reste vide tant que Sender n'est pas configuré.
+  const dernierEnvoiParEmail = new Map();
+  for (const inv of invitationsRes?.data || []) {
+    const cle = (inv.email || "").toLowerCase();
+    if (!dernierEnvoiParEmail.has(cle)) dernierEnvoiParEmail.set(cle, inv);
+  }
+
   const decoreParent = (p) => {
     const u = usersByEmail.get((p.email || "").toLowerCase());
+    const envoi = dernierEnvoiParEmail.get((p.email || "").toLowerCase());
     return {
       ...p,
       authActivated: Boolean(u?.last_sign_in_at || u?.confirmed_at),
       authInvitedAt: u?.invited_at || null,
+      invitationEnvoyeeLe: envoi?.sent_at || null,
+      invitationOuverteLe: envoi?.opened_at || null,
+      invitationCliqueeLe: envoi?.clicked_at || null,
+      invitationRebondLe: envoi?.bounced_at || null,
     };
   };
 
@@ -113,10 +130,11 @@ export async function POST(request) {
   }
 
   let userId;
-  const { data: invited, error: inviteError } =
-    await admin.auth.admin.inviteUserByEmail(email.trim(), {
-      redirectTo: `${SITE_URL}/activer-compte`,
-    });
+  const { data: invited, error: inviteError } = await envoyerInvitation(admin, {
+    email,
+    firstName,
+    lastName,
+  });
 
   if (inviteError) {
     // Le compte Auth peut déjà exister sans fiche parent (invitation partie
