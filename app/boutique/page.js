@@ -19,7 +19,7 @@ export default function BoutiquePage() {
   const [panier, setPanier] = useState({}); // { productId: qty }
   const [moi, setMoi] = useState(null); // parent connecté, ou null
   const [accessToken, setAccessToken] = useState(null);
-  const [buyer, setBuyer] = useState({ firstName: "", lastName: "", email: "" });
+  const [buyer, setBuyer] = useState({ firstName: "", lastName: "", email: "", phone: "" });
   const [etape, setEtape] = useState("catalogue"); // catalogue | paiement | confirme
   const [redirectUrl, setRedirectUrl] = useState(null);
   const [orderId, setOrderId] = useState(null);
@@ -54,7 +54,12 @@ export default function BoutiquePage() {
       const data = await res.json();
       if (data.parent) {
         setMoi(data.parent);
-        setBuyer({ firstName: data.parent.firstName, lastName: data.parent.lastName, email: data.parent.email });
+        setBuyer({
+          firstName: data.parent.firstName,
+          lastName: data.parent.lastName,
+          email: data.parent.email,
+          phone: data.parent.phone || "",
+        });
       }
     })();
   }, []);
@@ -275,6 +280,14 @@ export default function BoutiquePage() {
                       placeholder="E-mail"
                       value={buyer.email}
                       onChange={(e) => setBuyer({ ...buyer, email: e.target.value })}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                    />
+                    <input
+                      required
+                      type="tel"
+                      placeholder="Téléphone"
+                      value={buyer.phone}
+                      onChange={(e) => setBuyer({ ...buyer, phone: e.target.value })}
                       className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                     />
                     {erreur && <p className="text-sm text-red-600">{erreur}</p>}

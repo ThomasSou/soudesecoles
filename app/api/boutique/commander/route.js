@@ -22,8 +22,11 @@ export async function POST(request) {
   if (items.length === 0) {
     return NextResponse.json({ error: "Le panier est vide." }, { status: 400 });
   }
-  if (!buyer.firstName?.trim() || !buyer.lastName?.trim() || !buyer.email?.trim()) {
-    return NextResponse.json({ error: "Merci d'indiquer votre nom, prénom et e-mail." }, { status: 400 });
+  if (!buyer.firstName?.trim() || !buyer.lastName?.trim() || !buyer.email?.trim() || !buyer.phone?.trim()) {
+    return NextResponse.json(
+      { error: "Merci d'indiquer votre nom, prénom, e-mail et téléphone." },
+      { status: 400 }
+    );
   }
 
   const admin = createAdminClient();
@@ -89,6 +92,7 @@ export async function POST(request) {
       buyer_first_name: buyer.firstName.trim(),
       buyer_last_name: buyer.lastName.trim(),
       buyer_email: buyer.email.trim(),
+      buyer_phone: buyer.phone.trim(),
       parent_id: parentId,
       family_id: familyId,
       status: "pending",

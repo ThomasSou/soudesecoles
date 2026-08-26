@@ -538,7 +538,10 @@ function BoutiqueAdmin({ accessToken }) {
                 <div>
                   <p className="font-semibold text-slate-800">
                     {c.buyer_first_name} {c.buyer_last_name}{" "}
-                    <span className="text-xs text-slate-400">({c.buyer_email})</span>
+                    <span className="text-xs text-slate-400">
+                      ({c.buyer_email}
+                      {c.buyer_phone ? ` — ${c.buyer_phone}` : ""})
+                    </span>
                   </p>
                   <p className="text-xs text-slate-500 mt-1">
                     {(c.items || []).map((it) => `${it.qty}x ${it.name}`).join(", ")}

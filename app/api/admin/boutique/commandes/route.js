@@ -8,7 +8,9 @@ export async function GET(request) {
 
   const { data, error } = await auth.admin
     .from("shop_orders")
-    .select("id, items, total_cents, buyer_first_name, buyer_last_name, buyer_email, status, created_at, paid_at")
+    .select(
+      "id, items, total_cents, buyer_first_name, buyer_last_name, buyer_email, buyer_phone, status, created_at, paid_at"
+    )
     .order("created_at", { ascending: false })
     .limit(300);
 

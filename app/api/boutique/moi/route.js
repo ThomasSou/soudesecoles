@@ -20,7 +20,7 @@ export async function GET(request) {
 
   const { data: parent } = await admin
     .from("parents")
-    .select("id, first_name, last_name, email, family_id")
+    .select("id, first_name, last_name, email, phone, family_id")
     .eq("id", userData.user.id)
     .maybeSingle();
 
@@ -35,6 +35,7 @@ export async function GET(request) {
       firstName: parent.first_name,
       lastName: parent.last_name,
       email: parent.email,
+      phone: parent.phone,
       familyId: parent.family_id,
     },
   });
