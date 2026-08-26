@@ -48,7 +48,11 @@ export async function envoyerInvitation(admin, { email, firstName, lastName, par
     return admin.auth.admin.inviteUserByEmail(trimmedEmail, { redirectTo: lien });
   }
 
-  const { data: liste } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  const { data: liste, error: listeError } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  if (listeError) {
+    console.error("[envoyerInvitation] listUsers a échoué :", listeError.message);
+    return { data: null, error: listeError };
+  }
   const existant = (liste?.users || []).find(
     (u) => u.email?.toLowerCase() === trimmedEmail.toLowerCase()
   );
@@ -66,7 +70,10 @@ export async function envoyerInvitation(admin, { email, firstName, lastName, par
       email: trimmedEmail,
       email_confirm: true,
     });
-    if (creationError) return { data: null, error: creationError };
+    if (creationError) {
+      console.error("[envoyerInvitation] createUser a échoué :", creationError.message);
+      return { data: null, error: creationError };
+    }
     userId = cree.user.id;
   }
 
