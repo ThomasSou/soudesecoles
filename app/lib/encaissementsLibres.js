@@ -4,6 +4,7 @@
 // statut réel auprès de HelloAsso avant d'enregistrer le paiement.
 import { createAdminClient } from "./supabaseServerAdmin";
 import { getCheckoutIntent, checkoutIntentIsPaid } from "./helloasso";
+import { currentSchoolYear } from "./anneeScolaire";
 
 export async function confirmEncaissementIfPaid(id) {
   const admin = createAdminClient();
@@ -37,6 +38,21 @@ export async function confirmEncaissementIfPaid(id) {
     .eq("id", encaissement.id)
     .select()
     .single();
+
+  // Rattaché à une famille : recopié dans `purchases` pour apparaître dans
+  // son historique d'achat sur /espace-adherent, comme la boutique.
+  if (updated?.family_id) {
+    await admin.from("purchases").insert({
+      family_id: updated.family_id,
+      school_year: currentSchoolYear(),
+      label: updated.motif,
+      event_name: "Encaissement libre",
+      amount: updated.montant_cents / 100,
+      payment_method: "helloasso",
+      external_id: updated.helloasso_order_id || updated.checkout_intent_id,
+      purchased_at: updated.paid_at,
+    });
+  }
 
   return updated || encaissement;
 }

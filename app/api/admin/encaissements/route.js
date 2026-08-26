@@ -38,6 +38,7 @@ export async function POST(request) {
   const nomFamille = body?.nom?.trim();
   const motif = body?.motif?.trim();
   const montant = Number(body?.montant);
+  const familyId = body?.familyId || null;
 
   if (!prenom || !nomFamille || !motif) {
     return NextResponse.json({ error: "Prénom, nom et motif sont obligatoires." }, { status: 400 });
@@ -51,7 +52,13 @@ export async function POST(request) {
 
   const { data: encaissement, error: insertError } = await auth.admin
     .from("encaissements_libres")
-    .insert({ nom: nomComplet, motif, montant_cents: montantCents, created_by: auth.parent.id })
+    .insert({
+      nom: nomComplet,
+      motif,
+      montant_cents: montantCents,
+      created_by: auth.parent.id,
+      family_id: familyId,
+    })
     .select()
     .single();
 

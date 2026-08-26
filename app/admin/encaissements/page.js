@@ -25,11 +25,85 @@ const STATUTS = {
   failed: { label: "Échoué", classe: "bg-red-50 text-red-700" },
 };
 
+function ChampFamille({ accessToken, familyId, setFamilyId }) {
+  const [familles, setFamilles] = useState([]);
+  const [recherche, setRecherche] = useState("");
+  const [ouvert, setOuvert] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/encaissements/familles", { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then((r) => r.json())
+      .then((data) => setFamilles(data.familles || []));
+  }, [accessToken]);
+
+  const resultats =
+    recherche.trim().length < 2
+      ? []
+      : familles
+          .filter((f) => f.label.toLowerCase().includes(recherche.trim().toLowerCase()))
+          .slice(0, 8);
+
+  const familleChoisie = familles.find((f) => f.id === familyId);
+
+  if (familleChoisie) {
+    return (
+      <p className="text-sm text-slate-600">
+        Rattaché à <span className="font-medium">{familleChoisie.label}</span>{" "}
+        <button
+          type="button"
+          onClick={() => {
+            setFamilyId(null);
+            setRecherche("");
+          }}
+          className="text-sou-blue underline text-xs ml-1"
+        >
+          retirer
+        </button>
+      </p>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <input
+        value={recherche}
+        onChange={(e) => {
+          setRecherche(e.target.value);
+          setOuvert(true);
+        }}
+        onFocus={() => setOuvert(true)}
+        onBlur={() => setTimeout(() => setOuvert(false), 150)}
+        placeholder="Rechercher un parent par nom..."
+        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+      />
+      {ouvert && resultats.length > 0 && (
+        <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-sm max-h-48 overflow-auto">
+          {resultats.map((f) => (
+            <button
+              type="button"
+              key={f.id}
+              onClick={() => {
+                setFamilyId(f.id);
+                setRecherche(f.label);
+                setOuvert(false);
+              }}
+              className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NouvelEncaissementForm({ accessToken }) {
   const [prenom, setPrenom] = useState("");
   const [nom, setNom] = useState("");
   const [motif, setMotif] = useState("");
   const [montant, setMontant] = useState("");
+  const [familyId, setFamilyId] = useState(null);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState("");
 
@@ -41,7 +115,7 @@ function NouvelEncaissementForm({ accessToken }) {
       const res = await fetch("/api/admin/encaissements", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ prenom, nom, motif, montant }),
+        body: JSON.stringify({ prenom, nom, motif, montant, familyId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
@@ -104,6 +178,15 @@ function NouvelEncaissementForm({ accessToken }) {
           />
           <span className="absolute inset-y-0 right-3 flex items-center text-slate-400 text-sm">€</span>
         </div>
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-slate-500">
+          Rattacher à une famille (facultatif)
+        </label>
+        <p className="text-xs text-slate-400 mb-1">
+          Fait apparaître ce paiement dans l&apos;historique d&apos;achat de la famille sur son espace adhérent.
+        </p>
+        <ChampFamille accessToken={accessToken} familyId={familyId} setFamilyId={setFamilyId} />
       </div>
       <button
         type="submit"
