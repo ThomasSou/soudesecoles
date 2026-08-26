@@ -10,6 +10,7 @@ export default function ActiverComptePage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [motDePasseVisible, setMotDePasseVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -126,24 +127,44 @@ export default function ActiverComptePage() {
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="password"
-          required
-          minLength={8}
-          placeholder="Choisissez un mot de passe (8 caractères min.)"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full border border-slate-300 rounded-lg px-4 py-2"
-        />
-        <input
-          type="password"
-          required
-          minLength={8}
-          placeholder="Confirmez le mot de passe"
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          className="w-full border border-slate-300 rounded-lg px-4 py-2"
-        />
+        <div className="relative">
+          <input
+            type={motDePasseVisible ? "text" : "password"}
+            required
+            minLength={8}
+            placeholder="Choisissez un mot de passe (8 caractères min.)"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full border border-slate-300 rounded-lg px-4 py-2 pr-16"
+          />
+          <button
+            type="button"
+            onClick={() => setMotDePasseVisible((v) => !v)}
+            tabIndex={-1}
+            className="absolute inset-y-0 right-0 px-3 text-xs font-semibold text-slate-500 hover:text-sou-blue"
+          >
+            {motDePasseVisible ? "Masquer" : "Afficher"}
+          </button>
+        </div>
+        <div className="relative">
+          <input
+            type={motDePasseVisible ? "text" : "password"}
+            required
+            minLength={8}
+            placeholder="Confirmez le mot de passe"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            className="w-full border border-slate-300 rounded-lg px-4 py-2 pr-16"
+          />
+          <button
+            type="button"
+            onClick={() => setMotDePasseVisible((v) => !v)}
+            tabIndex={-1}
+            className="absolute inset-y-0 right-0 px-3 text-xs font-semibold text-slate-500 hover:text-sou-blue"
+          >
+            {motDePasseVisible ? "Masquer" : "Afficher"}
+          </button>
+        </div>
 
         {formError && <p className="text-red-600 text-sm">{formError}</p>}
 

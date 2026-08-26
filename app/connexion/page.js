@@ -9,6 +9,7 @@ export default function ConnexionPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [motDePasseVisible, setMotDePasseVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -45,14 +46,24 @@ export default function ConnexionPage() {
           onChange={(e) => setEmail(e.target.value)}
           className="w-full border border-slate-300 rounded-lg px-4 py-2"
         />
-        <input
-          type="password"
-          required
-          placeholder="Mot de passe"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full border border-slate-300 rounded-lg px-4 py-2"
-        />
+        <div className="relative">
+          <input
+            type={motDePasseVisible ? "text" : "password"}
+            required
+            placeholder="Mot de passe"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full border border-slate-300 rounded-lg px-4 py-2 pr-16"
+          />
+          <button
+            type="button"
+            onClick={() => setMotDePasseVisible((v) => !v)}
+            tabIndex={-1}
+            className="absolute inset-y-0 right-0 px-3 text-xs font-semibold text-slate-500 hover:text-sou-blue"
+          >
+            {motDePasseVisible ? "Masquer" : "Afficher"}
+          </button>
+        </div>
 
         {error && <p className="text-red-600 text-sm">{error}</p>}
 

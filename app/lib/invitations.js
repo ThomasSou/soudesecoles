@@ -63,7 +63,13 @@ export async function envoyerInvitation(admin, { email, firstName, lastName, par
   });
 
   if (error) {
-    return { data: null, error };
+    // Repli : generateLink() peut refuser à tort (fausse alerte SPF/DKIM
+    // observée en production alors que l'envoi natif ci-dessous fonctionne
+    // très bien avec la même config SMTP). On ne bloque jamais une
+    // invitation pour ça ; l'e-mail part alors via Supabase/Infomaniak au
+    // lieu de Sender (pas de suivi ouverture/clic pour celle-ci, mais elle
+    // part).
+    return admin.auth.admin.inviteUserByEmail(trimmedEmail, { redirectTo: lien });
   }
 
   const actionLink = data?.properties?.action_link;
