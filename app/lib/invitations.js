@@ -43,7 +43,10 @@ function gabaritInvitation({ firstName, actionLink }) {
 export async function envoyerInvitation(admin, { email, firstName, lastName, parentId, redirectTo }) {
   const trimmedEmail = email.trim();
 
+  console.error("[envoyerInvitation] isSenderConfigured =", isSenderConfigured());
+
   if (!isSenderConfigured()) {
+    console.error("[envoyerInvitation] circuit maison ignoré : Sender non configuré, utilisation de inviteUserByEmail");
     const lien = redirectTo || `${SITE_URL}/activer-compte`;
     return admin.auth.admin.inviteUserByEmail(trimmedEmail, { redirectTo: lien });
   }
