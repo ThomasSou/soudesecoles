@@ -1,11 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "../lib/supabaseClient";
 
 export default function ActiverComptePage() {
+  return (
+    <Suspense fallback={null}>
+      <ActiverCompteForm />
+    </Suspense>
+  );
+}
+
+function ActiverCompteForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const jeton = searchParams.get("jeton");
+
   const [status, setStatus] = useState("chargement"); // chargement | pret | erreur
   const [errorMsg, setErrorMsg] = useState("");
   const [password, setPassword] = useState("");
@@ -15,6 +26,14 @@ export default function ActiverComptePage() {
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
+    // Circuit maison (lien envoyé via Sender) : le jeton dans l'URL suffit,
+    // pas besoin d'établir de session Supabase avant de choisir un mot de
+    // passe — c'est la route /api/activer-compte qui vérifie le jeton.
+    if (jeton) {
+      setStatus("pret");
+      return;
+    }
+
     const supabase = createClient();
     const hash = typeof window !== "undefined" ? window.location.hash : "";
     const params = new URLSearchParams(hash.replace(/^#/, ""));
@@ -73,7 +92,7 @@ export default function ActiverComptePage() {
         window.history.replaceState(null, "", window.location.pathname);
         setStatus("pret");
       });
-  }, []);
+  }, [jeton]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -89,6 +108,33 @@ export default function ActiverComptePage() {
     }
 
     setSaving(true);
+
+    if (jeton) {
+      try {
+        const res = await fetch("/api/activer-compte", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: jeton, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
+
+        const supabase = createClient();
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password,
+        });
+        if (signInError) throw signInError;
+
+        router.push("/espace-adherent");
+      } catch (err) {
+        setFormError(err.message);
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({ password });
     setSaving(false);

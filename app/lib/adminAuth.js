@@ -9,6 +9,7 @@ export const PERMISSIONS = [
   { key: "messages", label: "Messages reçus" },
   { key: "emails", label: "Envoi d'e-mails" },
   { key: "boutique", label: "Boutique en ligne (produits et commandes)" },
+  { key: "encaissements", label: "Encaissements libres (hors boutique et cotisation)" },
   { key: "avantages", label: "Avantages (boisson offerte, offres partenaires)" },
   { key: "benevoles", label: "Créneaux bénévoles" },
   { key: "statistiques", label: "Statistiques de fréquentation" },

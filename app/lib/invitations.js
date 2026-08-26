@@ -15,17 +15,24 @@ function gabaritInvitation({ firstName, actionLink }) {
           Activer mon espace
         </a>
       </p>
-      <p style="font-size: 13px; color: #64748b;">Ce lien est à usage unique. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.</p>
+      <p style="font-size: 13px; color: #64748b;">Ce lien est valable 7 jours et à usage unique. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.</p>
     </div>
   `;
 }
 
 // Envoie une invitation à créer un compte de connexion. Deux circuits :
 //
-// - Sender configuré (SENDER_API_KEY) : on demande à Supabase de générer le
-//   lien d'activation SANS envoyer de mail (generateLink), puis on envoie
-//   nous-mêmes l'e-mail via Sender. Contourne la limite d'envoi de Supabase
-//   Auth, indispensable pour inviter les 400+ familles.
+// - Sender configuré (SENDER_API_KEY) : circuit maison de bout en bout.
+//   Les fonctions Supabase generateLink()/inviteUserByEmail() se sont
+//   révélées peu fiables en production dès qu'elles sont appelées par
+//   programmation (clé API) : elles échouent de façon reproductible avec
+//   une fausse alerte SPF/DKIM/DMARC, sans qu'aucune trace n'apparaisse
+//   dans les journaux Supabase — alors que le même envoi, déclenché à la
+//   main depuis le tableau de bord Supabase, réussit systématiquement.
+//   On ne dépend donc plus du tout de ces fonctions : le compte est créé
+//   ici (createUser, confirmé d'emblée), un jeton maison à usage unique est
+//   généré et stocké dans `invitations`, et c'est cette route qui envoie
+//   l'e-mail via Sender avec un lien vers /activer-compte?jeton=...
 // - Sender non configuré : comportement inchangé (inviteUserByEmail, envoi
 //   par Supabase via le SMTP Infomaniak). C'est le cas tant que Thomas n'a
 //   pas créé le compte Sender.
@@ -34,16 +41,13 @@ function gabaritInvitation({ firstName, actionLink }) {
 // pour que les routes appelantes n'aient rien à changer à leur gestion
 // d'erreur existante (message "already been registered" compris).
 export async function envoyerInvitation(admin, { email, firstName, lastName, parentId, redirectTo }) {
-  const lien = redirectTo || `${SITE_URL}/activer-compte`;
   const trimmedEmail = email.trim();
 
   if (!isSenderConfigured()) {
+    const lien = redirectTo || `${SITE_URL}/activer-compte`;
     return admin.auth.admin.inviteUserByEmail(trimmedEmail, { redirectTo: lien });
   }
 
-  // Compte déjà actif ? On reproduit le message reconnu par les routes
-  // appelantes plutôt que de dépendre du libellé d'erreur de generateLink,
-  // qui n'est pas garanti identique à celui d'inviteUserByEmail.
   const { data: liste } = await admin.auth.admin.listUsers({ perPage: 1000 });
   const existant = (liste?.users || []).find(
     (u) => u.email?.toLowerCase() === trimmedEmail.toLowerCase()
@@ -56,24 +60,30 @@ export async function envoyerInvitation(admin, { email, firstName, lastName, par
     };
   }
 
-  const { data, error } = await admin.auth.admin.generateLink({
-    type: "invite",
-    email: trimmedEmail,
-    options: { redirectTo: lien },
-  });
-
-  if (error) {
-    // Repli : generateLink() peut refuser à tort (fausse alerte SPF/DKIM
-    // observée en production alors que l'envoi natif ci-dessous fonctionne
-    // très bien avec la même config SMTP). On ne bloque jamais une
-    // invitation pour ça ; l'e-mail part alors via Supabase/Infomaniak au
-    // lieu de Sender (pas de suivi ouverture/clic pour celle-ci, mais elle
-    // part).
-    return admin.auth.admin.inviteUserByEmail(trimmedEmail, { redirectTo: lien });
+  let userId = existant?.id;
+  if (!userId) {
+    const { data: cree, error: creationError } = await admin.auth.admin.createUser({
+      email: trimmedEmail,
+      email_confirm: true,
+    });
+    if (creationError) return { data: null, error: creationError };
+    userId = cree.user.id;
   }
 
-  const actionLink = data?.properties?.action_link;
-  const user = data?.user || existant;
+  const { data: invitation, error: insertError } = await admin
+    .from("invitations")
+    .insert({
+      parent_id: parentId || null,
+      user_id: userId,
+      email: trimmedEmail,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    })
+    .select("token")
+    .single();
+
+  if (insertError) return { data: null, error: insertError };
+
+  const actionLink = `${SITE_URL}/activer-compte?jeton=${invitation.token}`;
 
   try {
     const { messageId } = await envoyerEmailTransactionnel({
@@ -81,17 +91,13 @@ export async function envoyerInvitation(admin, { email, firstName, lastName, par
       toName: [firstName, lastName].filter(Boolean).join(" ") || undefined,
       subject: "Activez votre espace famille — Sou des Écoles Montmerle-Lurcy",
       html: gabaritInvitation({ firstName, actionLink }),
-      text: `${firstName ? `Bonjour ${firstName},` : "Bonjour,"}\n\nActivez votre espace famille du Sou des Écoles en suivant ce lien :\n${actionLink}\n\nCe lien est à usage unique.`,
+      text: `${firstName ? `Bonjour ${firstName},` : "Bonjour,"}\n\nActivez votre espace famille du Sou des Écoles en suivant ce lien :\n${actionLink}\n\nCe lien est valable 7 jours.`,
     });
 
-    await admin.from("invitations").insert({
-      parent_id: parentId || null,
-      email: trimmedEmail,
-      provider_message_id: messageId,
-    });
+    await admin.from("invitations").update({ provider_message_id: messageId }).eq("token", invitation.token);
   } catch (sendError) {
     return { data: null, error: sendError };
   }
 
-  return { data: { user }, error: null };
+  return { data: { user: { id: userId, email: trimmedEmail } }, error: null };
 }
