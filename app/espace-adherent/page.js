@@ -29,6 +29,16 @@ function formatPurchaseDate(iso) {
   });
 }
 
+function formatCreneauBenevole(debut, fin) {
+  if (!debut || !fin) return "";
+  const d = new Date(debut);
+  const f = new Date(fin);
+  const jour = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  const heureDebut = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  const heureFin = f.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return `${jour} — ${heureDebut} à ${heureFin}`;
+}
+
 const TARIFS_ADHESION = [
   { id: "jaime", label: "J'aime", montant: 17 },
   { id: "passionnement", label: "Passionnément", montant: 20 },
@@ -216,6 +226,7 @@ export default function EspaceAdherentPage() {
   const [accessToken, setAccessToken] = useState(null);
   const [userEmail, setUserEmail] = useState("");
   const [estAdmin, setEstAdmin] = useState(false);
+  const [creneauxBenevoles, setCreneauxBenevoles] = useState([]);
 
   async function fetchFamilyData(supabase) {
     const [familyRes, parentsRes, childrenRes, purchasesRes, membershipRes] = await Promise.all([
@@ -264,12 +275,28 @@ export default function EspaceAdherentPage() {
         .then((r) => setEstAdmin(r.ok))
         .catch(() => setEstAdmin(false));
 
+      fetch("/api/benevoles/mes-inscriptions", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+        .then((r) => r.json())
+        .then((d) => setCreneauxBenevoles(d.inscriptions || []))
+        .catch(() => setCreneauxBenevoles([]));
+
       await fetchFamilyData(supabase);
       setLoading(false);
     }
 
     load();
   }, [router]);
+
+  async function seDesinscrire(id) {
+    if (!confirm("Vous désinscrire de ce créneau ?")) return;
+    await fetch(`/api/benevoles/mes-inscriptions/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    setCreneauxBenevoles((prev) => prev.filter((c) => c.id !== id));
+  }
 
   async function handleLogout() {
     const supabase = createClient();
@@ -478,6 +505,35 @@ export default function EspaceAdherentPage() {
                   <span>{purchasesTotal.toFixed(2)} €</span>
                 </div>
               </>
+            )}
+          </div>
+
+          <div className="border border-slate-200 rounded-xl p-6">
+            <h2 className="font-semibold text-sou-blue mb-3">Mes créneaux bénévoles</h2>
+            {creneauxBenevoles.length === 0 ? (
+              <p className="text-slate-500 text-sm">
+                Aucune inscription pour le moment. Voir les{" "}
+                <a href="/benevoles" className="text-sou-blue underline">
+                  créneaux à pourvoir
+                </a>
+                .
+              </p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {creneauxBenevoles.map((c) => (
+                  <li key={c.id} className="py-2 flex justify-between items-center gap-4 text-sm">
+                    <div>
+                      <p className="text-slate-700">
+                        {c.evenementNom} — {c.atelierNom}
+                      </p>
+                      <p className="text-slate-400 text-xs mt-0.5">{formatCreneauBenevole(c.debut, c.fin)}</p>
+                    </div>
+                    <button onClick={() => seDesinscrire(c.id)} className="text-red-600 text-xs shrink-0">
+                      Se désinscrire
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 

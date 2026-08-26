@@ -11,6 +11,7 @@ const BANNER_SIZES = {
 const NAV_LINKS = [
   { href: "/", label: "Accueil" },
   { href: "/evenements", label: "Événements" },
+  { href: "/benevoles", label: "Bénévoles" },
   { href: "/boutique", label: "Boutique" },
   { href: "/partenaires", label: "Partenaires" },
   { href: "/presse", label: "Presse" },

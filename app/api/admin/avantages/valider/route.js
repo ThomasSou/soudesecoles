@@ -20,7 +20,7 @@ export async function POST(request) {
 
   const { data: avantage } = await auth.admin
     .from("avantages")
-    .select("id, label, type, active, requiert_adhesion")
+    .select("id, label, type, active, requiert_adhesion, limite")
     .eq("id", avantageId)
     .maybeSingle();
 
@@ -36,32 +36,35 @@ export async function POST(request) {
     return NextResponse.json({ error: "Adhésion non à jour : avantage non applicable." }, { status: 403 });
   }
 
+  const { data: existantes } = await auth.admin
+    .from("avantage_utilisations")
+    .select("used_at, used_by")
+    .eq("avantage_id", avantageId)
+    .eq("family_id", familyId)
+    .order("used_at", { ascending: false });
+
+  if ((existantes || []).length >= avantage.limite) {
+    return NextResponse.json(
+      {
+        ok: false,
+        dejaUtilise: true,
+        limiteAtteinte: true,
+        limite: avantage.limite,
+        fois: existantes.length,
+        usedAt: existantes[0]?.used_at || null,
+        usedBy: existantes[0]?.used_by || null,
+      },
+      { status: 409 }
+    );
+  }
+
   const usedBy = `${auth.parent.first_name || ""} ${auth.parent.last_name || ""}`.trim() || "Bureau";
 
   const { error } = await auth.admin
     .from("avantage_utilisations")
     .insert({ avantage_id: avantageId, family_id: familyId, used_by: usedBy });
 
-  if (error) {
-    if (error.code === "23505") {
-      const { data: existante } = await auth.admin
-        .from("avantage_utilisations")
-        .select("used_at, used_by")
-        .eq("avantage_id", avantageId)
-        .eq("family_id", familyId)
-        .maybeSingle();
-      return NextResponse.json(
-        {
-          ok: false,
-          dejaUtilise: true,
-          usedAt: existante?.used_at || null,
-          usedBy: existante?.used_by || null,
-        },
-        { status: 409 }
-      );
-    }
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, fois: (existantes || []).length + 1, limite: avantage.limite });
 }

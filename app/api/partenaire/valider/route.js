@@ -4,9 +4,8 @@ import { resolveFamilleParToken } from "../../../lib/avantages";
 
 export const dynamic = "force-dynamic";
 
-// Enregistre l'utilisation de l'offre partenaire pour la famille scannée.
-// La contrainte unique (avantage_id, family_id) empêche toute double
-// utilisation, même en cas de double clic ou de deux scans simultanés.
+// Enregistre l'utilisation de l'offre partenaire pour la famille scannée,
+// jusqu'à la limite configurée pour cet avantage.
 export async function POST(request) {
   const body = await request.json().catch(() => null);
   const { avantageId, pin, token } = body || {};
@@ -17,7 +16,7 @@ export async function POST(request) {
   const admin = createAdminClient();
   const { data: avantage } = await admin
     .from("avantages")
-    .select("id, label, partner_name, active, type, requiert_adhesion")
+    .select("id, label, partner_name, active, type, requiert_adhesion, limite")
     .eq("id", avantageId)
     .eq("pin_code", pin)
     .eq("type", "partenaire")
@@ -33,18 +32,23 @@ export async function POST(request) {
     return NextResponse.json({ error: "Adhésion non à jour : offre non applicable." }, { status: 403 });
   }
 
+  const { data: existantes } = await admin
+    .from("avantage_utilisations")
+    .select("id")
+    .eq("avantage_id", avantageId)
+    .eq("family_id", familyId);
+
+  if ((existantes || []).length >= avantage.limite) {
+    return NextResponse.json({ ok: false, dejaUtilise: true, limiteAtteinte: true }, { status: 409 });
+  }
+
   const { error } = await admin.from("avantage_utilisations").insert({
     avantage_id: avantageId,
     family_id: familyId,
     used_by: avantage.partner_name || "Partenaire",
   });
 
-  if (error) {
-    if (error.code === "23505") {
-      return NextResponse.json({ ok: false, dejaUtilise: true }, { status: 409 });
-    }
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, fois: (existantes || []).length + 1, limite: avantage.limite });
 }

@@ -16,7 +16,7 @@ export async function POST(request) {
   const admin = createAdminClient();
   const { data: avantage } = await admin
     .from("avantages")
-    .select("id, label, partner_name, active, type, requiert_adhesion")
+    .select("id, label, partner_name, active, type, requiert_adhesion, limite")
     .eq("id", avantageId)
     .eq("pin_code", pin)
     .eq("type", "partenaire")
@@ -29,19 +29,23 @@ export async function POST(request) {
   const { familyId, adhesionValide } = await resolveFamilleParToken(admin, token);
   if (!familyId) return NextResponse.json({ error: "Carte inconnue." }, { status: 404 });
 
-  const { data: utilisation } = await admin
+  const { data: utilisations } = await admin
     .from("avantage_utilisations")
     .select("used_at, used_by")
     .eq("avantage_id", avantageId)
     .eq("family_id", familyId)
-    .maybeSingle();
+    .order("used_at", { ascending: false });
+
+  const fois = (utilisations || []).length;
 
   return NextResponse.json({
     ok: true,
     label: avantage.label,
     adhesionValide,
     adhesionRequise: avantage.requiert_adhesion,
-    dejaUtilise: Boolean(utilisation),
-    usedAt: utilisation?.used_at || null,
+    limite: avantage.limite,
+    fois,
+    dejaUtilise: fois >= avantage.limite,
+    usedAt: utilisations?.[0]?.used_at || null,
   });
 }

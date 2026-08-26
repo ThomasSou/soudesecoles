@@ -16,7 +16,7 @@ export async function GET(request) {
 
   const { data: avantages, error } = await auth.admin
     .from("avantages")
-    .select("id, label, requiert_adhesion")
+    .select("id, label, requiert_adhesion, limite")
     .eq("type", "interne")
     .eq("active", true);
 
@@ -27,18 +27,25 @@ export async function GET(request) {
     .from("avantage_utilisations")
     .select("avantage_id, used_at, used_by")
     .eq("family_id", familyId)
-    .in("avantage_id", avantages.map((a) => a.id));
+    .in("avantage_id", avantages.map((a) => a.id))
+    .order("used_at", { ascending: false });
 
-  const parUtilisation = {};
-  for (const u of utilisations || []) parUtilisation[u.avantage_id] = u;
+  const parAvantage = {};
+  for (const u of utilisations || []) {
+    (parAvantage[u.avantage_id] = parAvantage[u.avantage_id] || []).push(u);
+  }
 
   return NextResponse.json({
     ok: true,
-    avantages: avantages.map((a) => ({
-      ...a,
-      utilise: Boolean(parUtilisation[a.id]),
-      usedAt: parUtilisation[a.id]?.used_at || null,
-      usedBy: parUtilisation[a.id]?.used_by || null,
-    })),
+    avantages: avantages.map((a) => {
+      const fois = (parAvantage[a.id] || []).length;
+      return {
+        ...a,
+        fois,
+        utilise: fois >= a.limite,
+        usedAt: parAvantage[a.id]?.[0]?.used_at || null,
+        usedBy: parAvantage[a.id]?.[0]?.used_by || null,
+      };
+    }),
   });
 }

@@ -98,7 +98,8 @@ export default function PanneauAvantage({ familyId, token }) {
           <BoutonAvantage
             key={a.id}
             label={a.label}
-            initialementUtilise={a.utilise}
+            initialFois={a.fois}
+            limite={a.limite}
             usedAt={a.usedAt}
             onValider={async () => {
               const res = await fetch("/api/admin/avantages/valider", {
@@ -118,7 +119,8 @@ export default function PanneauAvantage({ familyId, token }) {
         {sessionPartenaire && statutPartenaire && (
           <BoutonAvantage
             label={sessionPartenaire.label}
-            initialementUtilise={statutPartenaire.dejaUtilise}
+            initialFois={statutPartenaire.fois}
+            limite={statutPartenaire.limite}
             usedAt={statutPartenaire.usedAt}
             bloque={
               statutPartenaire.adhesionRequise && !statutPartenaire.adhesionValide
@@ -145,11 +147,13 @@ export default function PanneauAvantage({ familyId, token }) {
   );
 }
 
-function BoutonAvantage({ label, initialementUtilise, usedAt, bloque, onValider }) {
-  const [utilise, setUtilise] = useState(initialementUtilise);
+function BoutonAvantage({ label, initialFois, limite, usedAt, bloque, onValider }) {
+  const [fois, setFois] = useState(initialFois || 0);
   const [heure, setHeure] = useState(usedAt);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState("");
+
+  const limiteAtteinte = fois >= limite;
 
   async function valider() {
     setEnvoi(true);
@@ -157,11 +161,11 @@ function BoutonAvantage({ label, initialementUtilise, usedAt, bloque, onValider 
     try {
       const data = await onValider();
       if (data.ok) {
-        setUtilise(true);
+        setFois(data.fois ?? fois + 1);
         setHeure(new Date().toISOString());
-      } else if (data.dejaUtilise) {
-        setUtilise(true);
-        setHeure(data.usedAt || null);
+      } else if (data.limiteAtteinte) {
+        setFois(data.fois ?? limite);
+        setHeure(data.usedAt || heure);
       } else {
         setErreur(data.error || "Une erreur est survenue.");
       }
@@ -176,15 +180,16 @@ function BoutonAvantage({ label, initialementUtilise, usedAt, bloque, onValider 
     <div className="flex items-center justify-between gap-3 bg-white rounded-xl border border-slate-200 px-4 py-3">
       <div>
         <p className="text-sm font-medium text-slate-700">{label}</p>
-        {utilise && (
+        {fois > 0 && (
           <p className="text-xs text-slate-400 mt-0.5">
-            Déjà pris{heure ? ` — ${formatHeure(heure)}` : ""}
+            Pris {fois}/{limite}
+            {heure ? ` — dernière fois le ${formatHeure(heure)}` : ""}
           </p>
         )}
-        {bloque && !utilise && <p className="text-xs text-red-600 mt-0.5">{bloque}</p>}
+        {bloque && !limiteAtteinte && <p className="text-xs text-red-600 mt-0.5">{bloque}</p>}
         {erreur && <p className="text-xs text-red-600 mt-0.5">{erreur}</p>}
       </div>
-      {utilise ? (
+      {limiteAtteinte ? (
         <span className="text-green-600 text-lg">✓</span>
       ) : (
         <button

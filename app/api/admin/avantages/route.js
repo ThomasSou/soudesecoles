@@ -41,12 +41,18 @@ export async function POST(request) {
 
   if (!label) return NextResponse.json({ error: "Le nom de l'avantage est obligatoire." }, { status: 400 });
 
+  const limite = Number(body?.limite) || 1;
+  if (limite < 1) {
+    return NextResponse.json({ error: "La limite doit être d'au moins 1." }, { status: 400 });
+  }
+
   const insert = {
     label,
     type,
     partner_name: type === "partenaire" ? body?.partnerName?.trim() || null : null,
     pin_code: type === "partenaire" ? genererPin() : null,
     requiert_adhesion: body?.requiresMembership !== false,
+    limite,
     active: true,
   };
 

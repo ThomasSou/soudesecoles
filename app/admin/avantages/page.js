@@ -18,6 +18,7 @@ function NouvelAvantageForm({ accessToken, onCree }) {
   const [type, setType] = useState("interne");
   const [partnerName, setPartnerName] = useState("");
   const [requiresMembership, setRequiresMembership] = useState(true);
+  const [limite, setLimite] = useState("1");
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState("");
   const [ouvert, setOuvert] = useState(false);
@@ -30,7 +31,7 @@ function NouvelAvantageForm({ accessToken, onCree }) {
       const res = await fetch("/api/admin/avantages", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ label, type, partnerName, requiresMembership }),
+        body: JSON.stringify({ label, type, partnerName, requiresMembership, limite }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
@@ -38,6 +39,7 @@ function NouvelAvantageForm({ accessToken, onCree }) {
       setPartnerName("");
       setType("interne");
       setRequiresMembership(true);
+      setLimite("1");
       setOuvert(false);
       onCree(data.avantage);
     } catch (err) {
@@ -99,6 +101,19 @@ function NouvelAvantageForm({ accessToken, onCree }) {
         />
         Réservé aux familles à jour de cotisation
       </label>
+      <div>
+        <label className="text-xs font-semibold text-slate-500">
+          Nombre d&apos;utilisations autorisées par famille
+        </label>
+        <input
+          required
+          type="number"
+          min="1"
+          value={limite}
+          onChange={(e) => setLimite(e.target.value)}
+          className="w-24 border border-slate-300 rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
       <div className="flex gap-2">
         <button
           type="submit"
@@ -165,6 +180,8 @@ function LigneAvantage({ avantage, accessToken, onMaj }) {
   const [detailOuvert, setDetailOuvert] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const [pinRevele, setPinRevele] = useState(false);
+  const [editionLimite, setEditionLimite] = useState(false);
+  const [limite, setLimite] = useState(avantage.limite);
 
   async function patch(body) {
     setEnvoi(true);
@@ -194,6 +211,38 @@ function LigneAvantage({ avantage, accessToken, onMaj }) {
             <button onClick={() => setDetailOuvert((v) => !v)} className="underline">
               {avantage.utilisations} utilisation{avantage.utilisations > 1 ? "s" : ""}
             </button>
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            Utilisable{" "}
+            {editionLimite ? (
+              <>
+                <input
+                  type="number"
+                  min="1"
+                  value={limite}
+                  onChange={(e) => setLimite(e.target.value)}
+                  className="w-14 border border-slate-300 rounded px-1 py-0.5 text-xs"
+                />{" "}
+                fois par famille{" "}
+                <button
+                  onClick={async () => {
+                    await patch({ limite });
+                    setEditionLimite(false);
+                  }}
+                  disabled={envoi}
+                  className="underline"
+                >
+                  enregistrer
+                </button>
+              </>
+            ) : (
+              <>
+                {avantage.limite} fois par famille{" "}
+                <button onClick={() => setEditionLimite(true)} className="underline">
+                  modifier
+                </button>
+              </>
+            )}
           </p>
           {avantage.type === "partenaire" && (
             <p className="text-xs text-slate-500 mt-1">
@@ -278,11 +327,12 @@ export default function AdminAvantagesPage() {
         <div>
           <h1 className="text-2xl font-bold text-sou-blue mb-1">Avantages à usage limité</h1>
           <p className="text-slate-500 text-sm mb-6">
-            Boisson offerte aux adhérents à jour, offres partenaires... Un avantage actif
-            n&apos;est utilisable qu&apos;une fois par famille : le bouton de validation
-            apparaît directement sur la page de la carte quand un membre du bureau (avec le
-            droit « Avantages ») ou un partenaire connecté scanne la carte d&apos;un
-            adhérent. Les partenaires se connectent avec leur code PIN sur{" "}
+            Boisson offerte aux adhérents à jour, offres partenaires... Chaque avantage a une
+            limite d&apos;utilisations par famille (1 par défaut, modifiable). Le bouton de
+            validation apparaît directement sur la page de la carte quand un membre du bureau
+            (avec le droit « Avantages ») ou un partenaire connecté scanne la carte d&apos;un
+            adhérent — n&apos;importe qui d&apos;autre voit uniquement le statut d&apos;adhésion,
+            sans bouton. Les partenaires se connectent avec leur code PIN sur{" "}
             <span className="font-mono">/partenaire</span>.
           </p>
           <AvantagesAdmin accessToken={accessToken} />

@@ -10,6 +10,7 @@ export const PERMISSIONS = [
   { key: "emails", label: "Envoi d'e-mails" },
   { key: "boutique", label: "Boutique en ligne (produits et commandes)" },
   { key: "avantages", label: "Avantages (boisson offerte, offres partenaires)" },
+  { key: "benevoles", label: "Créneaux bénévoles" },
   { key: "statistiques", label: "Statistiques de fréquentation" },
   { key: "acces", label: "Gestion des accès et permissions du bureau" },
 ];

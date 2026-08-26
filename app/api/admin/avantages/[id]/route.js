@@ -58,6 +58,13 @@ export async function PATCH(request, { params }) {
   if (typeof body?.active === "boolean") update.active = body.active;
   if (typeof body?.label === "string" && body.label.trim()) update.label = body.label.trim();
   if (body?.regeneratePin) update.pin_code = String(Math.floor(1000 + Math.random() * 9000));
+  if (body?.limite !== undefined) {
+    const limite = Number(body.limite);
+    if (!Number.isFinite(limite) || limite < 1) {
+      return NextResponse.json({ error: "La limite doit être d'au moins 1." }, { status: 400 });
+    }
+    update.limite = limite;
+  }
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "Rien à mettre à jour." }, { status: 400 });
