@@ -34,42 +34,38 @@ export async function POST(request) {
   }
 
   const body = await request.json().catch(() => null);
-  const nom = body?.nom?.trim();
+  const prenom = body?.prenom?.trim();
+  const nomFamille = body?.nom?.trim();
   const motif = body?.motif?.trim();
   const montant = Number(body?.montant);
 
-  if (!nom || !motif) {
-    return NextResponse.json({ error: "Nom et motif sont obligatoires." }, { status: 400 });
+  if (!prenom || !nomFamille || !motif) {
+    return NextResponse.json({ error: "Prénom, nom et motif sont obligatoires." }, { status: 400 });
   }
   if (!Number.isFinite(montant) || montant <= 0) {
     return NextResponse.json({ error: "Le montant doit être supérieur à 0." }, { status: 400 });
   }
 
   const montantCents = Math.round(montant * 100);
+  const nomComplet = `${prenom} ${nomFamille}`;
 
   const { data: encaissement, error: insertError } = await auth.admin
     .from("encaissements_libres")
-    .insert({ nom, motif, montant_cents: montantCents, created_by: auth.parent.id })
+    .insert({ nom: nomComplet, motif, montant_cents: montantCents, created_by: auth.parent.id })
     .select()
     .single();
 
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
 
-  // HelloAsso exige prénom ET nom, non vides tous les deux : on découpe au
-  // premier espace, ou on répète le nom en entier s'il n'y en a pas.
-  const espace = nom.indexOf(" ");
-  const prenomPayeur = espace === -1 ? nom : nom.slice(0, espace);
-  const nomPayeur = espace === -1 ? nom : nom.slice(espace + 1);
-
   let intent;
   try {
     intent = await createCheckoutIntent({
       totalCents: montantCents,
-      itemName: `${motif} — ${nom}`.slice(0, 250),
+      itemName: `${motif} — ${nomComplet}`.slice(0, 250),
       backUrl: `${SITE_URL}/admin/encaissements`,
       errorUrl: `${SITE_URL}/admin/encaissements?id=${encaissement.id}&statut=erreur`,
       returnUrl: `${SITE_URL}/admin/encaissements?id=${encaissement.id}&statut=retour`,
-      payer: { firstName: prenomPayeur, lastName: nomPayeur, email: "contact@sou-montmerle.fr" },
+      payer: { firstName: prenom, lastName: nomFamille, email: "contact@sou-montmerle.fr" },
       metadata: { encaissementId: encaissement.id },
     });
   } catch (err) {

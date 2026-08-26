@@ -26,6 +26,7 @@ const STATUTS = {
 };
 
 function NouvelEncaissementForm({ accessToken }) {
+  const [prenom, setPrenom] = useState("");
   const [nom, setNom] = useState("");
   const [motif, setMotif] = useState("");
   const [montant, setMontant] = useState("");
@@ -40,7 +41,7 @@ function NouvelEncaissementForm({ accessToken }) {
       const res = await fetch("/api/admin/encaissements", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ nom, motif, montant }),
+        body: JSON.stringify({ prenom, nom, motif, montant }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
@@ -57,15 +58,27 @@ function NouvelEncaissementForm({ accessToken }) {
     <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
       <h2 className="font-semibold text-slate-800">Nouvel encaissement</h2>
       {erreur && <p className="text-sm text-red-600">{erreur}</p>}
-      <div>
-        <label className="text-xs font-semibold text-slate-500">Payer</label>
-        <input
-          required
-          value={nom}
-          onChange={(e) => setNom(e.target.value)}
-          placeholder="Nom de la personne qui règle"
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-        />
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-semibold text-slate-500">Prénom</label>
+          <input
+            required
+            value={prenom}
+            onChange={(e) => setPrenom(e.target.value)}
+            placeholder="Prénom de la personne qui règle"
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-500">Nom</label>
+          <input
+            required
+            value={nom}
+            onChange={(e) => setNom(e.target.value)}
+            placeholder="Nom de la personne qui règle"
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
       </div>
       <div>
         <label className="text-xs font-semibold text-slate-500">Motif du paiement</label>
