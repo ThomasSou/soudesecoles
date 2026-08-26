@@ -1,7 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import AdminShell from "../admin-shell";
 
 function formatMontant(cents) {
@@ -25,10 +24,15 @@ const STATUTS = {
   failed: { label: "Échoué", classe: "bg-red-50 text-red-700" },
 };
 
-function ChampFamille({ accessToken, familyId, setFamilyId }) {
+// Recherche un parent par nom de famille. Sert à la fois à rattacher un
+// encaissement à une famille (mode "maintenant") et à choisir le
+// destinataire d'une demande de paiement par e-mail (mode "email") : dans
+// les deux cas on a besoin de retrouver la bonne fiche parent.
+function RechercheDestinataire({ accessToken, choisi, onChoisir }) {
   const [familles, setFamilles] = useState([]);
   const [recherche, setRecherche] = useState("");
   const [ouvert, setOuvert] = useState(false);
+  const [familleEnAttente, setFamilleEnAttente] = useState(null);
 
   useEffect(() => {
     fetch("/api/admin/encaissements/familles", { headers: { Authorization: `Bearer ${accessToken}` } })
@@ -43,16 +47,29 @@ function ChampFamille({ accessToken, familyId, setFamilyId }) {
           .filter((f) => f.label.toLowerCase().includes(recherche.trim().toLowerCase()))
           .slice(0, 8);
 
-  const familleChoisie = familles.find((f) => f.id === familyId);
+  function choisirFamille(f) {
+    if (f.parents.length === 1) {
+      const p = f.parents[0];
+      onChoisir({ familyId: f.id, prenom: p.firstName || "", nom: p.lastName || "", email: p.email });
+      setRecherche(f.label);
+      setOuvert(false);
+    } else {
+      setFamilleEnAttente(f);
+      setOuvert(false);
+    }
+  }
 
-  if (familleChoisie) {
+  if (choisi) {
     return (
       <p className="text-sm text-slate-600">
-        Rattaché à <span className="font-medium">{familleChoisie.label}</span>{" "}
+        <span className="font-medium">
+          {choisi.prenom} {choisi.nom}
+        </span>
+        {choisi.email ? ` — ${choisi.email}` : ""}{" "}
         <button
           type="button"
           onClick={() => {
-            setFamilyId(null);
+            onChoisir(null);
             setRecherche("");
           }}
           className="text-sou-blue underline text-xs ml-1"
@@ -60,6 +77,37 @@ function ChampFamille({ accessToken, familyId, setFamilyId }) {
           retirer
         </button>
       </p>
+    );
+  }
+
+  if (familleEnAttente) {
+    return (
+      <div className="border border-slate-200 rounded-lg p-3 text-sm">
+        <p className="text-slate-600 mb-2">Quel parent, chez {familleEnAttente.label} ?</p>
+        <div className="flex flex-wrap gap-2">
+          {familleEnAttente.parents.map((p) => (
+            <button
+              type="button"
+              key={p.id}
+              onClick={() => {
+                onChoisir({ familyId: familleEnAttente.id, prenom: p.firstName || "", nom: p.lastName || "", email: p.email });
+                setRecherche(`${p.firstName || ""} ${p.lastName || ""}`.trim());
+                setFamilleEnAttente(null);
+              }}
+              className="border border-slate-300 rounded-full px-3 py-1 hover:border-sou-blue"
+            >
+              {p.firstName} {p.lastName}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setFamilleEnAttente(null)}
+          className="text-xs text-slate-400 underline mt-2"
+        >
+          Annuler
+        </button>
+      </div>
     );
   }
 
@@ -82,11 +130,7 @@ function ChampFamille({ accessToken, familyId, setFamilyId }) {
             <button
               type="button"
               key={f.id}
-              onClick={() => {
-                setFamilyId(f.id);
-                setRecherche(f.label);
-                setOuvert(false);
-              }}
+              onClick={() => choisirFamille(f)}
               className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
             >
               {f.label}
@@ -98,30 +142,64 @@ function ChampFamille({ accessToken, familyId, setFamilyId }) {
   );
 }
 
-function NouvelEncaissementForm({ accessToken }) {
+function NouvelEncaissementForm({ accessToken, onCree }) {
+  const [mode, setMode] = useState("maintenant"); // maintenant | email
   const [prenom, setPrenom] = useState("");
   const [nom, setNom] = useState("");
   const [motif, setMotif] = useState("");
   const [montant, setMontant] = useState("");
-  const [familyId, setFamilyId] = useState(null);
+  const [destinataire, setDestinataire] = useState(null); // { familyId, prenom, nom, email }
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState("");
+  const [succesEmail, setSuccesEmail] = useState("");
 
   async function handleSubmit(e) {
     e.preventDefault();
     setErreur("");
+    setSuccesEmail("");
+
+    if (mode === "email" && !destinataire) {
+      setErreur("Choisissez le parent qui recevra la demande de paiement.");
+      return;
+    }
+
     setEnvoi(true);
     try {
+      const body =
+        mode === "email"
+          ? {
+              mode: "email",
+              prenom: destinataire.prenom,
+              nom: destinataire.nom,
+              motif,
+              montant,
+              familyId: destinataire.familyId,
+              parentEmail: destinataire.email,
+            }
+          : { mode: "maintenant", prenom, nom, motif, montant, familyId: destinataire?.familyId || null };
+
       const res = await fetch("/api/admin/encaissements", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ prenom, nom, motif, montant, familyId }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
-      // HelloAsso refuse d'être affiché en iframe : redirection pleine page,
-      // comme pour la boutique et les cotisations.
-      window.location.href = data.redirectUrl;
+
+      if (mode === "email") {
+        setSuccesEmail(`Demande de paiement envoyée à ${destinataire.email}.`);
+        setPrenom("");
+        setNom("");
+        setMotif("");
+        setMontant("");
+        setDestinataire(null);
+        setEnvoi(false);
+        onCree();
+      } else {
+        // HelloAsso refuse d'être affiché en iframe : redirection pleine
+        // page, comme pour la boutique et les cotisations.
+        window.location.href = data.redirectUrl;
+      }
     } catch (err) {
       setErreur(err.message);
       setEnvoi(false);
@@ -131,29 +209,51 @@ function NouvelEncaissementForm({ accessToken }) {
   return (
     <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
       <h2 className="font-semibold text-slate-800">Nouvel encaissement</h2>
-      {erreur && <p className="text-sm text-red-600">{erreur}</p>}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-semibold text-slate-500">Prénom</label>
-          <input
-            required
-            value={prenom}
-            onChange={(e) => setPrenom(e.target.value)}
-            placeholder="Prénom de la personne qui règle"
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-slate-500">Nom</label>
-          <input
-            required
-            value={nom}
-            onChange={(e) => setNom(e.target.value)}
-            placeholder="Nom de la personne qui règle"
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-          />
-        </div>
+
+      <div className="flex flex-col gap-1.5 text-sm">
+        <label className="flex items-center gap-2">
+          <input type="radio" checked={mode === "maintenant"} onChange={() => setMode("maintenant")} />
+          Un membre du bureau paie maintenant
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="radio" checked={mode === "email"} onChange={() => setMode("email")} />
+          Envoyer une demande de paiement par e-mail
+        </label>
       </div>
+
+      {erreur && <p className="text-sm text-red-600">{erreur}</p>}
+      {succesEmail && <p className="text-sm text-green-700">{succesEmail}</p>}
+
+      {mode === "email" ? (
+        <div>
+          <label className="text-xs font-semibold text-slate-500">Qui doit payer ?</label>
+          <RechercheDestinataire accessToken={accessToken} choisi={destinataire} onChoisir={setDestinataire} />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-semibold text-slate-500">Prénom</label>
+            <input
+              required
+              value={prenom}
+              onChange={(e) => setPrenom(e.target.value)}
+              placeholder="Prénom de la personne qui règle"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-500">Nom</label>
+            <input
+              required
+              value={nom}
+              onChange={(e) => setNom(e.target.value)}
+              placeholder="Nom de la personne qui règle"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+      )}
+
       <div>
         <label className="text-xs font-semibold text-slate-500">Motif du paiement</label>
         <input
@@ -164,6 +264,7 @@ function NouvelEncaissementForm({ accessToken }) {
           className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
         />
       </div>
+
       <div>
         <label className="text-xs font-semibold text-slate-500">Montant</label>
         <div className="relative w-32">
@@ -179,72 +280,43 @@ function NouvelEncaissementForm({ accessToken }) {
           <span className="absolute inset-y-0 right-3 flex items-center text-slate-400 text-sm">€</span>
         </div>
       </div>
-      <div>
-        <label className="text-xs font-semibold text-slate-500">
-          Rattacher à une famille (facultatif)
-        </label>
-        <p className="text-xs text-slate-400 mb-1">
-          Fait apparaître ce paiement dans l&apos;historique d&apos;achat de la famille sur son espace adhérent.
-        </p>
-        <ChampFamille accessToken={accessToken} familyId={familyId} setFamilyId={setFamilyId} />
-      </div>
+
+      {mode === "maintenant" && (
+        <div>
+          <label className="text-xs font-semibold text-slate-500">
+            Rattacher à une famille (facultatif)
+          </label>
+          <p className="text-xs text-slate-400 mb-1">
+            Fait apparaître ce paiement dans l&apos;historique d&apos;achat de la famille sur son espace adhérent.
+          </p>
+          <RechercheDestinataire accessToken={accessToken} choisi={destinataire} onChoisir={setDestinataire} />
+        </div>
+      )}
+
       <button
         type="submit"
         disabled={envoi}
         className="bg-sou-blue text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-sou-gold transition-colors disabled:opacity-50"
       >
-        {envoi ? "Redirection..." : "Créer le paiement"}
+        {envoi ? "..." : mode === "email" ? "Envoyer la demande de paiement" : "Créer le paiement"}
       </button>
     </form>
   );
 }
 
 function EncaissementsAdmin({ accessToken }) {
-  const searchParams = useSearchParams();
   const [encaissements, setEncaissements] = useState([]);
   const [chargement, setChargement] = useState(true);
-  const [banniere, setBanniere] = useState(null); // { type: 'succes'|'erreur', texte }
 
-  async function recharger() {
-    const res = await fetch("/api/admin/encaissements", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    const data = await res.json();
-    if (res.ok) setEncaissements(data.encaissements || []);
-    setChargement(false);
+  function recharger() {
+    fetch("/api/admin/encaissements", { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then((r) => r.json())
+      .then((data) => setEncaissements(data.encaissements || []))
+      .finally(() => setChargement(false));
   }
 
   useEffect(() => {
-    const id = searchParams.get("id");
-    const statut = searchParams.get("statut");
-
-    async function verifierRetour() {
-      if (!id) {
-        await recharger();
-        return;
-      }
-      const res = await fetch(`/api/admin/encaissements/${id}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const data = await res.json();
-      if (res.ok && data.encaissement?.status === "paid") {
-        setBanniere({
-          type: "succes",
-          texte: `Paiement de ${formatMontant(data.encaissement.montant_cents)} enregistré pour ${data.encaissement.nom}.`,
-        });
-      } else if (statut === "erreur") {
-        setBanniere({ type: "erreur", texte: "Le paiement a été annulé ou a échoué." });
-      } else {
-        setBanniere({
-          type: "erreur",
-          texte: "Paiement non confirmé pour le moment. Il apparaîtra dans la liste dès sa validation.",
-        });
-      }
-      window.history.replaceState(null, "", "/admin/encaissements");
-      await recharger();
-    }
-
-    verifierRetour();
+    recharger();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
 
@@ -256,18 +328,8 @@ function EncaissementsAdmin({ accessToken }) {
         une manifestation), encaissé par carte via HelloAsso plutôt que par un terminal à commission.
       </p>
 
-      {banniere && (
-        <div
-          className={`mb-6 rounded-xl p-4 text-sm ${
-            banniere.type === "succes" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-          }`}
-        >
-          {banniere.texte}
-        </div>
-      )}
-
       <div className="grid md:grid-cols-2 gap-8">
-        <NouvelEncaissementForm accessToken={accessToken} />
+        <NouvelEncaissementForm accessToken={accessToken} onCree={recharger} />
 
         <div>
           <h2 className="font-semibold text-slate-800 mb-3">Historique</h2>
@@ -310,11 +372,7 @@ function EncaissementsAdmin({ accessToken }) {
 export default function AdminEncaissementsPage() {
   return (
     <AdminShell title="Encaissements libres">
-      {(accessToken) => (
-        <Suspense fallback={null}>
-          <EncaissementsAdmin accessToken={accessToken} />
-        </Suspense>
-      )}
+      {(accessToken) => <EncaissementsAdmin accessToken={accessToken} />}
     </AdminShell>
   );
 }
