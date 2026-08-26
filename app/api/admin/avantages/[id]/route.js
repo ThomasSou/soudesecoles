@@ -47,7 +47,7 @@ export async function GET(request, { params }) {
   });
 }
 
-// PATCH : activer/désactiver, changer le libellé, ou régénérer le code PIN.
+// PATCH : activer/désactiver, changer le libellé, ou changer la limite.
 export async function PATCH(request, { params }) {
   const auth = await requirePermission(request, "avantages");
   if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -57,7 +57,6 @@ export async function PATCH(request, { params }) {
 
   if (typeof body?.active === "boolean") update.active = body.active;
   if (typeof body?.label === "string" && body.label.trim()) update.label = body.label.trim();
-  if (body?.regeneratePin) update.pin_code = String(Math.floor(1000 + Math.random() * 9000));
   if (body?.limite !== undefined) {
     const limite = Number(body.limite);
     if (!Number.isFinite(limite) || limite < 1) {

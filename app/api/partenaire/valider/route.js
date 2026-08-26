@@ -1,24 +1,28 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "../../../lib/supabaseServerAdmin";
-import { resolveFamilleParToken } from "../../../lib/avantages";
+import { resolveFamilleParToken, resolvePartenaire } from "../../../lib/avantages";
 
 export const dynamic = "force-dynamic";
 
-// Enregistre l'utilisation de l'offre partenaire pour la famille scannée,
-// jusqu'à la limite configurée pour cet avantage.
+// Enregistre l'utilisation d'un avantage partenaire pour la famille
+// scannée, jusqu'à la limite configurée. L'avantage doit appartenir au
+// partenaire connecté.
 export async function POST(request) {
   const body = await request.json().catch(() => null);
-  const { avantageId, pin, token } = body || {};
-  if (!avantageId || !pin || !token) {
+  const { partenaireId, pin, avantageId, token } = body || {};
+  if (!partenaireId || !pin || !avantageId || !token) {
     return NextResponse.json({ error: "Paramètres manquants." }, { status: 400 });
   }
 
   const admin = createAdminClient();
+  const partenaire = await resolvePartenaire(admin, partenaireId, pin);
+  if (!partenaire) return NextResponse.json({ error: "Compte partenaire invalide." }, { status: 404 });
+
   const { data: avantage } = await admin
     .from("avantages")
-    .select("id, label, partner_name, active, type, requiert_adhesion, limite")
+    .select("id, active, requiert_adhesion, limite")
     .eq("id", avantageId)
-    .eq("pin_code", pin)
+    .eq("partenaire_id", partenaireId)
     .eq("type", "partenaire")
     .maybeSingle();
 
@@ -45,7 +49,7 @@ export async function POST(request) {
   const { error } = await admin.from("avantage_utilisations").insert({
     avantage_id: avantageId,
     family_id: familyId,
-    used_by: avantage.partner_name || "Partenaire",
+    used_by: partenaire.nom,
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

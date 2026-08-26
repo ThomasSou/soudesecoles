@@ -17,3 +17,19 @@ export async function resolveFamilleParToken(admin, token) {
 
   return { familyId: membership.family_id, adhesionValide };
 }
+
+// Vérifie qu'un couple (partenaireId, pin) correspond bien à un compte
+// partenaire actif. Utilisé par toutes les routes de l'espace partenaire :
+// le PIN est le seul rempart, revérifié à chaque appel (pas de session
+// serveur).
+export async function resolvePartenaire(admin, partenaireId, pin) {
+  const { data: partenaire } = await admin
+    .from("partenaires")
+    .select("id, nom, active")
+    .eq("id", partenaireId)
+    .eq("pin_code", pin)
+    .maybeSingle();
+
+  if (!partenaire || !partenaire.active) return null;
+  return partenaire;
+}

@@ -25,7 +25,7 @@ export default function PanneauAvantage({ familyId, token }) {
   const [accessToken, setAccessToken] = useState(null);
   const [avantagesInternes, setAvantagesInternes] = useState([]);
   const [sessionPartenaire, setSessionPartenaire] = useState(null);
-  const [statutPartenaire, setStatutPartenaire] = useState(null);
+  const [avantagesPartenaire, setAvantagesPartenaire] = useState([]);
 
   useEffect(() => {
     let annule = false;
@@ -64,15 +64,17 @@ export default function PanneauAvantage({ familyId, token }) {
       } catch {
         return;
       }
-      const res = await fetch("/api/partenaire/statut", {
+      if (!session?.partenaireId || !session?.pin) return;
+
+      const res = await fetch("/api/partenaire/pour-famille", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avantageId: session.avantageId, pin: session.pin, token }),
+        body: JSON.stringify({ partenaireId: session.partenaireId, pin: session.pin, token }),
       });
       const data = await res.json();
       if (annule || !res.ok) return;
       setSessionPartenaire(session);
-      setStatutPartenaire(data);
+      setAvantagesPartenaire(data.avantages || []);
     }
 
     async function init() {
@@ -88,7 +90,7 @@ export default function PanneauAvantage({ familyId, token }) {
   }, [familyId, token]);
 
   if (chargement) return null;
-  if (avantagesInternes.length === 0 && !sessionPartenaire) return null;
+  if (avantagesInternes.length === 0 && avantagesPartenaire.length === 0) return null;
 
   return (
     <div className="mt-4 border border-sou-blue/20 rounded-2xl p-5 bg-sou-blue/5">
@@ -116,24 +118,22 @@ export default function PanneauAvantage({ familyId, token }) {
           />
         ))}
 
-        {sessionPartenaire && statutPartenaire && (
+        {avantagesPartenaire.map((a) => (
           <BoutonAvantage
-            label={sessionPartenaire.label}
-            initialFois={statutPartenaire.fois}
-            limite={statutPartenaire.limite}
-            usedAt={statutPartenaire.usedAt}
-            bloque={
-              statutPartenaire.adhesionRequise && !statutPartenaire.adhesionValide
-                ? "Adhésion non à jour : offre non applicable."
-                : null
-            }
+            key={a.id}
+            label={a.label}
+            initialFois={a.fois}
+            limite={a.limite}
+            usedAt={a.usedAt}
+            bloque={a.bloque ? "Adhésion non à jour : offre non applicable." : null}
             onValider={async () => {
               const res = await fetch("/api/partenaire/valider", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  avantageId: sessionPartenaire.avantageId,
+                  partenaireId: sessionPartenaire.partenaireId,
                   pin: sessionPartenaire.pin,
+                  avantageId: a.id,
                   token,
                 }),
               });
@@ -141,7 +141,7 @@ export default function PanneauAvantage({ familyId, token }) {
               return { ok: res.ok, ...data };
             }}
           />
-        )}
+        ))}
       </div>
     </div>
   );

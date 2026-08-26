@@ -13,10 +13,167 @@ function formatHeure(iso) {
   });
 }
 
-function NouvelAvantageForm({ accessToken, onCree }) {
+function NouveauPartenaireForm({ accessToken, onCree }) {
+  const [nom, setNom] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState("");
+  const [ouvert, setOuvert] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setErreur("");
+    setEnvoi(true);
+    try {
+      const res = await fetch("/api/admin/partenaires", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ nom }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
+      setNom("");
+      setOuvert(false);
+      onCree(data.partenaire);
+    } catch (err) {
+      setErreur(err.message);
+    } finally {
+      setEnvoi(false);
+    }
+  }
+
+  if (!ouvert) {
+    return (
+      <button
+        onClick={() => setOuvert(true)}
+        className="bg-sou-blue text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-sou-gold transition-colors"
+      >
+        + Nouveau partenaire
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+      {erreur && <p className="text-sm text-red-600">{erreur}</p>}
+      <div>
+        <label className="text-xs font-semibold text-slate-500">Nom du partenaire</label>
+        <input
+          required
+          value={nom}
+          onChange={(e) => setNom(e.target.value)}
+          placeholder="Ex : Nico Traiteur"
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={envoi}
+          className="bg-sou-blue text-white text-sm font-semibold px-4 py-2 rounded-full disabled:opacity-50"
+        >
+          {envoi ? "Création..." : "Créer"}
+        </button>
+        <button type="button" onClick={() => setOuvert(false)} className="text-sm text-slate-500 px-4 py-2">
+          Annuler
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function LignePartenaire({ partenaire, accessToken, onMaj }) {
+  const [envoi, setEnvoi] = useState(false);
+  const [pinRevele, setPinRevele] = useState(false);
+
+  async function patch(body) {
+    setEnvoi(true);
+    try {
+      const res = await fetch(`/api/admin/partenaires/${partenaire.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok) onMaj(data.partenaire);
+    } finally {
+      setEnvoi(false);
+    }
+  }
+
+  return (
+    <div className="border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <p className="font-semibold text-slate-800">{partenaire.nom}</p>
+        <p className="text-xs text-slate-500 mt-0.5">
+          {partenaire.avantages} avantage{partenaire.avantages > 1 ? "s" : ""} créé
+          {partenaire.avantages > 1 ? "s" : ""}
+        </p>
+        <p className="text-xs text-slate-500 mt-1">
+          Code PIN :{" "}
+          <button onClick={() => setPinRevele((v) => !v)} className="font-mono underline">
+            {pinRevele ? partenaire.pin_code : "••••"}
+          </button>{" "}
+          <button onClick={() => patch({ regeneratePin: true })} disabled={envoi} className="underline ml-2">
+            régénérer
+          </button>
+        </p>
+      </div>
+      <div className="flex items-center gap-3">
+        <span
+          className={`text-xs font-semibold px-2 py-1 rounded-full ${
+            partenaire.active ? "bg-green-50 text-green-700" : "bg-slate-100 text-slate-500"
+          }`}
+        >
+          {partenaire.active ? "Actif" : "Désactivé"}
+        </span>
+        <button
+          onClick={() => patch({ active: !partenaire.active })}
+          disabled={envoi}
+          className="text-sm text-sou-blue underline disabled:opacity-50"
+        >
+          {partenaire.active ? "Désactiver" : "Réactiver"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PartenairesAdmin({ accessToken, partenaires, setPartenaires }) {
+  const [chargement, setChargement] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/admin/partenaires", { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then((r) => r.json())
+      .then((data) => setPartenaires(data.partenaires || []))
+      .finally(() => setChargement(false));
+  }, [accessToken, setPartenaires]);
+
+  function majPartenaire(maj) {
+    setPartenaires((prev) => prev.map((p) => (p.id === maj.id ? { ...p, ...maj } : p)));
+  }
+
+  return (
+    <div className="space-y-4">
+      <NouveauPartenaireForm accessToken={accessToken} onCree={(p) => setPartenaires((prev) => [p, ...prev])} />
+      {chargement ? (
+        <p className="text-slate-500 text-sm">Chargement...</p>
+      ) : partenaires.length === 0 ? (
+        <p className="text-slate-500 text-sm">Aucun partenaire créé pour le moment.</p>
+      ) : (
+        <div className="space-y-3">
+          {partenaires.map((p) => (
+            <LignePartenaire key={p.id} partenaire={p} accessToken={accessToken} onMaj={majPartenaire} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NouvelAvantageForm({ accessToken, partenaires, onCree }) {
   const [label, setLabel] = useState("");
   const [type, setType] = useState("interne");
-  const [partnerName, setPartnerName] = useState("");
+  const [partenaireId, setPartenaireId] = useState("");
   const [requiresMembership, setRequiresMembership] = useState(true);
   const [limite, setLimite] = useState("1");
   const [envoi, setEnvoi] = useState(false);
@@ -31,12 +188,12 @@ function NouvelAvantageForm({ accessToken, onCree }) {
       const res = await fetch("/api/admin/avantages", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ label, type, partnerName, requiresMembership, limite }),
+        body: JSON.stringify({ label, type, partenaireId, requiresMembership, limite }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
       setLabel("");
-      setPartnerName("");
+      setPartenaireId("");
       setType("interne");
       setRequiresMembership(true);
       setLimite("1");
@@ -85,12 +242,28 @@ function NouvelAvantageForm({ accessToken, onCree }) {
       </div>
       {type === "partenaire" && (
         <div>
-          <label className="text-xs font-semibold text-slate-500">Nom du partenaire</label>
-          <input
-            value={partnerName}
-            onChange={(e) => setPartnerName(e.target.value)}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-          />
+          <label className="text-xs font-semibold text-slate-500">Partenaire</label>
+          {partenaires.length === 0 ? (
+            <p className="text-xs text-red-600 mt-1">
+              Créez d&apos;abord un partenaire dans la section ci-dessus.
+            </p>
+          ) : (
+            <select
+              required
+              value={partenaireId}
+              onChange={(e) => setPartenaireId(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="" disabled>
+                Choisir un partenaire...
+              </option>
+              {partenaires.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nom}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       )}
       <label className="flex items-center gap-2 text-sm">
@@ -117,7 +290,7 @@ function NouvelAvantageForm({ accessToken, onCree }) {
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={envoi}
+          disabled={envoi || (type === "partenaire" && partenaires.length === 0)}
           className="bg-sou-blue text-white text-sm font-semibold px-4 py-2 rounded-full disabled:opacity-50"
         >
           {envoi ? "Création..." : "Créer"}
@@ -179,7 +352,6 @@ function DetailUtilisations({ accessToken, avantageId, onFermer }) {
 function LigneAvantage({ avantage, accessToken, onMaj }) {
   const [detailOuvert, setDetailOuvert] = useState(false);
   const [envoi, setEnvoi] = useState(false);
-  const [pinRevele, setPinRevele] = useState(false);
   const [editionLimite, setEditionLimite] = useState(false);
   const [limite, setLimite] = useState(avantage.limite);
 
@@ -204,7 +376,7 @@ function LigneAvantage({ avantage, accessToken, onMaj }) {
         <div>
           <p className="font-semibold text-slate-800">{avantage.label}</p>
           <p className="text-xs text-slate-500 mt-0.5">
-            {avantage.type === "partenaire" ? `Partenaire${avantage.partner_name ? " — " + avantage.partner_name : ""}` : "Interne"}
+            {avantage.type === "partenaire" ? `Partenaire${avantage.partenaireNom ? " — " + avantage.partenaireNom : ""}` : "Interne"}
             {" — "}
             {avantage.requiert_adhesion ? "réservé aux adhérents à jour" : "ouvert à tous"}
             {" — "}
@@ -244,21 +416,6 @@ function LigneAvantage({ avantage, accessToken, onMaj }) {
               </>
             )}
           </p>
-          {avantage.type === "partenaire" && (
-            <p className="text-xs text-slate-500 mt-1">
-              Code PIN partenaire :{" "}
-              <button onClick={() => setPinRevele((v) => !v)} className="font-mono underline">
-                {pinRevele ? avantage.pin_code : "••••"}
-              </button>{" "}
-              <button
-                onClick={() => patch({ regeneratePin: true })}
-                disabled={envoi}
-                className="underline ml-2"
-              >
-                régénérer
-              </button>
-            </p>
-          )}
         </div>
         <div className="flex items-center gap-3">
           <span className={`text-xs font-semibold px-2 py-1 rounded-full ${avantage.active ? "bg-green-50 text-green-700" : "bg-slate-100 text-slate-500"}`}>
@@ -284,7 +441,7 @@ function LigneAvantage({ avantage, accessToken, onMaj }) {
   );
 }
 
-function AvantagesAdmin({ accessToken }) {
+function AvantagesAdmin({ accessToken, partenaires }) {
   const [avantages, setAvantages] = useState([]);
   const [chargement, setChargement] = useState(true);
 
@@ -305,6 +462,7 @@ function AvantagesAdmin({ accessToken }) {
     <div className="space-y-4">
       <NouvelAvantageForm
         accessToken={accessToken}
+        partenaires={partenaires}
         onCree={(a) => setAvantages((prev) => [{ ...a, utilisations: 0 }, ...prev])}
       />
       {avantages.length === 0 ? (
@@ -320,24 +478,41 @@ function AvantagesAdmin({ accessToken }) {
   );
 }
 
+function AvantagesEtPartenaires({ accessToken }) {
+  const [partenaires, setPartenaires] = useState([]);
+
+  return (
+    <div className="space-y-10">
+      <div>
+        <h1 className="text-2xl font-bold text-sou-blue mb-1">Avantages à usage limité</h1>
+        <p className="text-slate-500 text-sm mb-6">
+          Boisson offerte aux adhérents à jour, offres partenaires... Chaque avantage a une
+          limite d&apos;utilisations par famille (1 par défaut, modifiable). Le bouton de
+          validation apparaît directement sur la page de la carte quand un membre du bureau
+          (avec le droit « Avantages ») ou un partenaire connecté scanne la carte d&apos;un
+          adhérent — n&apos;importe qui d&apos;autre voit uniquement le statut d&apos;adhésion,
+          sans bouton.
+        </p>
+        <AvantagesAdmin accessToken={accessToken} partenaires={partenaires} />
+      </div>
+
+      <div>
+        <h2 className="text-xl font-bold text-sou-blue mb-1">Partenaires</h2>
+        <p className="text-slate-500 text-sm mb-6">
+          Chaque partenaire se connecte sur <span className="font-mono">/partenaire</span> avec
+          son propre code PIN, qui donne accès à tous ses avantages d&apos;un coup. Il peut soit
+          les créer lui-même depuis son espace, soit vous demander de les créer ici pour lui.
+        </p>
+        <PartenairesAdmin accessToken={accessToken} partenaires={partenaires} setPartenaires={setPartenaires} />
+      </div>
+    </div>
+  );
+}
+
 export default function AdminAvantagesPage() {
   return (
     <AdminShell title="Avantages">
-      {(accessToken) => (
-        <div>
-          <h1 className="text-2xl font-bold text-sou-blue mb-1">Avantages à usage limité</h1>
-          <p className="text-slate-500 text-sm mb-6">
-            Boisson offerte aux adhérents à jour, offres partenaires... Chaque avantage a une
-            limite d&apos;utilisations par famille (1 par défaut, modifiable). Le bouton de
-            validation apparaît directement sur la page de la carte quand un membre du bureau
-            (avec le droit « Avantages ») ou un partenaire connecté scanne la carte d&apos;un
-            adhérent — n&apos;importe qui d&apos;autre voit uniquement le statut d&apos;adhésion,
-            sans bouton. Les partenaires se connectent avec leur code PIN sur{" "}
-            <span className="font-mono">/partenaire</span>.
-          </p>
-          <AvantagesAdmin accessToken={accessToken} />
-        </div>
-      )}
+      {(accessToken) => <AvantagesEtPartenaires accessToken={accessToken} />}
     </AdminShell>
   );
 }
