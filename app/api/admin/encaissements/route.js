@@ -55,6 +55,12 @@ export async function POST(request) {
 
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
 
+  // HelloAsso exige prénom ET nom, non vides tous les deux : on découpe au
+  // premier espace, ou on répète le nom en entier s'il n'y en a pas.
+  const espace = nom.indexOf(" ");
+  const prenomPayeur = espace === -1 ? nom : nom.slice(0, espace);
+  const nomPayeur = espace === -1 ? nom : nom.slice(espace + 1);
+
   let intent;
   try {
     intent = await createCheckoutIntent({
@@ -63,7 +69,7 @@ export async function POST(request) {
       backUrl: `${SITE_URL}/admin/encaissements`,
       errorUrl: `${SITE_URL}/admin/encaissements?id=${encaissement.id}&statut=erreur`,
       returnUrl: `${SITE_URL}/admin/encaissements?id=${encaissement.id}&statut=retour`,
-      payer: { firstName: nom, lastName: "", email: "contact@sou-montmerle.fr" },
+      payer: { firstName: prenomPayeur, lastName: nomPayeur, email: "contact@sou-montmerle.fr" },
       metadata: { encaissementId: encaissement.id },
     });
   } catch (err) {
