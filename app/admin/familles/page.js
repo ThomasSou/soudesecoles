@@ -86,6 +86,67 @@ function RenvoyerInvitation({ parentId, token, onDone }) {
   );
 }
 
+// Pour une fiche "sans compte" qui n'a pas encore d'adresse e-mail : on la
+// saisit ici, ce qui déclenche l'invitation sur la fiche existante — jamais
+// de doublon créé.
+function AjouterAdresseEtInviter({ familyId, parentId, token, onDone }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    const res = await fetch("/api/admin/familles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ familyId, parentId, email }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) {
+      setError(data.error || "Une erreur est survenue.");
+      return;
+    }
+    onDone();
+  }
+
+  if (!ouvert) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOuvert(true)}
+        className="text-xs font-semibold text-sou-blue hover:text-sou-gold ml-1"
+      >
+        Ajouter une adresse et inviter
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="inline-flex items-center gap-2 ml-1">
+      <input
+        required
+        autoFocus
+        type="email"
+        placeholder="Adresse e-mail"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="border border-slate-300 rounded-lg px-2 py-1 text-xs"
+      />
+      <button type="submit" disabled={busy} className="text-xs font-semibold text-sou-blue disabled:opacity-60">
+        {busy ? "..." : "Inviter"}
+      </button>
+      <button type="button" onClick={() => setOuvert(false)} className="text-xs text-slate-400">
+        Annuler
+      </button>
+      {error && <span className="text-xs text-red-600">{error}</span>}
+    </form>
+  );
+}
+
 function ListeFamilles({ token }) {
   const [familles, setFamilles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -234,7 +295,7 @@ function ListeFamilles({ token }) {
                       {f.parents.map((p) => (
                         <li key={p.id}>
                           {p.first_name} {p.last_name}
-                          <span className="text-slate-400"> — {p.email}</span>
+                          {p.email && <span className="text-slate-400"> — {p.email}</span>}
                           {p.title && (
                             <span className="text-slate-400 text-xs ml-1">
                               ({p.title})
@@ -245,12 +306,24 @@ function ListeFamilles({ token }) {
                               · back-office
                             </span>
                           )}
-                          {!p.authActivated && (
+                          {p.authActivated ? (
+                            <span className="text-green-700 text-xs ml-1">· compte actif</span>
+                          ) : p.email ? (
                             <>
                               <span className={`text-xs ml-1 ${statutInvitation(p).couleur}`}>
                                 · {statutInvitation(p).texte}
                               </span>
                               <RenvoyerInvitation
+                                parentId={p.id}
+                                token={token}
+                                onDone={charger}
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-slate-400 text-xs ml-1">· sans compte</span>
+                              <AjouterAdresseEtInviter
+                                familyId={f.id}
                                 parentId={p.id}
                                 token={token}
                                 onDone={charger}
@@ -371,9 +444,8 @@ function FormulaireParent({ familyId, token, onDone, onCancel }) {
           className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
         />
         <input
-          required
           type="email"
-          placeholder="Adresse e-mail"
+          placeholder="Adresse e-mail (facultatif)"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
@@ -394,7 +466,7 @@ function FormulaireParent({ familyId, token, onDone, onCancel }) {
           disabled={busy}
           className="bg-sou-blue text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-sou-gold transition-colors disabled:opacity-60"
         >
-          {busy ? "Envoi..." : "Inviter ce parent"}
+          {busy ? "Envoi..." : email.trim() ? "Ajouter et inviter ce parent" : "Ajouter ce parent (sans compte)"}
         </button>
         <button
           type="button"

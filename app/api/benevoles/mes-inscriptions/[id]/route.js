@@ -17,11 +17,18 @@ export async function DELETE(request, { params }) {
     return NextResponse.json({ error: "Session invalide." }, { status: 401 });
   }
 
+  const { data: parent } = await admin
+    .from("parents")
+    .select("id")
+    .eq("auth_user_id", userData.user.id)
+    .maybeSingle();
+  if (!parent) return NextResponse.json({ error: "Profil introuvable." }, { status: 404 });
+
   const { error: deleteError } = await admin
     .from("benevolat_inscriptions")
     .delete()
     .eq("id", params.id)
-    .eq("parent_id", userData.user.id);
+    .eq("parent_id", parent.id);
 
   if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
   return NextResponse.json({ ok: true });

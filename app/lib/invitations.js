@@ -49,7 +49,11 @@ export async function envoyerInvitation(admin, { email, firstName, lastName, par
   if (!isSenderConfigured()) {
     console.error("[envoyerInvitation] circuit maison ignoré : Sender non configuré, utilisation de inviteUserByEmail");
     const lien = redirectTo || `${SITE_URL}/activer-compte`;
-    return admin.auth.admin.inviteUserByEmail(trimmedEmail, { redirectTo: lien });
+    const result = await admin.auth.admin.inviteUserByEmail(trimmedEmail, { redirectTo: lien });
+    if (!result.error && parentId && result.data?.user?.id) {
+      await admin.from("parents").update({ auth_user_id: result.data.user.id }).eq("id", parentId);
+    }
+    return result;
   }
 
   const { data: liste, error: listeError } = await admin.auth.admin.listUsers({ perPage: 1000 });
@@ -79,6 +83,13 @@ export async function envoyerInvitation(admin, { email, firstName, lastName, par
       return { data: null, error: creationError };
     }
     userId = cree.user.id;
+  }
+
+  // Rattache la fiche existante au compte (nouveau ou déjà présent côté
+  // Auth) : une fiche parent n'a plus forcément d'id égal à celui du
+  // compte, c'est cette colonne qui fait le lien désormais.
+  if (parentId) {
+    await admin.from("parents").update({ auth_user_id: userId }).eq("id", parentId);
   }
 
   const { data: invitation, error: insertError } = await admin

@@ -16,10 +16,17 @@ export async function GET(request) {
     return NextResponse.json({ error: "Session invalide." }, { status: 401 });
   }
 
+  const { data: parent } = await admin
+    .from("parents")
+    .select("id")
+    .eq("auth_user_id", userData.user.id)
+    .maybeSingle();
+  if (!parent) return NextResponse.json({ ok: true, inscriptions: [] });
+
   const { data: inscriptions, error: inscError } = await admin
     .from("benevolat_inscriptions")
     .select("id, creneau_id, created_at")
-    .eq("parent_id", userData.user.id)
+    .eq("parent_id", parent.id)
     .order("created_at", { ascending: false });
 
   if (inscError) return NextResponse.json({ error: inscError.message }, { status: 500 });

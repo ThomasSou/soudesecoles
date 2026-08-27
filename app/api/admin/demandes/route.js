@@ -76,33 +76,41 @@ export async function POST(request) {
     return NextResponse.json({ error: familyError.message }, { status: 500 });
   }
 
-  const { data: invited, error: inviteError } = await envoyerInvitation(admin, {
+  const { data: nouveauParent, error: parentError } = await admin
+    .from("parents")
+    .insert({
+      family_id: family.id,
+      first_name: demande.first_name,
+      last_name: demande.last_name,
+      email: demande.email,
+      phone: demande.phone,
+      role: "parent",
+    })
+    .select()
+    .single();
+
+  if (parentError) {
+    await admin.from("families").delete().eq("id", family.id);
+    return NextResponse.json({ error: parentError.message }, { status: 500 });
+  }
+
+  const { error: inviteError } = await envoyerInvitation(admin, {
     email: demande.email,
     firstName: demande.first_name,
     lastName: demande.last_name,
+    parentId: nouveauParent.id,
   });
 
   if (inviteError) {
-    // On annule la famille créée pour ne pas laisser de ligne orpheline.
+    // On annule la fiche et la famille créées pour ne pas laisser de ligne
+    // orpheline (family_id passe à null sur suppression de famille, la
+    // fiche parent doit donc être supprimée explicitement en premier).
+    await admin.from("parents").delete().eq("id", nouveauParent.id);
     await admin.from("families").delete().eq("id", family.id);
     return NextResponse.json(
       { error: `Invitation impossible : ${inviteError.message}` },
       { status: 500 }
     );
-  }
-
-  const { error: parentError } = await admin.from("parents").upsert({
-    id: invited.user.id,
-    family_id: family.id,
-    first_name: demande.first_name,
-    last_name: demande.last_name,
-    email: demande.email,
-    phone: demande.phone,
-    role: "parent",
-  });
-
-  if (parentError) {
-    return NextResponse.json({ error: parentError.message }, { status: 500 });
   }
 
   const childRows = (demande.children || [])

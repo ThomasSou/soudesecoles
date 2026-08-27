@@ -24,14 +24,17 @@
  *
  * Pour chaque famille :
  *  - crée la ligne `families`
- *  - pour chaque parent : invite l'adresse e-mail via Supabase Auth
- *    (l'utilisateur reçoit un e-mail officiel avec un lien pour définir
- *    son mot de passe), puis crée la ligne `parents` correspondante
- *    (id = id de l'utilisateur invité)
+ *  - pour chaque parent : crée d'abord la fiche `parents` (email facultatif),
+ *    puis invite l'adresse e-mail via Supabase Auth si elle est présente
+ *    (l'utilisateur reçoit un e-mail officiel avec un lien pour définir son
+ *    mot de passe) et rattache le compte créé à la fiche (`auth_user_id`)
  *  - crée les lignes `children`
  *
- * Si un parent a déjà un compte (email déjà utilisé), le script le signale
- * et passe au suivant sans écraser les données existantes.
+ * Un parent sans e-mail (`email` omis dans le JSON) obtient une fiche sans
+ * compte de connexion. Si deux parents de la même famille partagent la même
+ * adresse, seul le premier reçoit le compte ; le second est créé sans
+ * e-mail sur sa fiche (contrainte unique en base) — à compléter à la main
+ * si besoin.
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -79,7 +82,49 @@ for (const fam of families) {
   }
   familiesCreated++;
 
+  // Un e-mail ne peut appartenir qu'a une seule fiche (contrainte unique en
+  // base) : si deux parents de la meme famille partagent une adresse (cas
+  // frequent), seul le premier recoit le compte/l'invitation ; le second
+  // est cree "sans compte", sans e-mail sur sa fiche pour ne pas entrer en
+  // conflit — a completer manuellement plus tard si besoin.
+  const emailsDejaUtilises = new Set();
+
   for (const parent of fam.parents || []) {
+    const emailNormalise = parent.email?.trim().toLowerCase() || null;
+    const emailPartage = emailNormalise && emailsDejaUtilises.has(emailNormalise);
+
+    if (emailPartage) {
+      console.warn(
+        `  Parent ${parent.firstName} ${parent.lastName} : e-mail (${parent.email}) deja utilise par un autre parent de cette famille — fiche creee sans compte, a verifier.`
+      );
+    }
+
+    const { data: nouveauParent, error: creationError } = await admin
+      .from("parents")
+      .insert({
+        family_id: family.id,
+        first_name: parent.firstName || null,
+        last_name: parent.lastName || null,
+        email: emailPartage ? null : parent.email?.trim() || null,
+        phone: parent.phone || null,
+        role: "parent",
+      })
+      .select()
+      .single();
+
+    if (creationError) {
+      console.error(`  Erreur creation fiche parent ${parent.email || "(sans e-mail)"} :`, creationError.message);
+      continue;
+    }
+
+    if (!parent.email?.trim() || emailPartage) {
+      // Parent sans e-mail (ou e-mail deja pris par son conjoint) : fiche
+      // creee, pas d'invitation possible pour l'instant.
+      parentsSkipped++;
+      continue;
+    }
+    if (emailNormalise) emailsDejaUtilises.add(emailNormalise);
+
     const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
       parent.email,
       { redirectTo: `${SITE_URL}/activer-compte` }
@@ -87,24 +132,19 @@ for (const fam of families) {
 
     if (inviteError) {
       console.warn(
-        `  Parent ${parent.firstName} ${parent.lastName} (${parent.email}) non invite : ${inviteError.message} — a verifier/rattacher manuellement.`
+        `  Parent ${parent.firstName} ${parent.lastName} (${parent.email}) non invite : ${inviteError.message} — fiche creee, a rattacher manuellement.`
       );
       parentsSkipped++;
       continue;
     }
 
-    const { error: parentError } = await admin.from("parents").upsert({
-      id: invited.user.id,
-      family_id: family.id,
-      first_name: parent.firstName || null,
-      last_name: parent.lastName || null,
-      email: parent.email,
-      phone: parent.phone || null,
-      role: "parent",
-    });
+    const { error: majError } = await admin
+      .from("parents")
+      .update({ auth_user_id: invited.user.id })
+      .eq("id", nouveauParent.id);
 
-    if (parentError) {
-      console.error(`  Erreur creation fiche parent ${parent.email} :`, parentError.message);
+    if (majError) {
+      console.error(`  Erreur rattachement compte ${parent.email} :`, majError.message);
       continue;
     }
     parentsInvited++;

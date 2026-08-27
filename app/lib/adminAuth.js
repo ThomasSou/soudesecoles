@@ -40,7 +40,7 @@ export async function requireAdmin(request) {
   const { data: parent } = await admin
     .from("parents")
     .select("id, first_name, last_name, email, is_admin, permissions, title")
-    .eq("id", userData.user.id)
+    .eq("auth_user_id", userData.user.id)
     .maybeSingle();
 
   if (!parent || !parent.is_admin) {

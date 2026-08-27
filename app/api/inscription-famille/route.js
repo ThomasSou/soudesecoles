@@ -31,7 +31,7 @@ export async function POST(request) {
   const { data: existingParent } = await admin
     .from("parents")
     .select("id, family_id")
-    .eq("id", user.id)
+    .eq("auth_user_id", user.id)
     .maybeSingle();
 
   if (existingParent?.family_id) {
@@ -55,8 +55,8 @@ export async function POST(request) {
     return NextResponse.json({ error: familyError.message }, { status: 500 });
   }
 
-  const { error: parentError } = await admin.from("parents").upsert({
-    id: user.id,
+  const { error: parentError } = await admin.from("parents").insert({
+    auth_user_id: user.id,
     family_id: family.id,
     first_name: firstName || null,
     last_name: lastName || null,

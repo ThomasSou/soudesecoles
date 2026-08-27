@@ -80,9 +80,16 @@ export async function GET(request) {
   return NextResponse.json({ familles });
 }
 
-// Rattache un parent à une famille EXISTANTE et lui envoie une invitation.
-// Utilisé notamment pour les familles importées dont l'invitation initiale
-// avait échoué : on ne recrée pas la famille, on ajoute juste le compte.
+// Ajoute un parent à une famille EXISTANTE. Deux cas, selon que `parentId`
+// est fourni ou non :
+// - sans parentId : crée une nouvelle fiche (utilisé notamment pour les
+//   familles importées dont l'invitation initiale avait échoué : on ne
+//   recrée pas la famille, on ajoute juste un parent) ;
+// - avec parentId : complète une fiche "sans compte" déjà existante (parent
+//   sans e-mail au départ) en lui ajoutant une adresse, sans créer de
+//   doublon.
+// L'e-mail est facultatif : sans adresse, la fiche est créée/mise à jour
+// sans tentative d'invitation (parent sans compte assumé).
 export async function POST(request) {
   const auth = await requirePermission(request, "familles");
   if (auth.error) {
@@ -90,14 +97,16 @@ export async function POST(request) {
   }
   const admin = auth.admin;
 
-  const { familyId, firstName, lastName, email, phone, role } =
+  const { familyId, parentId, firstName, lastName, email, phone, role } =
     await request.json();
 
-  if (!familyId || !email?.trim()) {
-    return NextResponse.json(
-      { error: "Famille et adresse e-mail obligatoires." },
-      { status: 400 }
-    );
+  const trimmedEmail = email?.trim() || null;
+
+  if (!familyId) {
+    return NextResponse.json({ error: "Famille obligatoire." }, { status: 400 });
+  }
+  if (!parentId && !firstName?.trim() && !lastName?.trim()) {
+    return NextResponse.json({ error: "Prénom ou nom obligatoire." }, { status: 400 });
   }
 
   const { data: famille } = await admin
@@ -110,73 +119,107 @@ export async function POST(request) {
     return NextResponse.json({ error: "Famille introuvable." }, { status: 404 });
   }
 
-  // Le compte existe-t-il déjà côté Auth ?
-  const { data: dejaParent } = await admin
-    .from("parents")
-    .select("id, family_id")
-    .eq("email", email.trim())
-    .maybeSingle();
+  if (trimmedEmail) {
+    const { data: dejaParent } = await admin
+      .from("parents")
+      .select("id, family_id")
+      .eq("email", trimmedEmail)
+      .maybeSingle();
 
-  if (dejaParent) {
-    return NextResponse.json(
-      {
-        error:
-          dejaParent.family_id === familyId
-            ? "Ce parent est déjà rattaché à cette famille."
-            : "Cette adresse e-mail est déjà rattachée à une autre famille.",
-      },
-      { status: 409 }
-    );
-  }
-
-  let userId;
-  const { data: invited, error: inviteError } = await envoyerInvitation(admin, {
-    email,
-    firstName,
-    lastName,
-  });
-
-  if (inviteError) {
-    // Le compte Auth peut déjà exister sans fiche parent (invitation partie
-    // sans que la fiche soit créée) : on le retrouve pour le rattacher.
-    if (/already been registered/i.test(inviteError.message)) {
-      const { data: liste } = await admin.auth.admin.listUsers();
-      const existant = (liste?.users || []).find(
-        (u) => u.email?.toLowerCase() === email.trim().toLowerCase()
-      );
-      if (!existant) {
-        return NextResponse.json(
-          { error: `Invitation impossible : ${inviteError.message}` },
-          { status: 500 }
-        );
-      }
-      userId = existant.id;
-    } else {
+    if (dejaParent && dejaParent.id !== parentId) {
       return NextResponse.json(
-        { error: `Invitation impossible : ${inviteError.message}` },
-        { status: 500 }
+        {
+          error:
+            dejaParent.family_id === familyId
+              ? "Ce parent est déjà rattaché à cette famille."
+              : "Cette adresse e-mail est déjà rattachée à une autre famille.",
+        },
+        { status: 409 }
       );
     }
+  }
+
+  let parent;
+  if (parentId) {
+    // Complète une fiche "sans compte" existante.
+    const { data: existante } = await admin
+      .from("parents")
+      .select("id, family_id, auth_user_id, first_name, last_name")
+      .eq("id", parentId)
+      .maybeSingle();
+
+    if (!existante || existante.family_id !== familyId) {
+      return NextResponse.json({ error: "Fiche parent introuvable pour cette famille." }, { status: 404 });
+    }
+    if (existante.auth_user_id) {
+      return NextResponse.json({ error: "Ce parent a déjà un compte." }, { status: 409 });
+    }
+
+    const { data: maj, error: majError } = await admin
+      .from("parents")
+      .update({
+        email: trimmedEmail,
+        first_name: firstName?.trim() || existante.first_name,
+        last_name: lastName?.trim() || existante.last_name,
+        phone: phone?.trim() || null,
+      })
+      .eq("id", parentId)
+      .select()
+      .single();
+
+    if (majError) return NextResponse.json({ error: majError.message }, { status: 500 });
+    parent = maj;
   } else {
-    userId = invited.user.id;
+    const { data: nouveau, error: creationError } = await admin
+      .from("parents")
+      .insert({
+        family_id: familyId,
+        first_name: firstName?.trim() || null,
+        last_name: lastName?.trim() || null,
+        email: trimmedEmail,
+        phone: phone?.trim() || null,
+        role: role || "parent",
+      })
+      .select()
+      .single();
+
+    if (creationError) return NextResponse.json({ error: creationError.message }, { status: 500 });
+    parent = nouveau;
   }
 
-  const { error: parentError } = await admin.from("parents").upsert({
-    id: userId,
-    family_id: familyId,
-    first_name: firstName?.trim() || null,
-    last_name: lastName?.trim() || null,
-    email: email.trim(),
-    phone: phone?.trim() || null,
-    role: role || "parent",
-  });
-
-  if (parentError) {
-    return NextResponse.json({ error: parentError.message }, { status: 500 });
+  if (!trimmedEmail) {
+    // Parent sans adresse : pas d'invitation possible, on s'arrête là.
+    return NextResponse.json({ ok: true, invitationEnvoyee: false });
   }
 
-  return NextResponse.json({
-    ok: true,
-    invitationEnvoyee: !inviteError,
+  const { error: inviteError } = await envoyerInvitation(admin, {
+    email: parent.email,
+    firstName: parent.first_name,
+    lastName: parent.last_name,
+    parentId: parent.id,
   });
+
+  if (!inviteError) {
+    return NextResponse.json({ ok: true, invitationEnvoyee: true });
+  }
+
+  // Le compte Auth peut déjà exister sans que rien ne le référence côté
+  // fiche (invitation partie ailleurs sans fiche, ou fiche créée après
+  // coup) : on retrouve ce compte et on relie quand même la fiche, plutôt
+  // que d'échouer alors que le parent a en réalité déjà un accès.
+  if (/already been registered/i.test(inviteError.message)) {
+    const { data: liste } = await admin.auth.admin.listUsers();
+    const existant = (liste?.users || []).find(
+      (u) => u.email?.toLowerCase() === parent.email.toLowerCase()
+    );
+    if (existant) {
+      await admin.from("parents").update({ auth_user_id: existant.id }).eq("id", parent.id);
+    }
+    return NextResponse.json({ ok: true, invitationEnvoyee: false });
+  }
+
+  return NextResponse.json(
+    { error: `Invitation impossible : ${inviteError.message}` },
+    { status: 500 }
+  );
 }

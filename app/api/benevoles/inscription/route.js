@@ -49,7 +49,7 @@ export async function POST(request) {
       const { data: parent } = await admin
         .from("parents")
         .select("id, family_id")
-        .eq("id", userData.user.id)
+        .eq("auth_user_id", userData.user.id)
         .maybeSingle();
       if (parent) {
         parentId = parent.id;
