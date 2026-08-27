@@ -185,6 +185,21 @@ export default function BenevolesPage() {
                 </div>
               )}
 
+              {evenementActif && (
+                <div className="bg-sou-blue/5 border border-sou-blue/10 rounded-xl p-4">
+                  <h2 className="text-xl font-bold text-sou-blue mb-1">
+                    Besoin de bénévoles pour {evenementActif.nom}
+                  </h2>
+                  {evenementActif.description && (
+                    <p className="text-sm text-slate-600 mb-2">{evenementActif.description}</p>
+                  )}
+                  <p className="text-sm text-slate-600">
+                    On compte sur vous ! Même venir sur un seul créneau, ne serait-ce qu&apos;une heure et demie,
+                    est déjà une aide précieuse.
+                  </p>
+                </div>
+              )}
+
               {evenementActif?.ateliers.length === 0 ? (
                 <p className="text-slate-500">Aucun créneau disponible pour le moment.</p>
               ) : (

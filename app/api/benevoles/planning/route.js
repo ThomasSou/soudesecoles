@@ -10,7 +10,7 @@ export async function GET() {
 
   const { data: evenements, error } = await admin
     .from("benevolat_evenements")
-    .select("id, nom")
+    .select("id, nom, description")
     .eq("actif", true);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

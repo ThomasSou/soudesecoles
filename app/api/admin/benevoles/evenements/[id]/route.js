@@ -13,6 +13,7 @@ export async function PATCH(request, { params }) {
   const patch = {};
   if (body?.nom !== undefined) patch.nom = body.nom?.trim();
   if (body?.actif !== undefined) patch.actif = Boolean(body.actif);
+  if (body?.description !== undefined) patch.description = body.description?.trim() || null;
 
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "Rien à mettre à jour." }, { status: 400 });

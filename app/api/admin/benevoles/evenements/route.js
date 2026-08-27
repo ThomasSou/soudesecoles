@@ -56,7 +56,7 @@ export async function POST(request) {
 
   const { data, error } = await auth.admin
     .from("benevolat_evenements")
-    .insert({ nom, actif: true })
+    .insert({ nom, actif: true, description: body?.description?.trim() || null })
     .select()
     .single();
 

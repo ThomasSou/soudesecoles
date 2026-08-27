@@ -418,7 +418,10 @@ function BenevolesAdmin({ accessToken }) {
   const [nomAtelier, setNomAtelier] = useState("");
   const [nouvelEvenement, setNouvelEvenement] = useState(false);
   const [nomEvenement, setNomEvenement] = useState("");
+  const [descriptionEvenement, setDescriptionEvenement] = useState("");
   const [onglet, setOnglet] = useState("planning"); // planning | inscrits
+  const [editionDescription, setEditionDescription] = useState(false);
+  const [descriptionEnEdition, setDescriptionEnEdition] = useState("");
 
   const charger = useCallback(async () => {
     const res = await fetch("/api/admin/benevoles/evenements", {
@@ -441,15 +444,26 @@ function BenevolesAdmin({ accessToken }) {
     const res = await fetch("/api/admin/benevoles/evenements", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ nom: nomEvenement }),
+      body: JSON.stringify({ nom: nomEvenement, description: descriptionEvenement }),
     });
     const data = await res.json();
     if (res.ok) {
       setNomEvenement("");
+      setDescriptionEvenement("");
       setNouvelEvenement(false);
       setEvenementActifId(data.evenement.id);
       charger();
     }
+  }
+
+  async function enregistrerDescription() {
+    await fetch(`/api/admin/benevoles/evenements/${evenementActifId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ description: descriptionEnEdition }),
+    });
+    setEditionDescription(false);
+    charger();
   }
 
   async function basculerActifEvenement(ev) {
@@ -503,13 +517,19 @@ function BenevolesAdmin({ accessToken }) {
             + Événement
           </button>
         ) : (
-          <form onSubmit={creerEvenement} className="flex gap-2">
+          <form onSubmit={creerEvenement} className="flex flex-wrap gap-2 items-start">
             <input
               autoFocus
               value={nomEvenement}
               onChange={(e) => setNomEvenement(e.target.value)}
               placeholder="Ex : Foire 2026"
               className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm"
+            />
+            <input
+              value={descriptionEvenement}
+              onChange={(e) => setDescriptionEvenement(e.target.value)}
+              placeholder="Petit résumé (facultatif), affiché sur la page publique"
+              className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1 min-w-[16rem]"
             />
             <button type="submit" className="text-sm text-sou-blue font-semibold">
               OK
@@ -540,6 +560,39 @@ function BenevolesAdmin({ accessToken }) {
             <button onClick={() => basculerActifEvenement(evenementActif)} className="text-sm text-slate-500 underline">
               {evenementActif.actif ? "Désactiver l'événement" : "Réactiver l'événement"}
             </button>
+          </div>
+
+          <div className="print:hidden">
+            {editionDescription ? (
+              <div className="flex flex-wrap gap-2 items-start">
+                <input
+                  autoFocus
+                  value={descriptionEnEdition}
+                  onChange={(e) => setDescriptionEnEdition(e.target.value)}
+                  placeholder="Petit résumé de l'événement, affiché sur la page publique"
+                  className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1 min-w-[16rem]"
+                />
+                <button onClick={enregistrerDescription} className="text-sm text-sou-blue font-semibold">
+                  OK
+                </button>
+                <button onClick={() => setEditionDescription(false)} className="text-sm text-slate-500">
+                  Annuler
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">
+                {evenementActif.description || <span className="italic">Aucun résumé pour le moment.</span>}{" "}
+                <button
+                  onClick={() => {
+                    setDescriptionEnEdition(evenementActif.description || "");
+                    setEditionDescription(true);
+                  }}
+                  className="text-sou-blue font-semibold"
+                >
+                  {evenementActif.description ? "Modifier" : "Ajouter un résumé"}
+                </button>
+              </p>
+            )}
           </div>
 
           {onglet === "planning" ? (
