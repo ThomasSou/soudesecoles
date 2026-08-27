@@ -16,6 +16,7 @@ function gabaritInvitation({ firstName, actionLink }) {
         </a>
       </p>
       <p style="font-size: 13px; color: #64748b;">Ce lien est valable 7 jours et à usage unique. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.</p>
+      <p style="font-size: 13px; color: #64748b;">Le lien ne fonctionne plus ? Rendez-vous directement sur <a href="${SITE_URL}/mot-de-passe-oublie" style="color: #0b3d91;">${SITE_URL.replace(/^https?:\/\//, "")}/mot-de-passe-oublie</a> pour définir votre mot de passe.</p>
     </div>
   `;
 }
@@ -101,7 +102,7 @@ export async function envoyerInvitation(admin, { email, firstName, lastName, par
       toName: [firstName, lastName].filter(Boolean).join(" ") || undefined,
       subject: "Activez votre espace famille — Sou des Écoles Montmerle-Lurcy",
       html: gabaritInvitation({ firstName, actionLink }),
-      text: `${firstName ? `Bonjour ${firstName},` : "Bonjour,"}\n\nActivez votre espace famille du Sou des Écoles en suivant ce lien :\n${actionLink}\n\nCe lien est valable 7 jours.`,
+      text: `${firstName ? `Bonjour ${firstName},` : "Bonjour,"}\n\nActivez votre espace famille du Sou des Écoles en suivant ce lien :\n${actionLink}\n\nCe lien est valable 7 jours. S'il ne fonctionne plus, rendez-vous directement sur ${SITE_URL}/mot-de-passe-oublie pour définir votre mot de passe.`,
     });
 
     await admin.from("invitations").update({ provider_message_id: messageId }).eq("token", invitation.token);
