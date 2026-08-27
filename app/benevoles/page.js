@@ -13,6 +13,24 @@ function formatCreneau(debut, fin) {
   return `${jour} — ${heureDebut} à ${heureFin}`;
 }
 
+// Un atelier a toujours lieu sur une seule journée : on affiche cette date
+// une fois au-dessus de la liste, plutôt que de la répéter sur chaque ligne
+// de créneau (qui n'a alors plus besoin d'indiquer que l'horaire).
+function formatJour(debut) {
+  const jour = new Date(debut).toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  return jour.charAt(0).toUpperCase() + jour.slice(1);
+}
+
+function formatHeures(debut, fin) {
+  const heureDebut = new Date(debut).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  const heureFin = new Date(fin).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return `${heureDebut} à ${heureFin}`;
+}
+
 export default function BenevolesPage() {
   const [evenements, setEvenements] = useState([]);
   const [evenementActifId, setEvenementActifId] = useState(null);
@@ -175,7 +193,12 @@ export default function BenevolesPage() {
                     <div key={atelier.id}>
                       <h2 className="text-lg font-bold text-sou-blue mb-1">{atelier.nom}</h2>
                       {atelier.description && (
-                        <p className="text-sm text-slate-500 mb-3">{atelier.description}</p>
+                        <p className="text-sm text-slate-500 mb-1">{atelier.description}</p>
+                      )}
+                      {atelier.creneaux[0] && (
+                        <p className="text-sm font-semibold text-slate-700 mb-3">
+                          {formatJour(atelier.creneaux[0].debut)}
+                        </p>
                       )}
                       <div className="space-y-2">
                         {atelier.creneaux.map((c) => {
@@ -201,7 +224,7 @@ export default function BenevolesPage() {
                                     onChange={() => basculer(c.id)}
                                   />
                                   {c.nom && <span className="font-semibold">{c.nom} — </span>}
-                                  {formatCreneau(c.debut, c.fin)}
+                                  {formatHeures(c.debut, c.fin)}
                                 </span>
                                 <span
                                   className={`whitespace-nowrap text-xs font-semibold px-2 py-1 rounded-full ${

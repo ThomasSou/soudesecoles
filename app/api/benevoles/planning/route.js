@@ -20,17 +20,11 @@ export async function GET() {
 
   const evenementIds = evenements.map((e) => e.id);
 
-  const { data: ateliers, error: ateliersError } = await admin
+  const { data: ateliers } = await admin
     .from("benevolat_ateliers")
     .select("id, evenement_id, nom, description, position")
     .in("evenement_id", evenementIds)
     .order("position");
-
-  console.error(
-    "[planning] evenementIds =", JSON.stringify(evenementIds),
-    "ateliersError =", ateliersError?.message,
-    "ateliers.length =", ateliers?.length
-  );
 
   const atelierIds = (ateliers || []).map((a) => a.id);
 
@@ -76,8 +70,16 @@ export async function GET() {
     ateliersParEvenement[a.evenement_id].push({ ...a, creneaux: creneauxParAtelier[a.id] || [] });
   }
 
-  return NextResponse.json({
-    ok: true,
-    evenements: evenements.map((e) => ({ ...e, ateliers: ateliersParEvenement[e.id] || [] })),
-  });
+  // En-tête explicite : la page publique liste des créneaux qui se libèrent
+  // en temps réel (inscriptions concurrentes) et a déjà été vue affichant des
+  // données périmées à cause d'une mise en cache intermédiaire — on interdit
+  // donc tout cache (CDN ou navigateur), pas seulement le "force-dynamic" de
+  // Next.js qui ne l'empêche pas toujours pour un GET.
+  return NextResponse.json(
+    {
+      ok: true,
+      evenements: evenements.map((e) => ({ ...e, ateliers: ateliersParEvenement[e.id] || [] })),
+    },
+    { headers: { "Cache-Control": "no-store, must-revalidate" } }
+  );
 }
