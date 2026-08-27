@@ -20,11 +20,17 @@ export async function GET() {
 
   const evenementIds = evenements.map((e) => e.id);
 
-  const { data: ateliers } = await admin
+  const { data: ateliers, error: ateliersError } = await admin
     .from("benevolat_ateliers")
     .select("id, evenement_id, nom, description, position")
     .in("evenement_id", evenementIds)
     .order("position");
+
+  console.error(
+    "[planning] evenementIds =", JSON.stringify(evenementIds),
+    "ateliersError =", ateliersError?.message,
+    "ateliers.length =", ateliers?.length
+  );
 
   const atelierIds = (ateliers || []).map((a) => a.id);
 
