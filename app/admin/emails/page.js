@@ -290,7 +290,7 @@ function EnvoiEmails({ token, parent }) {
         {apercu && (
           <p className="text-sm text-slate-500 mt-2">
             {apercu.count} famille{apercu.count > 1 ? "s" : ""} correspondante{apercu.count > 1 ? "s" : ""}
-            {!apercu.mailConfigured && " — SMTP non configuré : l'envoi ne partira pas réellement pour l'instant."}
+            {!apercu.mailConfigured && " — Envoi non configuré : l'envoi ne partira pas réellement pour l'instant."}
           </p>
         )}
       </div>
@@ -401,7 +401,7 @@ function EnvoiEmails({ token, parent }) {
             ) : (
               <div>
                 <p className="text-amber-700 font-medium mb-2">
-                  SMTP non configuré : aucun e-mail n&apos;a été envoyé automatiquement. La campagne est enregistrée
+                  Envoi non configuré : aucun e-mail n&apos;a été envoyé automatiquement. La campagne est enregistrée
                   ({resultat.recipientsCount} famille(s) concernée(s)) — voici les adresses à contacter en attendant :
                 </p>
                 <p className="text-slate-600 break-words">
@@ -425,7 +425,7 @@ function EnvoiEmails({ token, parent }) {
                   <p className="font-semibold text-sou-blue">{c.subject}</p>
                   <p className="text-slate-500">
                     {c.segment_summary} — {c.sent_count}/{c.recipients_count} destinataire(s)
-                    {!c.mail_configured && " (brouillon, SMTP non configuré au moment de l'envoi)"}
+                    {!c.mail_configured && " (brouillon, envoi non configuré au moment de l'envoi)"}
                   </p>
                   <p className="text-slate-400 text-xs mt-1">
                     {new Date(c.created_at).toLocaleString("fr-FR")}

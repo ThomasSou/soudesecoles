@@ -13,7 +13,7 @@ export async function POST(request) {
 
   if (!isMailConfigured()) {
     return NextResponse.json(
-      { error: "SMTP non configuré : l'envoi de test n'est pas encore possible (voir avec Thomas)." },
+      { error: "Envoi non configuré : l'envoi de test n'est pas encore possible (voir avec Thomas)." },
       { status: 503 }
     );
   }
