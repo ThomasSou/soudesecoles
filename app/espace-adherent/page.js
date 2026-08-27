@@ -10,6 +10,7 @@ import {
   findCurrentMembership,
   isMembershipValid,
 } from "../lib/anneeScolaire";
+import { EVENTS } from "../evenements/data";
 
 const EMPTY_CHILD = { firstName: "", lastName: "", classLevel: "", teacherName: "" };
 
@@ -210,6 +211,251 @@ function AdhesionPaiement({ accessToken, onPaid }) {
         {envoi ? "Préparation du paiement..." : `Payer ${montant ? montant + " €" : ""}`}
       </button>
       <p className="text-xs text-slate-400 mt-2">Paiement sécurisé HelloAsso, sans quitter le site.</p>
+    </div>
+  );
+}
+
+const CATEGORIES_REMBOURSEMENT = [
+  { value: "manifestation", label: "Manifestation" },
+  { value: "investissement", label: "Investissement général" },
+  { value: "fonctionnement", label: "Frais de fonctionnement" },
+  { value: "autre", label: "Autre" },
+];
+
+const STATUTS_REMBOURSEMENT = {
+  pending: { label: "En attente", classe: "bg-amber-50 text-amber-700" },
+  reimbursed: { label: "Remboursé", classe: "bg-green-50 text-green-700" },
+  refused: { label: "Refusé", classe: "bg-red-50 text-red-700" },
+};
+
+function fichierEnDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Formulaire de demande de remboursement (frais engagés pour une
+// manifestation, un investissement général, un frais de fonctionnement, ou
+// autre) + historique des demandes déjà déposées. Le statut "Remboursé"
+// n'apparaît que lorsque le bureau l'a lui-même indiqué dans le back-office.
+function MesRemboursements({ accessToken }) {
+  const [demandes, setDemandes] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [category, setCategory] = useState("manifestation");
+  const [eventSlug, setEventSlug] = useState(EVENTS[0]?.slug || "");
+  const [description, setDescription] = useState("");
+  const [amount, setAmount] = useState("");
+  const [factureFile, setFactureFile] = useState(null);
+  const [ribFile, setRibFile] = useState(null);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState("");
+  const [succes, setSucces] = useState("");
+
+  function recharger() {
+    fetch("/api/remboursements", { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then((r) => r.json())
+      .then((data) => setDemandes(data.demandes || []))
+      .finally(() => setChargement(false));
+  }
+
+  useEffect(() => {
+    recharger();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken]);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setErreur("");
+    setSucces("");
+
+    if (!factureFile) {
+      setErreur("La facture est obligatoire.");
+      return;
+    }
+    if (!amount || Number(amount) <= 0) {
+      setErreur("Indiquez un montant.");
+      return;
+    }
+
+    setEnvoi(true);
+    try {
+      const invoiceDataUrl = await fichierEnDataUrl(factureFile);
+      const ribDataUrl = ribFile ? await fichierEnDataUrl(ribFile) : null;
+      const event = category === "manifestation" ? EVENTS.find((ev) => ev.slug === eventSlug) : null;
+
+      const res = await fetch("/api/remboursements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          category,
+          eventSlug: event?.slug || null,
+          eventName: event?.name || null,
+          description: description.trim() || null,
+          amount,
+          invoiceDataUrl,
+          ribDataUrl,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
+
+      setSucces("Votre demande a bien été envoyée.");
+      setDescription("");
+      setAmount("");
+      setFactureFile(null);
+      setRibFile(null);
+      recharger();
+    } catch (err) {
+      setErreur(err.message);
+    } finally {
+      setEnvoi(false);
+    }
+  }
+
+  return (
+    <div className="border border-slate-200 rounded-xl p-6">
+      <h2 className="font-semibold text-sou-blue mb-1">Mes remboursements</h2>
+      <p className="text-sm text-slate-500 mb-5">
+        Vous avez avancé des frais pour l&apos;association ? Déposez votre facture ici, le bureau
+        traite ensuite la demande et le statut se met à jour ci-dessous.
+      </p>
+
+      <form onSubmit={handleSubmit} className="space-y-3 mb-6">
+        <div>
+          <label className="text-xs font-semibold text-slate-500">Catégorie</label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          >
+            {CATEGORIES_REMBOURSEMENT.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {category === "manifestation" && (
+          <div>
+            <label className="text-xs font-semibold text-slate-500">Manifestation</label>
+            <select
+              value={eventSlug}
+              onChange={(e) => setEventSlug(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+            >
+              {EVENTS.map((ev) => (
+                <option key={ev.slug} value={ev.slug}>
+                  {ev.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div>
+          <label className="text-xs font-semibold text-slate-500">
+            Détail {category === "autre" ? "" : "(facultatif)"}
+          </label>
+          <input
+            required={category === "autre"}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Ex : Achat de gobelets réutilisables"
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-slate-500">Montant</label>
+          <div className="relative w-32">
+            <input
+              required
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg pl-3 pr-7 py-2 text-sm"
+            />
+            <span className="absolute inset-y-0 right-3 flex items-center text-slate-400 text-sm">€</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-slate-500">Facture (photo ou PDF)</label>
+          <input
+            required
+            type="file"
+            accept="image/*,application/pdf"
+            onChange={(e) => setFactureFile(e.target.files?.[0] || null)}
+            className="block w-full text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-slate-500">RIB (facultatif)</label>
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            onChange={(e) => setRibFile(e.target.files?.[0] || null)}
+            className="block w-full text-sm"
+          />
+        </div>
+
+        {erreur && <p className="text-sm text-red-600">{erreur}</p>}
+        {succes && <p className="text-sm text-green-700">{succes}</p>}
+
+        <button
+          type="submit"
+          disabled={envoi}
+          className="bg-sou-blue text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-sou-gold transition-colors disabled:opacity-50"
+        >
+          {envoi ? "Envoi..." : "Envoyer la demande"}
+        </button>
+      </form>
+
+      <div className="pt-4 border-t border-slate-100">
+        <p className="text-sm font-medium text-slate-600 mb-2">Historique</p>
+        {chargement ? (
+          <p className="text-slate-500 text-sm">Chargement...</p>
+        ) : demandes.length === 0 ? (
+          <p className="text-slate-500 text-sm">Aucune demande pour le moment.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {demandes.map((d) => {
+              const statut = STATUTS_REMBOURSEMENT[d.status] || STATUTS_REMBOURSEMENT.pending;
+              const libelle =
+                d.category === "manifestation"
+                  ? d.event_name
+                  : CATEGORIES_REMBOURSEMENT.find((c) => c.value === d.category)?.label;
+              return (
+                <li key={d.id} className="py-3 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <div>
+                      <p className="text-slate-700">{libelle}</p>
+                      {d.description && <p className="text-slate-400 text-xs">{d.description}</p>}
+                      <p className="text-slate-400 text-xs mt-0.5">{formatPurchaseDate(d.created_at)}</p>
+                      {d.status === "refused" && d.admin_note && (
+                        <p className="text-red-600 text-xs mt-1">Motif : {d.admin_note}</p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-medium text-slate-700">{(d.amount_cents / 100).toFixed(2)} €</p>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${statut.classe}`}>
+                        {statut.label}
+                      </span>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
@@ -507,6 +753,8 @@ export default function EspaceAdherentPage() {
               </>
             )}
           </div>
+
+          <MesRemboursements accessToken={accessToken} />
 
           <div className="border border-slate-200 rounded-xl p-6">
             <h2 className="font-semibold text-sou-blue mb-3">Mes créneaux bénévoles</h2>
