@@ -37,13 +37,17 @@ export async function GET() {
           .order("debut")
       : Promise.resolve({ data: [] }),
     atelierIds.length
-      ? admin.from("benevolat_inscriptions").select("creneau_id")
+      ? admin.from("benevolat_inscriptions").select("creneau_id, first_name, last_name")
       : Promise.resolve({ data: [] }),
   ]);
 
   const inscritsParCreneau = {};
+  const nomsParCreneau = {};
   for (const i of inscriptions || []) {
     inscritsParCreneau[i.creneau_id] = (inscritsParCreneau[i.creneau_id] || 0) + 1;
+    (nomsParCreneau[i.creneau_id] = nomsParCreneau[i.creneau_id] || []).push(
+      `${i.first_name} ${(i.last_name || "").charAt(0)}.`
+    );
   }
 
   const creneauxParAtelier = {};
@@ -55,6 +59,7 @@ export async function GET() {
       fin: c.fin,
       places: c.places,
       placesRestantes: Math.max(0, c.places - (inscritsParCreneau[c.id] || 0)),
+      inscrits: nomsParCreneau[c.id] || [],
     });
   }
 

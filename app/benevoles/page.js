@@ -184,7 +184,7 @@ export default function BenevolesPage() {
                           return (
                             <label
                               key={c.id}
-                              className={`flex items-center justify-between gap-4 border rounded-xl p-3 text-sm ${
+                              className={`flex flex-col gap-1.5 border rounded-xl p-3 text-sm ${
                                 complet
                                   ? "border-slate-200 bg-slate-50 text-slate-400"
                                   : coche
@@ -192,22 +192,29 @@ export default function BenevolesPage() {
                                   : "border-slate-200 hover:border-sou-blue/50 cursor-pointer"
                               }`}
                             >
-                              <span className="flex items-center gap-3">
-                                <input
-                                  type="checkbox"
-                                  disabled={complet}
-                                  checked={coche}
-                                  onChange={() => basculer(c.id)}
-                                />
-                                {formatCreneau(c.debut, c.fin)}
+                              <span className="flex items-center justify-between gap-4">
+                                <span className="flex items-center gap-3">
+                                  <input
+                                    type="checkbox"
+                                    disabled={complet}
+                                    checked={coche}
+                                    onChange={() => basculer(c.id)}
+                                  />
+                                  {formatCreneau(c.debut, c.fin)}
+                                </span>
+                                <span
+                                  className={`whitespace-nowrap text-xs font-semibold px-2 py-1 rounded-full ${
+                                    complet ? "bg-slate-200 text-slate-500" : "bg-green-50 text-green-700"
+                                  }`}
+                                >
+                                  {complet ? "Complet" : `${c.placesRestantes} place${c.placesRestantes > 1 ? "s" : ""}`}
+                                </span>
                               </span>
-                              <span
-                                className={`whitespace-nowrap text-xs font-semibold px-2 py-1 rounded-full ${
-                                  complet ? "bg-slate-200 text-slate-500" : "bg-green-50 text-green-700"
-                                }`}
-                              >
-                                {complet ? "Complet" : `${c.placesRestantes} place${c.placesRestantes > 1 ? "s" : ""}`}
-                              </span>
+                              {c.inscrits.length > 0 && (
+                                <span className="text-xs text-slate-400 pl-7">
+                                  Déjà inscrit·e{c.inscrits.length > 1 ? "s" : ""} : {c.inscrits.join(", ")}
+                                </span>
+                              )}
                             </label>
                           );
                         })}
