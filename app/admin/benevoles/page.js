@@ -31,6 +31,7 @@ function CreneauForm({ initial, onSubmit, onCancel }) {
   const [debut, setDebut] = useState(initial ? fromIso(initial.debut) : { date: "", heure: "" });
   const [fin, setFin] = useState(initial ? fromIso(initial.fin) : { date: "", heure: "" });
   const [places, setPlaces] = useState(initial?.places?.toString() || "1");
+  const [nom, setNom] = useState(initial?.nom || "");
   const [erreur, setErreur] = useState("");
   const [envoi, setEnvoi] = useState(false);
 
@@ -45,7 +46,7 @@ function CreneauForm({ initial, onSubmit, onCancel }) {
     }
     setEnvoi(true);
     try {
-      await onSubmit({ debut: debutIso, fin: finIso, places: Number(places) });
+      await onSubmit({ debut: debutIso, fin: finIso, places: Number(places), nom: nom.trim() || null });
     } catch (err) {
       setErreur(err.message || "Une erreur est survenue.");
     } finally {
@@ -56,6 +57,13 @@ function CreneauForm({ initial, onSubmit, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
       {erreur && <p className="text-xs text-red-600">{erreur}</p>}
+      <input
+        type="text"
+        placeholder="Nom du créneau (facultatif) — ex : Service midi"
+        value={nom}
+        onChange={(e) => setNom(e.target.value)}
+        className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"
+      />
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         <input
           required
@@ -241,7 +249,10 @@ function AtelierBloc({ atelier, accessToken, onChange }) {
             />
           ) : (
             <div key={c.id} className="flex items-center justify-between text-sm bg-white border border-slate-100 rounded-lg px-3 py-2">
-              <span>{formatCreneau(c.debut, c.fin)}</span>
+              <span>
+                {c.nom && <span className="font-medium">{c.nom} — </span>}
+                {formatCreneau(c.debut, c.fin)}
+              </span>
               <span className="text-slate-500">
                 {c.inscrits}/{c.places} inscrit{c.inscrits > 1 ? "s" : ""}
               </span>

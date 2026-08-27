@@ -14,6 +14,7 @@ export async function POST(request) {
   const debut = body?.debut;
   const fin = body?.fin;
   const places = Number(body?.places);
+  const nom = body?.nom?.trim() || null;
 
   if (!atelierId || !debut || !fin) {
     return NextResponse.json({ error: "Atelier, début et fin obligatoires." }, { status: 400 });
@@ -27,7 +28,7 @@ export async function POST(request) {
 
   const { data, error } = await auth.admin
     .from("benevolat_creneaux")
-    .insert({ atelier_id: atelierId, debut, fin, places })
+    .insert({ atelier_id: atelierId, debut, fin, places, nom })
     .select()
     .single();
 

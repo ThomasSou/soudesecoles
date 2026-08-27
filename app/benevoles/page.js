@@ -200,6 +200,7 @@ export default function BenevolesPage() {
                                     checked={coche}
                                     onChange={() => basculer(c.id)}
                                   />
+                                  {c.nom && <span className="font-semibold">{c.nom} — </span>}
                                   {formatCreneau(c.debut, c.fin)}
                                 </span>
                                 <span
@@ -238,7 +239,8 @@ export default function BenevolesPage() {
                       return (
                         <li key={id} className="flex justify-between gap-2">
                           <span>
-                            {c.atelierNom} — {formatCreneau(c.debut, c.fin)}
+                            {c.atelierNom}
+                            {c.nom ? ` (${c.nom})` : ""} — {formatCreneau(c.debut, c.fin)}
                           </span>
                           <button
                             type="button"

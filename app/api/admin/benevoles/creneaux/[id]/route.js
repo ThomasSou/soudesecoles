@@ -11,6 +11,7 @@ export async function PATCH(request, { params }) {
   const patch = {};
   if (body?.debut !== undefined) patch.debut = body.debut;
   if (body?.fin !== undefined) patch.fin = body.fin;
+  if (body?.nom !== undefined) patch.nom = body.nom?.trim() || null;
   if (body?.places !== undefined) {
     const places = Number(body.places);
     if (!Number.isFinite(places) || places < 1) {

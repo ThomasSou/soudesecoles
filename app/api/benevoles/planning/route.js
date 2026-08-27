@@ -32,7 +32,7 @@ export async function GET() {
     atelierIds.length
       ? admin
           .from("benevolat_creneaux")
-          .select("id, atelier_id, debut, fin, places")
+          .select("id, atelier_id, debut, fin, places, nom")
           .in("atelier_id", atelierIds)
           .order("debut")
       : Promise.resolve({ data: [] }),
@@ -55,6 +55,7 @@ export async function GET() {
     if (!creneauxParAtelier[c.atelier_id]) creneauxParAtelier[c.atelier_id] = [];
     creneauxParAtelier[c.atelier_id].push({
       id: c.id,
+      nom: c.nom,
       debut: c.debut,
       fin: c.fin,
       places: c.places,
