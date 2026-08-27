@@ -125,6 +125,25 @@ function suggestionProchainCreneau(creneaux) {
 function AtelierBloc({ atelier, accessToken, onChange }) {
   const [nouveauCreneau, setNouveauCreneau] = useState(false);
   const [creneauEnEdition, setCreneauEnEdition] = useState(null);
+  const [renommage, setRenommage] = useState(false);
+  const [nouveauNom, setNouveauNom] = useState(atelier.nom);
+
+  async function renommerAtelier(e) {
+    e.preventDefault();
+    if (!nouveauNom.trim() || nouveauNom.trim() === atelier.nom) {
+      setRenommage(false);
+      return;
+    }
+    const res = await fetch(`/api/admin/benevoles/ateliers/${atelier.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ nom: nouveauNom }),
+    });
+    if (res.ok) {
+      setRenommage(false);
+      onChange();
+    }
+  }
 
   async function creerCreneau(form) {
     const res = await fetch("/api/admin/benevoles/creneaux", {
@@ -170,9 +189,38 @@ function AtelierBloc({ atelier, accessToken, onChange }) {
 
   return (
     <div className="border border-slate-200 rounded-xl p-4">
-      <div className="flex items-center justify-between mb-3">
-        <p className="font-semibold text-slate-800">{atelier.nom}</p>
-        <div className="flex gap-3">
+      <div className="flex items-center justify-between mb-3 gap-3">
+        {renommage ? (
+          <form onSubmit={renommerAtelier} className="flex gap-2 flex-1">
+            <input
+              autoFocus
+              value={nouveauNom}
+              onChange={(e) => setNouveauNom(e.target.value)}
+              className="border border-slate-300 rounded-lg px-2 py-1 text-sm font-semibold flex-1"
+            />
+            <button type="submit" className="text-sm text-sou-blue font-semibold">
+              OK
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setNouveauNom(atelier.nom);
+                setRenommage(false);
+              }}
+              className="text-sm text-slate-500"
+            >
+              Annuler
+            </button>
+          </form>
+        ) : (
+          <p className="font-semibold text-slate-800">{atelier.nom}</p>
+        )}
+        <div className="flex gap-3 shrink-0">
+          {!renommage && (
+            <button onClick={() => setRenommage(true)} className="text-sm text-sou-blue font-semibold">
+              Renommer
+            </button>
+          )}
           <button onClick={() => setNouveauCreneau(true)} className="text-sm text-sou-blue font-semibold">
             + Créneau
           </button>
