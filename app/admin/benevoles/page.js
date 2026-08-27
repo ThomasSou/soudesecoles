@@ -108,6 +108,20 @@ function CreneauForm({ initial, onSubmit, onCancel }) {
   );
 }
 
+// Propose un créneau à la suite du dernier de l'atelier : même jour, heure
+// de début = heure de fin du précédent, même durée. Reste modifiable à la
+// main avant validation.
+function suggestionProchainCreneau(creneaux) {
+  if (!creneaux || creneaux.length === 0) return null;
+  const dernier = creneaux[creneaux.length - 1];
+  const debutPrecedent = new Date(dernier.debut);
+  const finPrecedent = new Date(dernier.fin);
+  const dureeMs = finPrecedent - debutPrecedent;
+  const debut = finPrecedent;
+  const fin = new Date(finPrecedent.getTime() + dureeMs);
+  return { debut: debut.toISOString(), fin: fin.toISOString(), places: dernier.places };
+}
+
 function AtelierBloc({ atelier, accessToken, onChange }) {
   const [nouveauCreneau, setNouveauCreneau] = useState(false);
   const [creneauEnEdition, setCreneauEnEdition] = useState(null);
@@ -198,7 +212,11 @@ function AtelierBloc({ atelier, accessToken, onChange }) {
           <p className="text-sm text-slate-400">Aucun créneau pour le moment.</p>
         )}
         {nouveauCreneau && (
-          <CreneauForm onSubmit={creerCreneau} onCancel={() => setNouveauCreneau(false)} />
+          <CreneauForm
+            initial={suggestionProchainCreneau(atelier.creneaux)}
+            onSubmit={creerCreneau}
+            onCancel={() => setNouveauCreneau(false)}
+          />
         )}
       </div>
     </div>

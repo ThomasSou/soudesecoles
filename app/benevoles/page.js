@@ -25,15 +25,19 @@ export default function BenevolesPage() {
   const [envoi, setEnvoi] = useState(false);
   const [chargement, setChargement] = useState(true);
 
-  useEffect(() => {
-    fetch("/api/benevoles/planning")
+  function chargerPlanning() {
+    return fetch("/api/benevoles/planning")
       .then((r) => r.json())
       .then((d) => {
         const liste = d.evenements || [];
         setEvenements(liste);
-        setEvenementActifId(liste[0]?.id || null);
+        setEvenementActifId((courant) => courant || liste[0]?.id || null);
         setChargement(false);
       });
+  }
+
+  useEffect(() => {
+    chargerPlanning();
 
     (async () => {
       const supabase = createClient();
@@ -131,6 +135,16 @@ export default function BenevolesPage() {
               Votre inscription sur {selection.length} créneau{selection.length > 1 ? "x" : ""} a bien été
               enregistrée. À bientôt !
             </p>
+            <button
+              onClick={() => {
+                setSelection([]);
+                setEtape("planning");
+                chargerPlanning();
+              }}
+              className="inline-block mt-6 text-sou-blue underline text-sm"
+            >
+              ← Retour au planning
+            </button>
           </div>
         ) : (
           <div className="grid lg:grid-cols-3 gap-10">
