@@ -10,4 +10,5 @@ test-import-bureau.json
 # téléphones, adresses de familles) : jamais dans le dépôt.
 scripts/familles.json
 scripts/familles-rapport.txt
+scripts/familles-recap.csv
 scripts/derniers-parents-importes.json

@@ -229,6 +229,10 @@ for (const fichier of fichiersClasse) {
   const colsNomEleve = tousIdx(/nom de famille .l.ve/i);
   const colsPrenomEleve = tousIdx(/pr.nom .l.ve/i);
   const colsClasse = tousIdx(/classes? .l.ves?/i);
+  // Seuls les exports maternelle la contiennent ; elle sert à distinguer deux
+  // élèves homonymes (même nom, même prénom) là où les exports élémentaire ne
+  // fournissent que le nom — cf. plus bas la construction de la clé enfant.
+  const colsDateNaissance = tousIdx(/date de naissance/i);
 
   if (cNomResp < 0 || cCourriel < 0 || colsNomEleve.length === 0) {
     anomalies.push(`IGNORÉ — ${fichier} : colonnes attendues introuvables.`);
@@ -254,6 +258,7 @@ for (const fichier of fichiersClasse) {
         nom: propre(l[cNom]),
         prenom: propre(l[colsPrenomEleve[i]]),
         classe: propre(l[colsClasse[i]]),
+        dateNaissance: colsDateNaissance[i] !== undefined ? propre(l[colsDateNaissance[i]]) : "",
       }))
       .filter((e) => e.nom || e.prenom);
 
@@ -263,10 +268,17 @@ for (const fichier of fichiersClasse) {
       const nomEleve = enfant.nom;
       const prenomEleve = enfant.prenom;
       const classe = enfant.classe;
+      const dateNaissance = enfant.dateNaissance;
 
     // Un parent est identifié par son e-mail ; à défaut par son nom complet.
     const cleP = email ? `mail:${email}` : `nom:${cleNom(nomResp)} ${cleNom(prenomResp)}`;
-    const cleE = `enfant:${cleNom(nomEleve)} ${cleNom(prenomEleve)}`;
+    // Un enfant est identifié par son nom + sa date de naissance quand on l'a
+    // (exports maternelle) : ça évite de confondre deux élèves homonymes de
+    // classes différentes (voir l'incident Léo Granger — PETITS et CM1-CM2 —
+    // fusionnés par erreur avant ce correctif, faute d'un identifiant fiable
+    // dans les exports élémentaire). Sans date (exports élémentaire), on
+    // retombe sur nom + prénom seuls, comme avant.
+    const cleE = `enfant:${cleNom(nomEleve)} ${cleNom(prenomEleve)}` + (dateNaissance ? `|${dateNaissance}` : "");
 
     if (!parents.has(cleP)) {
       parents.set(cleP, {
@@ -281,7 +293,13 @@ for (const fichier of fichiersClasse) {
     infoParent.sources.add(fichier);
 
     if (!enfants.has(cleE)) {
-      enfants.set(cleE, { nom: joliNom(nomEleve), prenom: joliNom(prenomEleve), classe, vuAvecClasses: new Set() });
+      enfants.set(cleE, {
+        nom: joliNom(nomEleve),
+        prenom: joliNom(prenomEleve),
+        classe,
+        identifieParDate: Boolean(dateNaissance),
+        vuAvecClasses: new Set(),
+      });
     }
     const infoEnfant = enfants.get(cleE);
     if (classe) infoEnfant.vuAvecClasses.add(classe);
@@ -312,11 +330,22 @@ for (const fichier of fichiersClasse) {
 //    changé de classe en cours d'année (rare), soit ce sont en réalité deux
 //    élèves homonymes qu'on est en train de confondre en un seul.
 for (const [, e] of enfants) {
-  if (e.vuAvecClasses.size > 1) {
+  if (e.vuAvecClasses.size <= 1) continue;
+  if (e.identifieParDate) {
+    // Même enfant confirmé par la date de naissance (les deux lignes
+    // concordent) : la classe est juste mal renseignée sur l'une des deux
+    // lignes (ex. classe double niveau notée différemment par chaque
+    // parent) — pas un risque d'homonyme, juste à corriger la classe.
     anomalies.push(
-      `VÉRIFIER — l'élève ${e.prenom} ${e.nom} apparaît avec plusieurs classes ` +
-        `différentes (${[...e.vuAvecClasses].join(", ")}) : vérifier qu'il ne s'agit pas de deux ` +
-        `élèves homonymes plutôt qu'un seul, avant d'importer.`
+      `CLASSE INCOHÉRENTE — l'élève ${e.prenom} ${e.nom} (même date de naissance) est noté dans deux ` +
+        `classes différentes selon la ligne (${[...e.vuAvecClasses].join(", ")}) — probablement une classe à ` +
+        `double niveau désignée différemment par chaque parent. Choisis la bonne classe dans scripts/familles.json.`
+    );
+  } else {
+    anomalies.push(
+      `VÉRIFIER — l'élève ${e.prenom} ${e.nom} apparaît avec plusieurs classes différentes ` +
+        `(${[...e.vuAvecClasses].join(", ")}), sans date de naissance pour trancher : vérifier qu'il ne s'agit ` +
+        `pas de deux élèves homonymes plutôt qu'un seul, avant d'importer.`
     );
   }
 }
@@ -365,8 +394,9 @@ try {
       if (!email) continue;
       coordonnees.set(email, {
         adresse: propre(l[cAdr]),
-        // Les CP perdent parfois leur zéro initial en passant par Excel.
-        cp: propre(l[cCp]).padStart(5, "0"),
+        // Les CP perdent parfois leur zéro initial en passant par Excel — mais
+        // un CP réellement vide ne doit pas devenir "00000".
+        cp: propre(l[cCp]) ? propre(l[cCp]).padStart(5, "0") : "",
         ville: propre(l[cVille]),
         telephone: propre(l[cTel]),
       });
@@ -450,12 +480,49 @@ for (const membres of groupes.values()) {
     });
   }
 
+  // Dédoublonnage : un "parent" sans prénom NI e-mail qui partage le nom de
+  // famille d'un autre parent déjà identifié dans cette même famille est
+  // presque à coup sûr la même personne, réapparue via le fichier CM1-CM2
+  // qui n'a pas de colonne prénom (11 Liste CM1-CM2.csv) — pas un deuxième
+  // parent distinct. On le retire plutôt que de créer une fiche en double
+  // pour la même personne physique. On ne fusionne jamais deux parents qui
+  // ont chacun un prénom ou un e-mail : seul un doublon sans AUCUN
+  // identifiant propre est retiré.
+  const parentsFinal = parentsRetenus.filter((p) => {
+    if (p.firstName || p.email) return true;
+    const doublonProbable = parentsRetenus.some(
+      (autre) => autre !== p && autre.lastName === p.lastName && (autre.firstName || autre.email)
+    );
+    if (doublonProbable) {
+      anomalies.push(
+        `DOUBLON RETIRÉ — un parent "${p.lastName}" sans prénom ni e-mail a été retiré de la famille ` +
+          `${nomFamille} : très probablement la même personne qu'un autre parent "${p.lastName}" déjà identifié ` +
+          `dans cette famille (réapparu via un export sans colonne prénom).`
+      );
+      return false;
+    }
+    return true;
+  });
+
+  // Garde-fou : une famille n'a jamais plus de deux parents. Au-delà, c'est
+  // presque certainement deux familles distinctes fusionnées par erreur
+  // (typiquement via un enfant homonyme) — voir l'incident Léo Granger — ou,
+  // plus rarement, une vraie famille recomposée à vérifier quand même.
+  if (parentsFinal.length > 2) {
+    anomalies.push(
+      `VÉRIFIER — la famille ${nomFamille} a ${parentsFinal.length} parents ` +
+        `(${parentsFinal.map((p) => `${p.firstName} ${p.lastName}`).join(", ")}) : ` +
+        `une famille en a rarement plus de deux — vérifier qu'il ne s'agit pas d'une fusion ` +
+        `erronée de deux familles distinctes (sinon, famille recomposée légitime, rien à faire).`
+    );
+  }
+
   familles.push({
     addressLine: coord?.adresse || "",
     postalCode: coord?.cp || "",
     city: coord?.ville || "",
     schoolYear: anneeScolaire,
-    parents: parentsRetenus,
+    parents: parentsFinal,
     children: sesEnfants.map((e) => ({
       firstName: e.prenom,
       lastName: e.nom,
@@ -473,16 +540,55 @@ familles.sort((a, b) =>
 
 const sortieJson = join(ICI, "familles.json");
 const sortieRapport = join(ICI, "familles-rapport.txt");
+const sortieRecap = join(ICI, "familles-recap.csv");
 
 writeFileSync(sortieJson, JSON.stringify(familles, null, 2), "utf8");
+
+// Tableau récapitulatif : une ligne par famille, à ouvrir dans Excel pour une
+// relecture finale et à garder comme trace de ce qui a été importé.
+const celluleCsv = (v) => `"${(v ?? "").toString().replace(/"/g, '""')}"`;
+const ligneRecapCsv = (champs) => champs.map(celluleCsv).join(";");
+const lignesRecap = [
+  ligneRecapCsv([
+    "Adresse",
+    "CP",
+    "Ville",
+    "Parent 1",
+    "E-mail 1",
+    "Téléphone 1",
+    "Parent 2",
+    "E-mail 2",
+    "Téléphone 2",
+    "Autres parents (alerte si présent)",
+    "Enfants",
+  ]),
+  ...familles.map((f) => {
+    const [p1, p2, ...pAutres] = f.parents;
+    const nomParent = (p) => (p ? `${p.firstName} ${p.lastName}`.trim() : "");
+    return ligneRecapCsv([
+      f.addressLine,
+      f.postalCode,
+      f.city,
+      nomParent(p1),
+      p1?.email || "",
+      p1?.phone || "",
+      nomParent(p2),
+      p2?.email || "",
+      p2?.phone || "",
+      pAutres.map(nomParent).join(", "),
+      f.children.map((c) => `${c.firstName} ${c.lastName} (${c.classLevel || "?"})`).join(", "),
+    ]);
+  }),
+];
+writeFileSync(sortieRecap, "﻿" + lignesRecap.join("\r\n"), "utf8");
 
 const tousLesParents = familles.flatMap((f) => f.parents);
 const nbParents = tousLesParents.length;
 const nbParentsSansCompte = tousLesParents.filter((p) => !p.email).length;
 const nbEnfants = familles.reduce((s, f) => s + f.children.length, 0);
 
-const anomaliesAVerifier = anomalies.filter((a) => a.startsWith("VÉRIFIER"));
-const autresAnomalies = anomalies.filter((a) => !a.startsWith("VÉRIFIER"));
+const anomaliesAVerifier = anomalies.filter((a) => a.startsWith("VÉRIFIER") || a.startsWith("CLASSE INCOHÉRENTE"));
+const autresAnomalies = anomalies.filter((a) => !anomaliesAVerifier.includes(a));
 
 const rapport = [
   `Reconstitution des familles — année ${anneeScolaire}`,
@@ -528,5 +634,6 @@ writeFileSync(sortieRapport, rapport, "utf8");
 console.log(rapport);
 console.log(`\nFichier écrit : ${sortieJson}`);
 console.log(`Rapport écrit : ${sortieRapport}`);
+console.log(`Récapitulatif (Excel) écrit : ${sortieRecap}`);
 console.log(`\nRelis le rapport, corrige si besoin, puis :`);
 console.log(`  node scripts/import-familles.mjs scripts/familles.json`);
