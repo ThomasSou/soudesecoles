@@ -28,6 +28,19 @@ const NIVEAUX = [
   { key: "elementaire", label: "Élémentaire (CP au CM2)" },
 ];
 
+// Pause entre deux vagues d'envoi (cf. app/lib/emailCampagne.js : ~20
+// e-mails par vague). Laisse respirer le serveur d'envoi et évite un pic
+// de centaines d'e-mails en quelques secondes.
+const PAUSE_ENTRE_VAGUES_MS = 1500;
+
+const CANAUX = {
+  sender: "Sender — adapté à l'envoi en masse",
+  smtp: "SMTP Infomaniak — déconseillé pour un envoi à toute l'école (~450)",
+  aucun: "aucun canal configuré — rien ne partira",
+};
+
+const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+
 function EnvoiEmails({ token, parent }) {
   const [classesDisponibles, setClassesDisponibles] = useState([]);
   const [campagnes, setCampagnes] = useState([]);
@@ -47,6 +60,13 @@ function EnvoiEmails({ token, parent }) {
   const [busyEnvoi, setBusyEnvoi] = useState(false);
   const [resultat, setResultat] = useState(null);
   const [error, setError] = useState("");
+
+  // Double validation : l'envoi réel ne part qu'après confirmation explicite.
+  const [confirmation, setConfirmation] = useState(false);
+  const [confirmCoche, setConfirmCoche] = useState(false);
+  // Envoi par vagues en cours : { campaignId, sent, total, done, enPause, enErreur }.
+  const [progres, setProgres] = useState(null);
+  const stopRef = useRef(false);
 
   const [testEmail, setTestEmail] = useState("");
   const [busyTest, setBusyTest] = useState(false);
@@ -98,9 +118,10 @@ function EnvoiEmails({ token, parent }) {
     setBusyApercu(false);
     if (!res.ok) {
       setError(data.error || "Erreur.");
-      return;
+      return null;
     }
     setApercu(data);
+    return data;
   }
 
   const previewRecipient = useMemo(() => {
@@ -129,22 +150,32 @@ function EnvoiEmails({ token, parent }) {
     return true;
   });
 
-  async function envoyer() {
+  // Étape 1 : clic sur « Envoyer » → on rafraîchit le nombre de
+  // destinataires et on ouvre le panneau de confirmation. Rien ne part.
+  async function ouvrirConfirmation() {
     if (!subject.trim() || contenuVide) {
       setError("Merci de renseigner le sujet et au moins un bloc avec du contenu.");
       return;
     }
+    setError("");
+    setResultat(null);
+    setConfirmCoche(false);
+    const data = await voirApercu();
+    if (!data) return;
+    setConfirmation(true);
+  }
+
+  // Étape 2 : confirmation cochée → on crée la campagne et on envoie la
+  // première vague, puis on enchaîne les suivantes.
+  async function demarrerEnvoi() {
+    setConfirmation(false);
     setBusyEnvoi(true);
     setError("");
     setResultat(null);
     const res = await fetch("/api/admin/emails", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        segment: segment(),
-        subject,
-        contentBlocks: blocks,
-      }),
+      body: JSON.stringify({ segment: segment(), subject, contentBlocks: blocks }),
     });
     const data = await res.json();
     setBusyEnvoi(false);
@@ -152,7 +183,74 @@ function EnvoiEmails({ token, parent }) {
       setError(data.error || "Erreur.");
       return;
     }
-    setResultat(data);
+    if (!data.mailConfigured) {
+      setResultat(data);
+      setApercu(null);
+      return;
+    }
+    const etat = {
+      campaignId: data.campaignId,
+      sent: data.sentCount,
+      total: data.recipientsCount,
+      done: data.done,
+    };
+    setProgres(etat);
+    if (data.done) {
+      finaliser(etat);
+    } else {
+      boucleEnvoi(data.campaignId);
+    }
+  }
+
+  // Enchaîne les vagues via /api/admin/emails/continuer, avec une pause
+  // entre chaque, jusqu'à la fin ou une mise en pause.
+  async function boucleEnvoi(campaignId) {
+    stopRef.current = false;
+    setProgres((p) => ({ ...(p || {}), campaignId, enPause: false, enErreur: false }));
+    while (!stopRef.current) {
+      await attendre(PAUSE_ENTRE_VAGUES_MS);
+      if (stopRef.current) break;
+      let data;
+      try {
+        const res = await fetch("/api/admin/emails/continuer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ campaignId }),
+        });
+        data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Erreur pendant l'envoi.");
+      } catch (e) {
+        setProgres((p) => ({ ...(p || {}), enErreur: true }));
+        setError(e.message + " L'envoi peut être repris.");
+        return;
+      }
+      const etat = {
+        campaignId,
+        sent: data.sentCount,
+        total: data.recipientsCount,
+        done: data.done,
+      };
+      setProgres(etat);
+      if (data.done) {
+        finaliser(etat);
+        return;
+      }
+    }
+    // Sortie de boucle sans « done » = mise en pause manuelle.
+    setProgres((p) => ({ ...(p || {}), enPause: true }));
+  }
+
+  function mettreEnPause() {
+    stopRef.current = true;
+  }
+
+  function finaliser(etat) {
+    setResultat({
+      mailConfigured: true,
+      sentCount: etat.sent,
+      recipientsCount: etat.total,
+    });
+    setProgres(null);
     setApercu(null);
     setSubject("");
     setBlocks(TEMPLATES[0].blocks());
@@ -190,6 +288,21 @@ function EnvoiEmails({ token, parent }) {
     setSubject(c.subject);
     setBlocks(c.content_blocks && c.content_blocks.length > 0 ? c.content_blocks : [newBlock("paragraph")]);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // Reprend l'envoi d'une campagne restée « en cours » (onglet fermé,
+  // fonction coupée, mise en pause).
+  function reprendreEnvoi(c) {
+    setError("");
+    setResultat(null);
+    setProgres({
+      campaignId: c.id,
+      sent: c.sent_count,
+      total: c.recipients_count,
+      done: false,
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    boucleEnvoi(c.id);
   }
 
   if (loading) {
@@ -288,10 +401,19 @@ function EnvoiEmails({ token, parent }) {
         </button>
 
         {apercu && (
-          <p className="text-sm text-slate-500 mt-2">
-            {apercu.count} famille{apercu.count > 1 ? "s" : ""} correspondante{apercu.count > 1 ? "s" : ""}
-            {!apercu.mailConfigured && " — Envoi non configuré : l'envoi ne partira pas réellement pour l'instant."}
-          </p>
+          <div className="text-sm text-slate-500 mt-2 space-y-0.5">
+            <p>
+              {apercu.count} destinataire{apercu.count > 1 ? "s" : ""}
+              {apercu.count > 1 ? " (un par parent, désinscrits exclus)" : ""}
+              {!apercu.mailConfigured &&
+                " — Envoi non configuré : l'envoi ne partira pas réellement pour l'instant."}
+            </p>
+            {apercu.canal && (
+              <p className="text-xs">
+                Canal d&apos;envoi : {CANAUX[apercu.canal] || apercu.canal}
+              </p>
+            )}
+          </div>
         )}
       </div>
 
@@ -384,25 +506,123 @@ function EnvoiEmails({ token, parent }) {
           </p>
         </div>
 
-        <button
-          onClick={envoyer}
-          disabled={busyEnvoi}
-          className="mt-4 bg-sou-blue text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-sou-gold transition-colors disabled:opacity-60"
-        >
-          {busyEnvoi ? "Envoi..." : "Envoyer"}
-        </button>
+        {!confirmation && !progres && (
+          <button
+            onClick={ouvrirConfirmation}
+            disabled={busyEnvoi || busyApercu}
+            className="mt-4 bg-sou-blue text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-sou-gold transition-colors disabled:opacity-60"
+          >
+            {busyApercu ? "Préparation..." : "Envoyer"}
+          </button>
+        )}
+
+        {confirmation && (
+          <div className="mt-4 border-2 border-sou-blue/40 bg-sou-blue/5 rounded-xl p-4 text-sm">
+            <p className="font-semibold text-sou-blue mb-1">Confirmer l&apos;envoi</p>
+            <p className="text-slate-600 mb-1">
+              Vous êtes sur le point d&apos;envoyer <strong>« {subject || "(sans sujet)"} »</strong> à{" "}
+              <strong>
+                {apercu ? apercu.count : "…"} destinataire
+                {apercu && apercu.count > 1 ? "s" : ""}
+              </strong>
+              {apercu?.segmentSummary ? ` — ${apercu.segmentSummary}` : ""}.
+            </p>
+            {apercu?.canal && (
+              <p className="text-xs text-slate-500 mb-3">
+                Canal d&apos;envoi : {CANAUX[apercu.canal] || apercu.canal}
+              </p>
+            )}
+            {apercu && !apercu.mailConfigured && (
+              <p className="text-amber-700 text-xs mb-3">
+                Aucun canal d&apos;envoi configuré : la campagne sera enregistrée mais aucun
+                e-mail ne partira automatiquement.
+              </p>
+            )}
+            <label className="flex items-start gap-2 mb-3">
+              <input
+                type="checkbox"
+                checked={confirmCoche}
+                onChange={(e) => setConfirmCoche(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Je confirme l&apos;envoi à {apercu ? apercu.count : "…"} destinataire
+                {apercu && apercu.count > 1 ? "s" : ""}.
+              </span>
+            </label>
+            <div className="flex gap-3">
+              <button
+                onClick={demarrerEnvoi}
+                disabled={!confirmCoche}
+                className="bg-sou-blue text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-sou-gold transition-colors disabled:opacity-40"
+              >
+                Confirmer l&apos;envoi
+              </button>
+              <button
+                onClick={() => setConfirmation(false)}
+                className="text-sm text-slate-500 hover:text-sou-blue px-3"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
+
+        {progres && (
+          <div className="mt-4 border border-slate-200 rounded-xl p-4 text-sm">
+            <p className="font-medium text-slate-700 mb-2">
+              {progres.enErreur
+                ? "Envoi interrompu"
+                : progres.enPause
+                ? "Envoi en pause"
+                : "Envoi en cours par vagues…"}{" "}
+              {progres.sent} / {progres.total}
+            </p>
+            <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
+              <div
+                className="h-full bg-sou-blue transition-all"
+                style={{
+                  width: `${
+                    progres.total ? Math.round((progres.sent / progres.total) * 100) : 0
+                  }%`,
+                }}
+              />
+            </div>
+            <div className="flex gap-3">
+              {!progres.enPause && !progres.enErreur && (
+                <button
+                  onClick={mettreEnPause}
+                  className="text-sm text-slate-500 hover:text-sou-blue px-3"
+                >
+                  Mettre en pause
+                </button>
+              )}
+              {(progres.enPause || progres.enErreur) && (
+                <button
+                  onClick={() => boucleEnvoi(progres.campaignId)}
+                  className="bg-sou-blue text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-sou-gold transition-colors"
+                >
+                  Reprendre l&apos;envoi
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 mt-2">
+              Vous pouvez fermer cette page : l&apos;envoi est repris depuis l&apos;historique.
+            </p>
+          </div>
+        )}
 
         {resultat && (
           <div className="mt-4 border border-slate-200 rounded-xl p-4 text-sm">
             {resultat.mailConfigured ? (
               <p className="text-green-700">
-                Envoyé à {resultat.sentCount} / {resultat.recipientsCount} famille(s).
+                Envoi terminé : {resultat.sentCount} / {resultat.recipientsCount} e-mail(s) partis.
               </p>
             ) : (
               <div>
                 <p className="text-amber-700 font-medium mb-2">
                   Envoi non configuré : aucun e-mail n&apos;a été envoyé automatiquement. La campagne est enregistrée
-                  ({resultat.recipientsCount} famille(s) concernée(s)) — voici les adresses à contacter en attendant :
+                  ({resultat.recipientsCount} destinataire(s) concerné(s)) — voici les adresses à contacter en attendant :
                 </p>
                 <p className="text-slate-600 break-words">
                   {(resultat.destinataires || []).map((d) => d.email).join(", ")}
@@ -422,7 +642,14 @@ function EnvoiEmails({ token, parent }) {
             {campagnes.map((c) => (
               <div key={c.id} className="border border-slate-200 rounded-xl p-4 text-sm flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-semibold text-sou-blue">{c.subject}</p>
+                  <p className="font-semibold text-sou-blue">
+                    {c.subject}
+                    {c.status === "en_cours" && (
+                      <span className="ml-2 text-xs font-semibold text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">
+                        envoi en cours
+                      </span>
+                    )}
+                  </p>
                   <p className="text-slate-500">
                     {c.segment_summary} — {c.sent_count}/{c.recipients_count} destinataire(s)
                     {!c.mail_configured && " (brouillon, envoi non configuré au moment de l'envoi)"}
@@ -431,12 +658,23 @@ function EnvoiEmails({ token, parent }) {
                     {new Date(c.created_at).toLocaleString("fr-FR")}
                   </p>
                 </div>
-                <button
-                  onClick={() => reprendreCampagne(c)}
-                  className="text-xs font-semibold text-sou-blue hover:text-sou-gold whitespace-nowrap"
-                >
-                  Reprendre
-                </button>
+                <div className="flex flex-col items-end gap-1.5 whitespace-nowrap">
+                  {c.status === "en_cours" && (
+                    <button
+                      onClick={() => reprendreEnvoi(c)}
+                      disabled={!!progres}
+                      className="text-xs font-semibold text-white bg-sou-blue rounded-full px-3 py-1.5 hover:bg-sou-gold disabled:opacity-50"
+                    >
+                      Reprendre l&apos;envoi
+                    </button>
+                  )}
+                  <button
+                    onClick={() => reprendreCampagne(c)}
+                    className="text-xs font-semibold text-sou-blue hover:text-sou-gold"
+                  >
+                    Réutiliser le contenu
+                  </button>
+                </div>
               </div>
             ))}
           </div>

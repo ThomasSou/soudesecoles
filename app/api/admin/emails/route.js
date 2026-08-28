@@ -1,10 +1,21 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../lib/adminAuth";
-import { CONTACT_EMAIL, isMailConfigured, sendMail } from "../../../lib/mail";
+import { isMailConfigured } from "../../../lib/mail";
 import { currentSchoolYear, isMembershipValid } from "../../../lib/anneeScolaire";
-import { entetesDesinscription, renderBlocksToHtml, renderBlocksToText } from "../../../lib/emailBlocks";
+import { renderBlocksToHtml, renderBlocksToText } from "../../../lib/emailBlocks";
 
 export const dynamic = "force-dynamic";
+
+// Canal d'envoi réellement actif en production, pour l'afficher dans le
+// back-office (savoir en un coup d'œil si une campagne partira par Sender,
+// taillé pour l'envoi en masse, ou par le SMTP classique en repli).
+function canalEnvoi() {
+  if (process.env.SENDER_API_KEY && process.env.SENDER_FROM_EMAIL) return "sender";
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
+    return "smtp";
+  }
+  return "aucun";
+}
 
 const MATERNELLE = ["PS", "MS", "GS", "TPS"];
 const ELEMENTAIRE = ["CP", "CE1", "CE2", "CM1", "CM2"];
@@ -159,6 +170,8 @@ export async function POST(request) {
       destinataires,
       count: destinataires.length,
       mailConfigured: isMailConfigured(),
+      canal: canalEnvoi(),
+      segmentSummary: resumeSegment(segment),
     });
   }
 
@@ -171,43 +184,47 @@ export async function POST(request) {
   }
 
   const mailConfigured = isMailConfigured();
-  let sentCount = 0;
+  const aEnvoyer = mailConfigured && destinataires.length > 0;
 
-  if (mailConfigured) {
-    for (const dest of destinataires) {
-      const res = await sendMail({
-        to: dest.email,
-        subject,
-        text: renderBlocksToText(blocks, { recipient: dest }),
-        html: renderBlocksToHtml(blocks, { subject, recipient: dest }),
-        replyTo: CONTACT_EMAIL,
-        headers: entetesDesinscription(dest, { contactEmail: CONTACT_EMAIL }),
-      });
-      if (res.sent) sentCount += 1;
-    }
+  // Création de la campagne. Elle porte la liste figée des destinataires et
+  // un curseur (next_index). L'envoi lui-même ne se fait PAS ici : cette
+  // requête reste légère (calcul du segment + insertion). Le front enchaîne
+  // ensuite les vagues via /api/admin/emails/continuer, avec reprise
+  // possible si l'onglet est fermé (cf. app/lib/emailCampagne.js).
+  const { data: campagne, error: insertError } = await auth.admin
+    .from("email_campaigns")
+    .insert({
+      subject,
+      message: renderBlocksToText(blocks),
+      html: renderBlocksToHtml(blocks, { subject }),
+      content_blocks: blocks,
+      segment: segment || {},
+      segment_summary: resumeSegment(segment),
+      recipients_count: destinataires.length,
+      sent_count: 0,
+      mail_configured: mailConfigured,
+      created_by: auth.parent.id,
+      status: aEnvoyer ? "en_cours" : "termine",
+      next_index: 0,
+      recipients: aEnvoyer ? destinataires : [],
+    })
+    .select("id")
+    .single();
+
+  if (insertError) {
+    return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
-
-  // Aperçu générique (destinataire type) conservé pour l'historique / la
-  // reprise d'une campagne passée — l'e-mail réellement envoyé à chacun
-  // était personnalisé.
-  await auth.admin.from("email_campaigns").insert({
-    subject,
-    message: renderBlocksToText(blocks),
-    html: renderBlocksToHtml(blocks, { subject }),
-    content_blocks: blocks,
-    segment: segment || {},
-    segment_summary: resumeSegment(segment),
-    recipients_count: destinataires.length,
-    sent_count: sentCount,
-    mail_configured: mailConfigured,
-    created_by: auth.parent.id,
-  });
 
   return NextResponse.json({
     ok: true,
+    campaignId: campagne.id,
     recipientsCount: destinataires.length,
-    sentCount,
+    sentCount: 0,
+    done: !aEnvoyer,
     mailConfigured,
+    canal: canalEnvoi(),
+    // Adresses renvoyées seulement si rien ne partira automatiquement, pour
+    // un envoi manuel en attendant.
     destinataires: mailConfigured ? undefined : destinataires,
   });
 }
