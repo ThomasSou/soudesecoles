@@ -1,11 +1,15 @@
-// L'année scolaire du Sou court du 1er septembre au 31 août.
-// Une adhésion prise pour "2025-2026" est donc valide jusqu'au 31/08/2026
-// inclus, et expire automatiquement le 1er septembre.
+// L'année scolaire du Sou bascule fin août, au moment de la rentrée : à
+// partir du 26 août, on est déjà dans la nouvelle année scolaire, et les
+// familles peuvent adhérer pour l'année qui commence. Une adhésion prise
+// pour "2026-2027" est donc valide jusqu'à la bascule suivante (fin août
+// 2027).
 
 export function currentSchoolYear(date = new Date()) {
   const year = date.getFullYear();
   // Les mois sont indexés à partir de 0 : août = 7, septembre = 8.
-  const startYear = date.getMonth() >= 8 ? year : year - 1;
+  const month = date.getMonth();
+  const nouvelleAnnee = month > 7 || (month === 7 && date.getDate() >= 26);
+  const startYear = nouvelleAnnee ? year : year - 1;
   return `${startYear}-${startYear + 1}`;
 }
 
