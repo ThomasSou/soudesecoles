@@ -3,7 +3,7 @@
 // l'éditeur (aperçu client) et dans la route d'envoi (génération du HTML
 // final, personnalisé par destinataire).
 
-import { PARTNERS } from "../partenaires/data";
+import { PARTNERS, TIER_ORDER } from "../partenaires/data";
 import { currentSchoolYear } from "./anneeScolaire";
 
 export const BLUE = "#1F3864";
@@ -237,17 +237,70 @@ function adhesionBadgeHtml(recipient) {
   </td></tr></table>`;
 }
 
+// Ratio largeur/hauteur de chaque logo, mesuré sur le fichier source d'origine.
+// Sert à calculer un width/height HTML explicite sur chaque <img> du pied
+// d'e-mail : sans ces attributs, Gmail (mobile) et Outlook ignorent le CSS et
+// affichent l'image à sa taille native — barrels.png fait 25000 px de large,
+// d'où les logos géants signalés lors des envois de test.
+// À mettre à jour si un fichier de logo est remplacé (voir app/partenaires/data.js).
+const LOGO_RATIO = {
+  "barrels.png": 25115 / 7314,
+  "diennet.jpg": 364 / 351,
+  "nicod.jpg": 526 / 333,
+  "spar.jpg": 367 / 366,
+  "millesime.jpg": 353 / 226,
+  "emilejob.jpg": 196 / 241,
+  "maitresdeboucheurs.jpg": 1146 / 1035,
+};
+
+// Hauteur d'affichage par palier : l'Or plus grand que l'Argent, lui-même plus
+// grand que le Bronze (demande de Thomas). Largeur plafonnée pour les logos
+// très panoramiques (le bandeau-mot « Barrels »).
+const LOGO_HAUTEUR_PAR_PALIER = { Gold: 48, Silver: 36, Bronze: 28 };
+const LOGO_LARGEUR_MAX = 150;
+
 // Logos des partenaires, cliquables vers leur site, ajoutés automatiquement
-// en pied de chaque e-mail.
+// en pied de chaque e-mail. Présentés dans l'ordre des paliers (Or, Argent,
+// Bronze) et servis en versions réduites dédiées à l'e-mail
+// (public/partenaires/email/), pas les gros originaux du site.
 function partenairesHtml() {
-  const logos = PARTNERS.map(
-    (p) =>
-      `<a href="${escapeHtml(p.website || SITE_URL + "/partenaires")}" style="display:inline-block;margin:6px 10px;"><img src="${SITE_URL}/partenaires/${p.file}" alt="${escapeHtml(p.name)}" style="height:36px;max-width:110px;object-fit:contain;vertical-align:middle;" /></a>`
-  ).join("");
+  const paliers = [...PARTNERS].sort(
+    (a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier)
+  );
+  const logos = paliers
+    .map((p) => {
+      const ratio = LOGO_RATIO[p.file] || 1;
+      let h = LOGO_HAUTEUR_PAR_PALIER[p.tier] || 32;
+      let w = Math.round(h * ratio);
+      if (w > LOGO_LARGEUR_MAX) {
+        w = LOGO_LARGEUR_MAX;
+        h = Math.round(w / ratio);
+      }
+      const href = escapeHtml(p.website || SITE_URL + "/partenaires");
+      return `<a href="${href}" style="display:inline-block;margin:8px 10px;text-decoration:none;vertical-align:middle;"><img src="${SITE_URL}/partenaires/email/${p.file}" alt="${escapeHtml(p.name)}" width="${w}" height="${h}" style="width:${w}px;height:${h}px;max-width:${w}px;border:0;" /></a>`;
+    })
+    .join("");
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 4px;"><tr><td style="text-align:center;padding:16px 12px;">
-    <p style="margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;">Merci à nos partenaires</p>
+    <p style="margin:0 0 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;">Merci à nos partenaires</p>
     ${logos}
   </td></tr></table>`;
+}
+
+// En-têtes de désinscription (RFC 2369 + RFC 8058, « un clic »). Gmail et
+// Apple Mail affichent alors leur propre bouton « Se désinscrire » en haut du
+// message, et leur présence est un critère de délivrabilité pour les envois
+// en nombre. Nécessite un identifiant de destinataire (parentId) : sans lui
+// (aperçu générique), on ne renvoie aucun en-tête plutôt que de risquer une
+// désinscription à l'aveugle.
+export function entetesDesinscription(recipient, { contactEmail } = {}) {
+  if (!recipient || !recipient.parentId) return {};
+  const url = `${SITE_URL}/api/emails/desabonner?p=${recipient.parentId}`;
+  const cibles = [`<${url}>`];
+  if (contactEmail) cibles.push(`<mailto:${contactEmail}?subject=desinscription>`);
+  return {
+    "List-Unsubscribe": cibles.join(", "),
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+  };
 }
 
 // Lien de désinscription (obligatoire pour un envoi de masse). Sans

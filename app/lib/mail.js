@@ -9,6 +9,8 @@
 //   bloquer l'envoi, sans lien avec notre code. Sender est fait pour ça.
 // - Sinon, repli sur le SMTP classique (nodemailer) — utile en secours ou
 //   pour un tout petit volume, mais à éviter pour un envoi à toute l'école.
+//   Ce repli sert aussi de filet quand Sender est configuré mais renvoie une
+//   erreur (compte en validation, quota, clé invalide).
 //
 // Tant qu'aucun des deux n'est configuré, cette fonction ne fait rien et
 // renvoie { sent: false, reason: "mail_non_configure" } : les messages
@@ -40,14 +42,22 @@ export function isMailConfigured() {
   return isSenderConfigured() || isSmtpConfigured();
 }
 
-export async function sendMail({ to, subject, text, html, replyTo }) {
+export async function sendMail({ to, subject, text, html, replyTo, headers }) {
   if (isSenderConfigured()) {
     try {
-      await envoyerEmailTransactionnel({ to, subject, text, html, replyTo });
+      await envoyerEmailTransactionnel({ to, subject, text, html, replyTo, headers });
       return { sent: true };
     } catch (error) {
       console.error("Envoi e-mail impossible (Sender) :", error?.message);
-      return { sent: false, reason: "erreur_envoi" };
+      // Sender est configuré mais a refusé l'envoi (compte gelé ou en cours de
+      // validation, quota atteint, clé invalide...). Plutôt que d'abandonner,
+      // on bascule sur le SMTP classique s'il est disponible : mieux vaut un
+      // envoi signé DKIM par Sender, mais un envoi par le SMTP vaut mieux que
+      // rien. On ne retourne l'échec que si le SMTP n'est pas configuré.
+      if (!isSmtpConfigured()) {
+        return { sent: false, reason: "erreur_envoi" };
+      }
+      console.warn("Repli sur le SMTP classique après échec de Sender.");
     }
   }
 
@@ -74,6 +84,7 @@ export async function sendMail({ to, subject, text, html, replyTo }) {
       subject,
       text,
       html,
+      headers,
     });
 
     return { sent: true };

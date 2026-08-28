@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 import { CONTACT_EMAIL, isMailConfigured, sendMail } from "../../../../lib/mail";
-import { renderBlocksToHtml, renderBlocksToText } from "../../../../lib/emailBlocks";
+import { entetesDesinscription, renderBlocksToHtml, renderBlocksToText } from "../../../../lib/emailBlocks";
+
+export const dynamic = "force-dynamic";
 
 // Envoie un e-mail de test (à une seule adresse), avec le rendu exact d'un
 // destinataire choisi — pour vérifier avant un envoi réel que les champs
@@ -24,12 +26,16 @@ export async function POST(request) {
   }
 
   const dest = recipient || {};
+  // Pas de préfixe « [TEST] » dans l'objet : un mot entre crochets en
+  // majuscules est un déclencheur classique des filtres anti-spam, et on veut
+  // que le test reflète exactement l'e-mail qui partira réellement.
   const res = await sendMail({
     to: to.trim(),
-    subject: `[TEST] ${subject}`,
+    subject,
     text: renderBlocksToText(contentBlocks, { recipient: dest }),
     html: renderBlocksToHtml(contentBlocks, { subject, recipient: dest }),
     replyTo: CONTACT_EMAIL,
+    headers: entetesDesinscription(dest, { contactEmail: CONTACT_EMAIL }),
   });
 
   if (!res.sent) {

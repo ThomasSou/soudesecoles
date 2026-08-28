@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../lib/adminAuth";
 import { CONTACT_EMAIL, isMailConfigured, sendMail } from "../../../lib/mail";
 import { currentSchoolYear, isMembershipValid } from "../../../lib/anneeScolaire";
-import { renderBlocksToHtml, renderBlocksToText } from "../../../lib/emailBlocks";
+import { entetesDesinscription, renderBlocksToHtml, renderBlocksToText } from "../../../lib/emailBlocks";
+
+export const dynamic = "force-dynamic";
 
 const MATERNELLE = ["PS", "MS", "GS", "TPS"];
 const ELEMENTAIRE = ["CP", "CE1", "CE2", "CM1", "CM2"];
@@ -179,6 +181,7 @@ export async function POST(request) {
         text: renderBlocksToText(blocks, { recipient: dest }),
         html: renderBlocksToHtml(blocks, { subject, recipient: dest }),
         replyTo: CONTACT_EMAIL,
+        headers: entetesDesinscription(dest, { contactEmail: CONTACT_EMAIL }),
       });
       if (res.sent) sentCount += 1;
     }

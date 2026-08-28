@@ -19,7 +19,10 @@ export function isSenderConfigured() {
 // donné par Sender quand il est présent dans la réponse (utile pour
 // recouper les évènements de webhook), sinon null : le recoupement se fait
 // alors par adresse e-mail (cf. app/api/emails/sender-webhook).
-export async function envoyerEmailTransactionnel({ to, toName, subject, html, text, replyTo }) {
+export async function envoyerEmailTransactionnel({ to, toName, subject, html, text, replyTo, headers }) {
+  const entetes = { ...(headers || {}) };
+  if (replyTo) entetes["Reply-To"] = replyTo;
+
   const res = await fetch("https://api.sender.net/v2/message/send", {
     method: "POST",
     headers: {
@@ -36,7 +39,7 @@ export async function envoyerEmailTransactionnel({ to, toName, subject, html, te
       subject,
       html,
       text,
-      headers: replyTo ? { "Reply-To": replyTo } : undefined,
+      headers: Object.keys(entetes).length ? entetes : undefined,
     }),
   });
 
