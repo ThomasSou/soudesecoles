@@ -3,7 +3,10 @@ import { requirePermission } from "../../../lib/adminAuth";
 import { CONTACT_EMAIL, sendMail } from "../../../lib/mail";
 import { envoyerInvitation } from "../../../lib/invitations";
 
+export const dynamic = "force-dynamic";
+
 const SCHOOL_YEAR = process.env.NEXT_PUBLIC_SCHOOL_YEAR || "2025-2026";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://sou-montmerle.fr";
 
 export async function GET(request) {
   const auth = await requirePermission(request, "demandes");
@@ -22,9 +25,62 @@ export async function GET(request) {
   return NextResponse.json({ demandes: data || [] });
 }
 
+// Gabarit HTML des e-mails de décision, dans le même esprit visuel que
+// l'invitation (cf. app/lib/invitations.js).
+function gabaritDecision({ firstName, acceptee, motif }) {
+  const salutation = firstName ? `Bonjour ${firstName},` : "Bonjour,";
+  const titre = acceptee
+    ? "Votre demande d'inscription a été acceptée"
+    : "Votre demande d'inscription n'a pas été retenue";
+  const corps = acceptee
+    ? `<p>Le bureau du Sou des Écoles a validé votre demande. Vous allez recevoir un second e-mail pour activer votre espace famille (adhésion en ligne, carte d'adhérent, historique).</p>
+       <p style="font-size: 13px; color: #64748b;">S'il n'arrive pas d'ici quelques minutes, pensez à vérifier vos courriers indésirables, ou rendez-vous sur <a href="${SITE_URL}/mot-de-passe-oublie" style="color: #1F3864;">${SITE_URL.replace(/^https?:\/\//, "")}/mot-de-passe-oublie</a>.</p>`
+    : `<p>Après examen, le bureau du Sou des Écoles n'a pas donné suite à votre demande d'inscription.</p>
+       <p style="font-size: 13px; color: #64748b;">Si vous pensez qu'il s'agit d'une erreur, répondez simplement à cet e-mail.</p>`;
+  const blocMotif = motif
+    ? `<p style="background: #f1f5f9; border-radius: 8px; padding: 12px 16px; white-space: pre-wrap;">${escapeHtml(
+        motif
+      )}</p>`
+    : "";
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #1e293b;">
+      <p style="font-size: 18px; font-weight: bold; color: #1F3864;">Sou des Écoles Montmerle-Lurcy</p>
+      <p>${salutation}</p>
+      <p style="font-weight: bold;">${titre}</p>
+      ${corps}
+      ${blocMotif}
+    </div>
+  `;
+}
+
+function gabaritDecisionTexte({ firstName, acceptee, motif }) {
+  const salutation = firstName ? `Bonjour ${firstName},` : "Bonjour,";
+  const corps = acceptee
+    ? "Le bureau du Sou des Écoles a validé votre demande d'inscription. Vous allez recevoir un second e-mail pour activer votre espace famille."
+    : "Après examen, le bureau du Sou des Écoles n'a pas donné suite à votre demande d'inscription. Si vous pensez qu'il s'agit d'une erreur, répondez simplement à cet e-mail.";
+  return [
+    salutation,
+    "",
+    corps,
+    motif ? "" : null,
+    motif ? `Message du bureau :\n${motif}` : null,
+  ]
+    .filter((l) => l !== null)
+    .join("\n");
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 // Valide ou refuse une demande.
 // Valider = créer la famille + le parent + les enfants, puis inviter le parent
 // par e-mail (même mécanisme que l'import de début d'année).
+// Dans les deux cas, la personne reçoit un e-mail lui confirmant la décision,
+// avec le motif éventuellement saisi par le bureau.
 export async function POST(request) {
   const auth = await requirePermission(request, "demandes");
   if (auth.error) {
@@ -32,7 +88,9 @@ export async function POST(request) {
   }
   const admin = auth.admin;
 
-  const { id, action } = await request.json();
+  const body = await request.json();
+  const { id, action } = body;
+  const motif = typeof body.message === "string" ? body.message.trim() : "";
   if (!id || !["valider", "refuser"].includes(action)) {
     return NextResponse.json({ error: "Action invalide." }, { status: 400 });
   }
@@ -53,12 +111,38 @@ export async function POST(request) {
     );
   }
 
+  const decisionCommune = {
+    decision_message: motif || null,
+    decided_at: new Date().toISOString(),
+    decided_by: auth.parent.id,
+  };
+
   if (action === "refuser") {
     await admin
       .from("registration_requests")
-      .update({ status: "refused" })
+      .update({ status: "refused", ...decisionCommune })
       .eq("id", id);
-    return NextResponse.json({ ok: true, status: "refused" });
+
+    const mail = await sendMail({
+      to: demande.email,
+      subject: "Votre demande d'inscription — Sou des Écoles Montmerle-Lurcy",
+      html: gabaritDecision({
+        firstName: demande.first_name,
+        acceptee: false,
+        motif,
+      }),
+      text: gabaritDecisionTexte({
+        firstName: demande.first_name,
+        acceptee: false,
+        motif,
+      }),
+    });
+
+    return NextResponse.json({
+      ok: true,
+      status: "refused",
+      mailSent: Boolean(mail.sent),
+    });
   }
 
   // --- Validation ---
@@ -129,14 +213,39 @@ export async function POST(request) {
 
   await admin
     .from("registration_requests")
-    .update({ status: "approved" })
+    .update({ status: "approved", ...decisionCommune })
     .eq("id", id);
 
+  // Notification interne au bureau.
   await sendMail({
     to: CONTACT_EMAIL,
     subject: "[Site] Demande d'inscription validée",
     text: `La demande de ${demande.first_name} ${demande.last_name} (${demande.email}) a été validée par ${auth.parent.first_name} ${auth.parent.last_name}. L'invitation a été envoyée.`,
   });
 
-  return NextResponse.json({ ok: true, status: "approved", familyId: family.id });
+  // Confirmation à la personne. L'invitation part en parallèle (sujet
+  // « Activez votre espace famille ») ; cet e-mail-ci confirme explicitement
+  // la décision et prévient qu'un second message suit, ce qui aide si
+  // l'invitation atterrit dans les indésirables.
+  const mail = await sendMail({
+    to: demande.email,
+    subject: "Votre demande d'inscription — Sou des Écoles Montmerle-Lurcy",
+    html: gabaritDecision({
+      firstName: demande.first_name,
+      acceptee: true,
+      motif,
+    }),
+    text: gabaritDecisionTexte({
+      firstName: demande.first_name,
+      acceptee: true,
+      motif,
+    }),
+  });
+
+  return NextResponse.json({
+    ok: true,
+    status: "approved",
+    familyId: family.id,
+    mailSent: Boolean(mail.sent),
+  });
 }
