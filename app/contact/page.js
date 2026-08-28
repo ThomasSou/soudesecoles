@@ -28,15 +28,15 @@ export default function ContactPage() {
           <p>
             Vous pouvez aussi nous écrire directement à{" "}
             <a
-              href="mailto:contactsoudesecolesmontmerle@gmail.com"
+              href="mailto:contact@sou-montmerle.fr"
               className="text-sou-blue underline"
             >
-              contactsoudesecolesmontmerle@gmail.com
+              contact@sou-montmerle.fr
             </a>
           </p>
           <p>
-            Sou des Écoles Laïques Montmerle-Lurcy — Mairie, 01090
-            Montmerle-sur-Saône
+            Sou des Écoles Laïques Montmerle-Lurcy — 1 parvis des enfants
+            d&apos;Izieu, 01090 Montmerle-sur-Saône
           </p>
         </div>
       </section>

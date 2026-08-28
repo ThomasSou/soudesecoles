@@ -95,11 +95,11 @@ export function Footer() {
         <div>
           <p className="font-bold text-white mb-2">Sou des Écoles Laïques Montmerle-Lurcy</p>
           <p>Association loi 1901 — depuis 1903</p>
-          <p>Mairie, 01090 Montmerle-sur-Saône</p>
+          <p>1 parvis des enfants d&apos;Izieu, 01090 Montmerle-sur-Saône</p>
         </div>
         <div>
           <p className="font-bold text-white mb-2">Contact</p>
-          <p>contactsoudesecolesmontmerle@gmail.com</p>
+          <p>contact@sou-montmerle.fr</p>
         </div>
         <div>
           <p className="font-bold text-white mb-2">Suivez-nous</p>

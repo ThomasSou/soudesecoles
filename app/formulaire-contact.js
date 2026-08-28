@@ -44,7 +44,7 @@ export default function FormulaireContact({
       if (!res.ok) {
         setError(
           result.error ||
-            "Votre message n'a pas pu être envoyé. Vous pouvez nous écrire à contactsoudesecolesmontmerle@gmail.com."
+            "Votre message n'a pas pu être envoyé. Vous pouvez nous écrire à contact@sou-montmerle.fr."
         );
         return;
       }
@@ -52,7 +52,7 @@ export default function FormulaireContact({
     } catch {
       setSending(false);
       setError(
-        "Votre message n'a pas pu être envoyé. Vous pouvez nous écrire à contactsoudesecolesmontmerle@gmail.com."
+        "Votre message n'a pas pu être envoyé. Vous pouvez nous écrire à contact@sou-montmerle.fr."
       );
     }
   }
