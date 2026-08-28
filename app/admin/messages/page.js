@@ -15,6 +15,11 @@ function ListeMessages({ token }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [voirTraites, setVoirTraites] = useState(false);
+  // Id du message dont le formulaire de réponse est ouvert.
+  const [reponseOuverte, setReponseOuverte] = useState(null);
+  const [brouillon, setBrouillon] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState("");
 
   const charger = useCallback(async () => {
     if (!token) return;
@@ -39,6 +44,44 @@ function ListeMessages({ token }) {
       },
       body: JSON.stringify({ id, handled }),
     });
+    charger();
+  }
+
+  function ouvrirReponse(m) {
+    setReponseOuverte(m.id);
+    setBrouillon(m.reply_body || "");
+    setErreur("");
+  }
+
+  function annulerReponse() {
+    setReponseOuverte(null);
+    setBrouillon("");
+    setErreur("");
+  }
+
+  async function envoyerReponse(id) {
+    if (!brouillon.trim()) {
+      setErreur("Écrivez une réponse avant d'envoyer.");
+      return;
+    }
+    setEnvoi(true);
+    setErreur("");
+    const res = await fetch("/api/admin/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ id, reply: brouillon }),
+    });
+    const data = await res.json();
+    setEnvoi(false);
+
+    if (!res.ok) {
+      setErreur(data.error || "L'envoi a échoué.");
+      return;
+    }
+    annulerReponse();
     charger();
   }
 
@@ -98,22 +141,71 @@ function ListeMessages({ token }) {
                 {m.message}
               </p>
 
-              <div className="flex gap-3 mt-4 pt-4 border-t border-slate-100">
-                <a
-                  href={`mailto:${m.email}?subject=${encodeURIComponent(
-                    "Re: " + (m.subject || "Votre message")
-                  )}`}
-                  className="bg-sou-blue text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-sou-gold transition-colors"
-                >
-                  Répondre
-                </a>
-                <button
-                  onClick={() => basculer(m.id, !m.handled)}
-                  className="text-sm text-slate-500 hover:text-sou-blue px-3"
-                >
-                  {m.handled ? "Marquer non traité" : "Marquer comme traité"}
-                </button>
-              </div>
+              {m.replied_at && (
+                <div className="mt-4 border-l-2 border-sou-blue/30 pl-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">
+                    Réponse envoyée le{" "}
+                    {new Date(m.replied_at).toLocaleDateString("fr-FR", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </p>
+                  <p className="text-sm text-slate-600 whitespace-pre-wrap">
+                    {m.reply_body}
+                  </p>
+                </div>
+              )}
+
+              {reponseOuverte === m.id ? (
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Votre réponse (envoyée depuis contact@sou-montmerle.fr, le
+                    message d&apos;origine est cité en dessous)
+                  </label>
+                  <textarea
+                    value={brouillon}
+                    onChange={(e) => setBrouillon(e.target.value)}
+                    rows={5}
+                    disabled={envoi}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm disabled:opacity-60"
+                  />
+                  {erreur && (
+                    <p className="text-red-600 text-sm mt-2">{erreur}</p>
+                  )}
+                  <div className="flex gap-3 mt-3">
+                    <button
+                      onClick={() => envoyerReponse(m.id)}
+                      disabled={envoi}
+                      className="bg-sou-blue text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-sou-gold transition-colors disabled:opacity-60"
+                    >
+                      {envoi ? "Envoi..." : "Envoyer la réponse"}
+                    </button>
+                    <button
+                      onClick={annulerReponse}
+                      disabled={envoi}
+                      className="text-sm text-slate-500 hover:text-sou-blue px-3 disabled:opacity-60"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-3 mt-4 pt-4 border-t border-slate-100">
+                  <button
+                    onClick={() => ouvrirReponse(m)}
+                    className="bg-sou-blue text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-sou-gold transition-colors"
+                  >
+                    {m.replied_at ? "Répondre à nouveau" : "Répondre"}
+                  </button>
+                  <button
+                    onClick={() => basculer(m.id, !m.handled)}
+                    className="text-sm text-slate-500 hover:text-sou-blue px-3"
+                  >
+                    {m.handled ? "Marquer non traité" : "Marquer comme traité"}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
