@@ -100,6 +100,11 @@ chaîne de connexion directe à la base Supabase (Project Settings → Database
 gunzip -c base-AAAA-MM-JJ.sql.gz | psql "chaine-de-connexion-supabase"
 ```
 
+(Chaîne de connexion : Direct connection ou Session pooler conviennent
+toutes les deux ici, tant que la machine qui lance la commande a accès en
+IPv6 ou passe par le pooler — voir la remarque plus bas sur `SUPABASE_DB_URL`
+si la Direct connection ne répond pas.)
+
 ⚠️ Cette commande ajoute les données du fichier à celles déjà présentes dans
 la base cible — elle ne les remplace pas automatiquement. Si l'objectif est
 de revenir exactement à l'état d'un jour donné (et donc d'effacer ce qui a
@@ -132,7 +137,15 @@ Le workflow utilise trois éléments secrets, enregistrés dans GitHub (Settings
 → Secrets and variables → Actions du dépôt) — jamais visibles en clair
 nulle part, y compris pas par Claude Code :
 
-- `SUPABASE_DB_URL` — la chaîne de connexion directe à la base Postgres.
+- `SUPABASE_DB_URL` — la chaîne de connexion à la base Postgres. **Attention :
+  pas la connexion « directe »** (Project Settings → Database → Connection
+  string → Direct connection) : elle est en IPv6 uniquement, injoignable
+  depuis GitHub Actions (réseau IPv4 uniquement). Utiliser la chaîne
+  **« Session pooler »** à la place (même page), au format
+  `postgresql://postgres.giztqbbgfcuehseehbfg:[MOT-DE-PASSE]@aws-1-eu-west-1.pooler.supabase.com:5432/postgres`
+  — elle passe par un relais IPv4 et se comporte comme une connexion directe
+  pour `pg_dump` (contrairement au mode « Transaction » du pooler, port 6543,
+  qui ne convient pas à `pg_dump`).
 - `RCLONE_CONFIG` — le fichier de configuration de l'outil `rclone`, qui
   contient à la fois l'accès à Google Drive (compte
   `presidentsoudesecolesmontmerle@gmail.com`) et l'accès aux fichiers
