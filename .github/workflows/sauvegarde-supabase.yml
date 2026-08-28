@@ -1,0 +1,63 @@
+name: Sauvegarde quotidienne Supabase
+
+# Tourne chaque nuit à 0h00 UTC. GitHub Actions ne suit pas les changements
+# d'heure français : 0h UTC correspond à 1h du matin heure de Paris en hiver
+# (CET, UTC+1) et 2h en été (CEST, UTC+2). Ce décalage saisonnier n'a aucune
+# importance pour une sauvegarde nocturne — l'objectif est qu'elle tourne
+# hors heures d'utilisation du site, pas une heure exacte à la minute près.
+# Voir docs/sauvegardes.md pour le détail (portée, restauration).
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch: # permet de la lancer manuellement depuis l'onglet Actions de GitHub, pour tester
+
+jobs:
+  sauvegarde:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Installer psql et rclone
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          curl https://rclone.org/install.sh | sudo bash
+
+      - name: Préparer le dossier du jour
+        run: |
+          echo "DATE=$(date +%Y-%m-%d)" >> "$GITHUB_ENV"
+          mkdir -p sauvegarde
+
+      # Uniquement le schéma "public" (toutes les données de l'association :
+      # familles, parents, enfants, adhésions, achats...) — volontairement
+      # sans le schéma "auth" (comptes de connexion, mots de passe hachés) :
+      # voir docs/sauvegardes.md pour l'explication de ce choix et la
+      # procédure à suivre en cas de restauration.
+      - name: Exporter les données (base Postgres)
+        run: |
+          pg_dump "${{ secrets.SUPABASE_DB_URL }}" --schema=public --no-owner --no-privileges \
+            | gzip > "sauvegarde/base-${{ env.DATE }}.sql.gz"
+
+      - name: Configurer rclone (remotes Google Drive + Supabase Storage)
+        run: |
+          mkdir -p ~/.config/rclone
+          printf '%s' "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
+
+      # Les 3 buckets de fichiers utilisés par le site (voir docs/sauvegardes.md).
+      - name: Récupérer les fichiers (Supabase Storage)
+        run: |
+          mkdir -p "sauvegarde/fichiers-${{ env.DATE }}"
+          for bucket in shop-images email-images remboursements; do
+            rclone copy "supabase-s3:$bucket" "sauvegarde/fichiers-${{ env.DATE }}/$bucket"
+          done
+          tar -czf "sauvegarde/fichiers-${{ env.DATE }}.tar.gz" -C sauvegarde "fichiers-${{ env.DATE }}"
+          rm -rf "sauvegarde/fichiers-${{ env.DATE }}"
+
+      - name: Envoyer vers Google Drive
+        run: |
+          rclone copy sauvegarde "gdrive:${{ secrets.GDRIVE_BACKUP_FOLDER }}/${{ env.DATE }}"
+
+      # Rétention 30 jours : supprime les fichiers plus anciens, puis les
+      # dossiers datés devenus vides (le dossier racine, lui, est conservé).
+      - name: Purger les sauvegardes de plus de 30 jours
+        run: |
+          rclone delete "gdrive:${{ secrets.GDRIVE_BACKUP_FOLDER }}" --min-age 30d
+          rclone rmdirs "gdrive:${{ secrets.GDRIVE_BACKUP_FOLDER }}" --leave-root

@@ -87,6 +87,16 @@ de bord Supabase, puis versionnées ici pour l'historique. Quand tu ajoutes une
 migration, dis-le explicitement à Thomas : elle ne prendra effet que
 lorsqu'elle aura été exécutée.
 
+### Sauvegardes
+
+Une sauvegarde automatique tourne chaque nuit (GitHub Actions, voir
+`.github/workflows/sauvegarde-supabase.yml`) : données de la base (schéma
+`public`) + fichiers des buckets Supabase Storage, envoyées vers Google Drive
+(compte `presidentsoudesecolesmontmerle@gmail.com`), 30 jours d'historique.
+Détail complet (portée, ce qui n'est pas couvert et pourquoi, procédure de
+restauration) dans [`docs/sauvegardes.md`](docs/sauvegardes.md) — à lire
+avant toute restauration.
+
 ## Pièges déjà rencontrés — à ne pas refaire
 
 **HelloAsso refuse d'être affiché dans une iframe.** Une première version du
