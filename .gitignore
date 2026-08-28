@@ -5,3 +5,9 @@ node_modules
 out
 .DS_Store
 test-import-bureau.json
+
+# Données personnelles générées par les scripts d'import (noms, e-mails,
+# téléphones, adresses de familles) : jamais dans le dépôt.
+scripts/familles.json
+scripts/familles-rapport.txt
+scripts/derniers-parents-importes.json
