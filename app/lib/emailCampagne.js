@@ -4,6 +4,7 @@ import {
   renderBlocksToHtml,
   renderBlocksToText,
 } from "./emailBlocks";
+import { chargerPlanningEvenement } from "./benevolesPlanning";
 
 // Envoi des campagnes e-mail par vagues.
 //
@@ -27,6 +28,13 @@ export async function envoyerVague(admin, campagne) {
   const blocks = campagne.content_blocks || [];
   const subject = campagne.subject;
 
+  // Planning bénévoles éventuel : rechargé à chaque vague pour que les places
+  // restantes reflètent l'instant de l'envoi (les vagues s'étalent sur
+  // plusieurs minutes).
+  const planning = campagne.benevoles_evenement_id
+    ? await chargerPlanningEvenement(admin, campagne.benevoles_evenement_id)
+    : null;
+
   let index = campagne.next_index || 0;
   let sentCount = campagne.sent_count || 0;
   const fin = Math.min(index + TAILLE_VAGUE, total);
@@ -37,8 +45,8 @@ export async function envoyerVague(admin, campagne) {
       const res = await sendMail({
         to: dest.email,
         subject,
-        text: renderBlocksToText(blocks, { recipient: dest }),
-        html: renderBlocksToHtml(blocks, { subject, recipient: dest }),
+        text: renderBlocksToText(blocks, { recipient: dest, planning }),
+        html: renderBlocksToHtml(blocks, { subject, recipient: dest, planning }),
         replyTo: CONTACT_EMAIL,
         headers: entetesDesinscription(dest, { contactEmail: CONTACT_EMAIL }),
       });

@@ -54,6 +54,9 @@ function EnvoiEmails({ token, parent }) {
   const [subject, setSubject] = useState("");
   const [blocks, setBlocks] = useState(() => TEMPLATES[0].blocks());
   const [previewChoix, setPreviewChoix] = useState("generique-adherent");
+  // Planning bénévoles à joindre à la campagne (id d'événement, "" = aucun).
+  const [benevolesEvenements, setBenevolesEvenements] = useState([]);
+  const [benevolesEvenementId, setBenevolesEvenementId] = useState("");
 
   const [apercu, setApercu] = useState(null);
   const [busyApercu, setBusyApercu] = useState(false);
@@ -82,6 +85,7 @@ function EnvoiEmails({ token, parent }) {
     const dataContacts = await resContacts.json();
     setClassesDisponibles(data.classes || []);
     setCampagnes(data.campagnes || []);
+    setBenevolesEvenements(data.benevolesEvenements || []);
     setContacts(dataContacts.contacts || []);
     setLoading(false);
   }, [token]);
@@ -175,7 +179,12 @@ function EnvoiEmails({ token, parent }) {
     const res = await fetch("/api/admin/emails", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ segment: segment(), subject, contentBlocks: blocks }),
+      body: JSON.stringify({
+        segment: segment(),
+        subject,
+        contentBlocks: blocks,
+        benevolesEvenementId: benevolesEvenementId || null,
+      }),
     });
     const data = await res.json();
     setBusyEnvoi(false);
@@ -254,6 +263,7 @@ function EnvoiEmails({ token, parent }) {
     setApercu(null);
     setSubject("");
     setBlocks(TEMPLATES[0].blocks());
+    setBenevolesEvenementId("");
     charger();
   }
 
@@ -273,6 +283,7 @@ function EnvoiEmails({ token, parent }) {
         subject,
         contentBlocks: blocks,
         recipient: previewRecipient,
+        benevolesEvenementId: benevolesEvenementId || null,
       }),
     });
     const data = await res.json();
@@ -287,6 +298,7 @@ function EnvoiEmails({ token, parent }) {
   function reprendreCampagne(c) {
     setSubject(c.subject);
     setBlocks(c.content_blocks && c.content_blocks.length > 0 ? c.content_blocks : [newBlock("paragraph")]);
+    setBenevolesEvenementId(c.benevoles_evenement_id || "");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -444,8 +456,34 @@ function EnvoiEmails({ token, parent }) {
           placeholder="Sujet de l'e-mail"
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-4"
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-3"
         />
+
+        {benevolesEvenements.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+            <label className="text-slate-600">
+              Ajouter le planning des créneaux bénévoles :
+            </label>
+            <select
+              value={benevolesEvenementId}
+              onChange={(e) => setBenevolesEvenementId(e.target.value)}
+              className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm bg-white"
+            >
+              <option value="">Aucun</option>
+              {benevolesEvenements.map((ev) => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.nom}
+                </option>
+              ))}
+            </select>
+            {benevolesEvenementId && (
+              <span className="text-xs text-slate-400">
+                Le tableau des créneaux et places restantes sera inséré à l&apos;envoi
+                (chiffres de ce moment-là).
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-2">
           <EditeurBlocs blocks={blocks} setBlocks={setBlocks} token={token} />
@@ -475,6 +513,13 @@ function EnvoiEmails({ token, parent }) {
             <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-100" style={{ height: 520 }}>
               <iframe title="Aperçu de l'e-mail" srcDoc={html} className="w-full h-full" style={{ border: "none" }} />
             </div>
+            {benevolesEvenementId && (
+              <p className="text-xs text-slate-400 mt-2">
+                Le planning des créneaux bénévoles n&apos;apparaît pas dans cet aperçu :
+                il est calculé et inséré au moment de l&apos;envoi (et dans l&apos;e-mail
+                de test).
+              </p>
+            )}
           </div>
         </div>
 

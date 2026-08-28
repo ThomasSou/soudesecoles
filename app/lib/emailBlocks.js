@@ -325,9 +325,105 @@ function mesureOuvertureHtml(subject) {
   return `<img src="${SITE_URL}/api/emails/pixel?e=${envoi}" alt="" width="1" height="1" style="display:block;width:1px;height:1px;border:0;" />`;
 }
 
-export function renderBlocksToHtml(blocks, { subject, recipient } = {}) {
+// Formate une plage horaire de créneau : "sam. 4 sept., 09:00 – 12:00".
+function formaterPlageCreneau(debut, fin) {
+  try {
+    const d = new Date(debut);
+    const f = new Date(fin);
+    if (Number.isNaN(d.getTime())) return "";
+    const jour = d.toLocaleDateString("fr-FR", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+    const h = (x) =>
+      x.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    return Number.isNaN(f.getTime())
+      ? `${jour}, ${h(d)}`
+      : `${jour}, ${h(d)} – ${h(f)}`;
+  } catch {
+    return "";
+  }
+}
+
+function dispoCreneauTexte(c) {
+  if (c.placesRestantes <= 0) return "complet";
+  return `il reste ${c.placesRestantes} place${
+    c.placesRestantes > 1 ? "s" : ""
+  } sur ${c.places}`;
+}
+
+// Récapitulatif des créneaux bénévoles d'un événement, inséré (en option)
+// dans une campagne. Les places restantes sont celles de l'instant de
+// l'envoi : le lien renvoie vers la page publique, toujours à jour.
+// `planning` : { nom, ateliers: [{ nom, creneaux: [{ nom, debut, fin, places, placesRestantes }] }] }
+export function planningCreneauxHtml(planning) {
+  if (!planning || !Array.isArray(planning.ateliers) || planning.ateliers.length === 0) {
+    return "";
+  }
+  const lien = `${SITE_URL}/benevoles`;
+  const corps = planning.ateliers
+    .map((a) => {
+      const creneaux = (a.creneaux || [])
+        .map((c) => {
+          const complet = c.placesRestantes <= 0;
+          const dispo = complet
+            ? `<span style="color:#b91c1c;font-weight:600;">complet</span>`
+            : `<span style="color:#15803d;font-weight:600;">il reste ${c.placesRestantes} place${
+                c.placesRestantes > 1 ? "s" : ""
+              } sur ${c.places}</span>`;
+          const libelle = [c.nom, formaterPlageCreneau(c.debut, c.fin)]
+            .filter(Boolean)
+            .join(" — ");
+          return `<tr>
+            <td style="padding:6px 10px;font-size:13px;color:#334155;border-top:1px solid #e2e8f0;">${escapeHtml(
+              libelle
+            )}</td>
+            <td style="padding:6px 10px;font-size:13px;text-align:right;border-top:1px solid #e2e8f0;white-space:nowrap;">${dispo}</td>
+          </tr>`;
+        })
+        .join("");
+      return `<tr><td colspan="2" style="padding:12px 10px 2px;font-size:14px;font-weight:700;color:${BLUE};">${escapeHtml(
+        a.nom || ""
+      )}</td></tr>${creneaux}`;
+    })
+    .join("");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;border:1px solid #e2e8f0;border-radius:10px;">
+    <tr><td colspan="2" style="padding:14px 10px 2px;font-size:15px;font-weight:700;color:${BLUE};font-family:Georgia,'Times New Roman',serif;">Créneaux bénévoles${
+      planning.nom ? ` — ${escapeHtml(planning.nom)}` : ""
+    }</td></tr>
+    <tr><td colspan="2" style="padding:0 10px 6px;font-size:12px;color:#64748b;line-height:1.5;">Places disponibles au moment de l'envoi de cet e-mail. Cliquez pour vous inscrire sur la page à jour.</td></tr>
+    ${corps}
+    <tr><td colspan="2" style="padding:14px 10px 12px;">
+      <a href="${lien}" style="display:inline-block;padding:10px 22px;font-size:13px;font-weight:600;color:#ffffff;background:${BLUE};text-decoration:none;border-radius:999px;">Voir les créneaux et m'inscrire</a>
+    </td></tr>
+  </table>`;
+}
+
+export function planningCreneauxTexte(planning) {
+  if (!planning || !Array.isArray(planning.ateliers) || planning.ateliers.length === 0) {
+    return "";
+  }
+  const corps = planning.ateliers
+    .map((a) => {
+      const cs = (a.creneaux || [])
+        .map(
+          (c) =>
+            `  - ${[c.nom, formaterPlageCreneau(c.debut, c.fin)]
+              .filter(Boolean)
+              .join(" — ")} : ${dispoCreneauTexte(c)}`
+        )
+        .join("\n");
+      return `${a.nom || ""}\n${cs}`;
+    })
+    .join("\n\n");
+  return `Créneaux bénévoles${planning.nom ? ` — ${planning.nom}` : ""}\n(Places disponibles au moment de l'envoi. Inscription à jour : ${SITE_URL}/benevoles)\n\n${corps}\n\nS'inscrire : ${SITE_URL}/benevoles`;
+}
+
+export function renderBlocksToHtml(blocks, { subject, recipient, planning } = {}) {
   const dest = { ...DEFAULT_RECIPIENT, ...(recipient || {}) };
   const body = (blocks || []).map((b) => blockToHtml(b, dest)).join("\n");
+  const planningHtml = planningCreneauxHtml(planning);
 
   return `<!doctype html>
 <html lang="fr">
@@ -353,6 +449,7 @@ export function renderBlocksToHtml(blocks, { subject, recipient } = {}) {
               <td style="padding:32px 32px 8px;">
                 ${adhesionBadgeHtml(dest)}
                 ${body}
+                ${planningHtml}
               </td>
             </tr>
             <tr>
@@ -377,7 +474,7 @@ export function renderBlocksToHtml(blocks, { subject, recipient } = {}) {
 }
 
 // Version texte simple (fallback pour les clients mail sans HTML).
-export function renderBlocksToText(blocks, { recipient } = {}) {
+export function renderBlocksToText(blocks, { recipient, planning } = {}) {
   const dest = { ...DEFAULT_RECIPIENT, ...(recipient || {}) };
   const statut = dest.adherent
     ? "Adhésion en cours."
@@ -403,5 +500,9 @@ export function renderBlocksToText(blocks, { recipient } = {}) {
     ? `${SITE_URL}/api/emails/desabonner?p=${dest.parentId}`
     : `${SITE_URL}/contact`;
 
-  return `${statut}\n\n${corps}\n\n--\nSe désinscrire : ${desabo}`;
+  const planningTxt = planningCreneauxTexte(planning);
+
+  return `${statut}\n\n${corps}${
+    planningTxt ? `\n\n${planningTxt}` : ""
+  }\n\n--\nSe désinscrire : ${desabo}`;
 }

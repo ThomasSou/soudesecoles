@@ -145,7 +145,19 @@ export async function GET(request) {
     new Set((enfants || []).map((c) => c.class_level).filter(Boolean))
   ).sort();
 
-  return NextResponse.json({ campagnes: data || [], classes });
+  // Événements bénévoles actifs : proposés pour insérer leur planning de
+  // créneaux dans une campagne.
+  const { data: evenementsBenevoles } = await auth.admin
+    .from("benevolat_evenements")
+    .select("id, nom")
+    .eq("actif", true)
+    .order("nom");
+
+  return NextResponse.json({
+    campagnes: data || [],
+    classes,
+    benevolesEvenements: evenementsBenevoles || [],
+  });
 }
 
 // Calcule un aperçu des destinataires (dryRun) ou envoie réellement le
@@ -159,7 +171,8 @@ export async function POST(request) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const { segment, subject, contentBlocks, dryRun } = await request.json();
+  const { segment, subject, contentBlocks, dryRun, benevolesEvenementId } =
+    await request.json();
 
   const familles = await chargerFamilles(auth.admin);
   const correspondantes = famillesCorrespondantes(familles, segment);
@@ -207,6 +220,7 @@ export async function POST(request) {
       status: aEnvoyer ? "en_cours" : "termine",
       next_index: 0,
       recipients: aEnvoyer ? destinataires : [],
+      benevoles_evenement_id: benevolesEvenementId || null,
     })
     .select("id")
     .single();
