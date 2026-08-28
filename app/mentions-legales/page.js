@@ -16,9 +16,7 @@ export default function MentionsLegalesPage() {
           <p>
             Sou des Écoles Laïques de Montmerle-Lurcy, association loi 1901 fondée en 1903.
             <br />
-            Siège social : Mairie, 01090 Montmerle-sur-Saône.
-            <br />
-            Adresse de correspondance : 1 parvis des enfants d&apos;Izieu, 01090 Montmerle-sur-Saône.
+            Siège social : 1 parvis des enfants d&apos;Izieu, 01090 Montmerle-sur-Saône.
             <br />
             Contact :{" "}
             <a href="mailto:contact@sou-montmerle.fr" className="text-sou-blue underline">
