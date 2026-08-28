@@ -362,6 +362,11 @@ export function planningCreneauxHtml(planning) {
     return "";
   }
   const lien = `${SITE_URL}/benevoles`;
+  // Toute cellule du tableau est cliquable : le contenu est enveloppé dans un
+  // lien pleine largeur vers la page publique des créneaux (toujours à jour).
+  const cell = (inner, style, colspan = 1) =>
+    `<td${colspan > 1 ? ` colspan="${colspan}"` : ""} style="${style}"><a href="${lien}" style="display:block;color:inherit;text-decoration:none;">${inner}</a></td>`;
+
   const corps = planning.ateliers
     .map((a) => {
       const creneaux = (a.creneaux || [])
@@ -376,23 +381,35 @@ export function planningCreneauxHtml(planning) {
             .filter(Boolean)
             .join(" — ");
           return `<tr>
-            <td style="padding:6px 10px;font-size:13px;color:#334155;border-top:1px solid #e2e8f0;">${escapeHtml(
-              libelle
-            )}</td>
-            <td style="padding:6px 10px;font-size:13px;text-align:right;border-top:1px solid #e2e8f0;white-space:nowrap;">${dispo}</td>
+            ${cell(
+              escapeHtml(libelle),
+              "padding:6px 10px;font-size:13px;color:#334155;border-top:1px solid #e2e8f0;"
+            )}
+            ${cell(
+              dispo,
+              "padding:6px 10px;font-size:13px;text-align:right;border-top:1px solid #e2e8f0;white-space:nowrap;"
+            )}
           </tr>`;
         })
         .join("");
-      return `<tr><td colspan="2" style="padding:12px 10px 2px;font-size:14px;font-weight:700;color:${BLUE};">${escapeHtml(
-        a.nom || ""
-      )}</td></tr>${creneaux}`;
+      return `<tr>${cell(
+        escapeHtml(a.nom || ""),
+        `padding:12px 10px 2px;font-size:14px;font-weight:700;color:${BLUE};`,
+        2
+      )}</tr>${creneaux}`;
     })
     .join("");
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;border:1px solid #e2e8f0;border-radius:10px;">
-    <tr><td colspan="2" style="padding:14px 10px 2px;font-size:15px;font-weight:700;color:${BLUE};font-family:Georgia,'Times New Roman',serif;">Créneaux bénévoles${
-      planning.nom ? ` — ${escapeHtml(planning.nom)}` : ""
-    }</td></tr>
-    <tr><td colspan="2" style="padding:0 10px 6px;font-size:12px;color:#64748b;line-height:1.5;">Places disponibles au moment de l'envoi de cet e-mail. Cliquez pour vous inscrire sur la page à jour.</td></tr>
+    <tr>${cell(
+      `Créneaux bénévoles${planning.nom ? ` — ${escapeHtml(planning.nom)}` : ""}`,
+      `padding:14px 10px 2px;font-size:15px;font-weight:700;color:${BLUE};font-family:Georgia,'Times New Roman',serif;`,
+      2
+    )}</tr>
+    <tr>${cell(
+      "Places disponibles au moment de l'envoi de cet e-mail. Cliquez pour vous inscrire sur la page à jour.",
+      "padding:0 10px 6px;font-size:12px;color:#64748b;line-height:1.5;",
+      2
+    )}</tr>
     ${corps}
     <tr><td colspan="2" style="padding:14px 10px 12px;">
       <a href="${lien}" style="display:inline-block;padding:10px 22px;font-size:13px;font-weight:600;color:#ffffff;background:${BLUE};text-decoration:none;border-radius:999px;">Voir les créneaux et m'inscrire</a>
