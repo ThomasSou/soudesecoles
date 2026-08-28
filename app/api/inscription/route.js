@@ -40,7 +40,7 @@ export async function POST(request) {
     return NextResponse.json(
       {
         error:
-          "Un compte existe déjà avec cette adresse e-mail. Utilisez la page de connexion, ou contactez-nous si vous avez oublié votre mot de passe.",
+          "Un compte existe déjà avec cette adresse e-mail. Utilisez la page de connexion, ou réinitialisez votre mot de passe.",
       },
       { status: 409 }
     );

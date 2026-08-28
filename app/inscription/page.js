@@ -19,6 +19,10 @@ export default function InscriptionPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Cas particulier : l'e-mail correspond déjà à un compte. On affiche alors
+  // un message avec les liens vers la connexion et la réinitialisation du
+  // mot de passe (impossible à rendre dans la chaîne d'erreur simple).
+  const [compteExistant, setCompteExistant] = useState(false);
   const [sent, setSent] = useState(false);
 
   function updateChild(index, field, value) {
@@ -30,6 +34,7 @@ export default function InscriptionPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+    setCompteExistant(false);
 
     const enfantsValides = children.filter(
       (c) => c.firstName.trim() && c.lastName.trim()
@@ -57,6 +62,10 @@ export default function InscriptionPage() {
       setLoading(false);
 
       if (!res.ok) {
+        if (res.status === 409) {
+          setCompteExistant(true);
+          return;
+        }
         setError(result.error || "Une erreur est survenue. Merci de réessayer.");
         return;
       }
@@ -252,7 +261,21 @@ export default function InscriptionPage() {
           />
         </div>
 
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {compteExistant ? (
+          <p className="text-red-600 text-sm">
+            Un compte existe déjà avec cette adresse e-mail. Utilisez la{" "}
+            <Link href="/connexion" className="underline">
+              page de connexion
+            </Link>
+            , ou{" "}
+            <Link href="/mot-de-passe-oublie" className="underline">
+              réinitialisez votre mot de passe
+            </Link>
+            .
+          </p>
+        ) : (
+          error && <p className="text-red-600 text-sm">{error}</p>
+        )}
 
         <button
           type="submit"
