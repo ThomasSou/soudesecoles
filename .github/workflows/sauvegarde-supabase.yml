@@ -55,10 +55,16 @@ jobs:
           /usr/lib/postgresql/17/bin/pg_dump "${{ secrets.SUPABASE_DB_URL }}" --schema=public --no-owner --no-privileges \
             | gzip > "sauvegarde/base-${{ env.DATE }}.sql.gz"
 
+      # Le secret RCLONE_CONFIG contient le rclone.conf encodé en base64 (une
+      # seule ligne). Raison : le jeton OAuth Google est une très longue ligne
+      # JSON qui se cassait systématiquement au copier-coller dans un secret
+      # GitHub (le token JSON ressortait tronqué -> "invalid character ...").
+      # Le base64 est une chaîne continue sans caractère spécial : incassable.
+      # Pour (re)générer le secret, voir docs/sauvegardes.md.
       - name: Configurer rclone (remotes Google Drive + Supabase Storage)
         run: |
           mkdir -p ~/.config/rclone
-          printf '%s' "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
+          echo "${{ secrets.RCLONE_CONFIG }}" | base64 --decode > ~/.config/rclone/rclone.conf
 
       # Les 3 buckets de fichiers utilisés par le site (voir docs/sauvegardes.md).
       - name: Récupérer les fichiers (Supabase Storage)
