@@ -78,6 +78,12 @@ function EnvoiEmails({ token, parent }) {
   const [busyTest, setBusyTest] = useState(false);
   const [testResultat, setTestResultat] = useState(null);
 
+  // Brouillon : id de la ligne email_campaigns en cours d'édition (null si le
+  // contenu de l'éditeur n'a pas encore été enregistré comme brouillon).
+  const [brouillonId, setBrouillonId] = useState(null);
+  const [busyBrouillon, setBusyBrouillon] = useState(false);
+  const [brouillonMsg, setBrouillonMsg] = useState("");
+
   const charger = useCallback(async () => {
     if (!token) return;
     const [res, resContacts] = await Promise.all([
@@ -196,6 +202,7 @@ function EnvoiEmails({ token, parent }) {
           subject,
           contentBlocks: blocks,
           benevolesEvenementId: benevolesEvenementId || null,
+          brouillonId,
         }),
       });
       data = await res.json().catch(() => ({}));
@@ -289,6 +296,8 @@ function EnvoiEmails({ token, parent }) {
     setBlocks(TEMPLATES[0].blocks());
     setBenevolesEvenementId("");
     setInclureContacts(false);
+    setBrouillonId(null);
+    setBrouillonMsg("");
     charger();
   }
 
@@ -336,10 +345,67 @@ function EnvoiEmails({ token, parent }) {
     }
   }
 
+  async function enregistrerBrouillon() {
+    setBusyBrouillon(true);
+    setBrouillonMsg("");
+    setError("");
+    try {
+      const res = await fetch("/api/admin/emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          brouillon: true,
+          campaignId: brouillonId,
+          segment: segment(),
+          subject,
+          contentBlocks: blocks,
+          benevolesEvenementId: benevolesEvenementId || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setBrouillonMsg(data.error || "L'enregistrement du brouillon a échoué.");
+        return;
+      }
+      setBrouillonId(data.campaignId);
+      setBrouillonMsg("Brouillon enregistré — vous pouvez fermer la page sans le perdre.");
+      charger();
+    } catch (e) {
+      setBrouillonMsg("Impossible de joindre le serveur.");
+    } finally {
+      setBusyBrouillon(false);
+    }
+  }
+
+  async function supprimerBrouillon(id) {
+    if (!window.confirm("Supprimer définitivement ce brouillon ?")) return;
+    const res = await fetch(`/api/admin/emails?id=${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      if (brouillonId === id) {
+        setBrouillonId(null);
+        setBrouillonMsg("");
+      }
+      charger();
+    }
+  }
+
   function reprendreCampagne(c) {
-    setSubject(c.subject);
+    setSubject(c.subject || "");
     setBlocks(c.content_blocks && c.content_blocks.length > 0 ? c.content_blocks : [newBlock("paragraph")]);
     setBenevolesEvenementId(c.benevoles_evenement_id || "");
+    // Restaure aussi le segment (destinataires) — utile surtout pour reprendre
+    // l'édition d'un brouillon là où on l'avait laissé.
+    const seg = c.segment || {};
+    setScope(seg.scope === "personnalise" ? "personnalise" : "toute");
+    setClasses(Array.isArray(seg.classes) ? seg.classes : []);
+    setNiveaux(Array.isArray(seg.niveaux) ? seg.niveaux : []);
+    setAdherents(seg.adherents || "tous");
+    setInclureContacts(!!seg.inclureContacts);
+    setBrouillonId(c.status === "brouillon" ? c.id : null);
+    setBrouillonMsg("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -616,13 +682,27 @@ function EnvoiEmails({ token, parent }) {
         </div>
 
         {!confirmation && !progres && (
-          <button
-            onClick={ouvrirConfirmation}
-            disabled={busyEnvoi || busyApercu}
-            className="mt-4 bg-sou-blue text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-sou-gold transition-colors disabled:opacity-60"
-          >
-            {busyApercu ? "Préparation..." : "Envoyer"}
-          </button>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              onClick={ouvrirConfirmation}
+              disabled={busyEnvoi || busyApercu}
+              className="bg-sou-blue text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-sou-gold transition-colors disabled:opacity-60"
+            >
+              {busyApercu ? "Préparation..." : "Envoyer"}
+            </button>
+            <button
+              onClick={enregistrerBrouillon}
+              disabled={busyBrouillon}
+              className="text-sm font-semibold text-sou-blue border border-sou-blue px-4 py-2 rounded-full hover:bg-sou-blue hover:text-white transition-colors disabled:opacity-60"
+            >
+              {busyBrouillon
+                ? "Enregistrement..."
+                : brouillonId
+                ? "Enregistrer le brouillon"
+                : "Enregistrer comme brouillon"}
+            </button>
+            {brouillonMsg && <span className="text-xs text-slate-500">{brouillonMsg}</span>}
+          </div>
         )}
 
         {confirmation && (
@@ -743,25 +823,34 @@ function EnvoiEmails({ token, parent }) {
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold text-sou-blue mb-4">Historique</h2>
+        <h2 className="text-lg font-semibold text-sou-blue mb-4">Historique et brouillons</h2>
         {campagnes.length === 0 ? (
-          <p className="text-slate-400 italic">Aucune campagne envoyée pour l&apos;instant.</p>
+          <p className="text-slate-400 italic">Aucune campagne ni brouillon pour l&apos;instant.</p>
         ) : (
           <div className="space-y-3">
             {campagnes.map((c) => (
               <div key={c.id} className="border border-slate-200 rounded-xl p-4 text-sm flex items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold text-sou-blue">
-                    {c.subject}
+                    {c.subject || "(sans sujet)"}
                     {c.status === "en_cours" && (
                       <span className="ml-2 text-xs font-semibold text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">
                         envoi en cours
                       </span>
                     )}
+                    {c.status === "brouillon" && (
+                      <span className="ml-2 text-xs font-semibold text-slate-600 bg-slate-100 rounded-full px-2 py-0.5">
+                        brouillon
+                      </span>
+                    )}
                   </p>
                   <p className="text-slate-500">
-                    {c.segment_summary} — {c.sent_count}/{c.recipients_count} destinataire(s)
-                    {!c.mail_configured && " (brouillon, envoi non configuré au moment de l'envoi)"}
+                    {c.status === "brouillon"
+                      ? "Brouillon non envoyé"
+                      : `${c.segment_summary} — ${c.sent_count}/${c.recipients_count} destinataire(s)`}
+                    {c.status !== "brouillon" &&
+                      !c.mail_configured &&
+                      " (envoi non configuré au moment de l'envoi)"}
                   </p>
                   <p className="text-slate-400 text-xs mt-1">
                     {new Date(c.created_at).toLocaleString("fr-FR")}
@@ -781,8 +870,16 @@ function EnvoiEmails({ token, parent }) {
                     onClick={() => reprendreCampagne(c)}
                     className="text-xs font-semibold text-sou-blue hover:text-sou-gold"
                   >
-                    Réutiliser le contenu
+                    {c.status === "brouillon" ? "Modifier ce brouillon" : "Réutiliser le contenu"}
                   </button>
+                  {c.status === "brouillon" && (
+                    <button
+                      onClick={() => supprimerBrouillon(c.id)}
+                      className="text-xs text-slate-400 hover:text-red-600"
+                    >
+                      Supprimer
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

@@ -211,8 +211,63 @@ export async function POST(request) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const { segment, subject, contentBlocks, dryRun, benevolesEvenementId } =
-    await request.json();
+  const {
+    segment,
+    subject,
+    contentBlocks,
+    dryRun,
+    benevolesEvenementId,
+    brouillon,
+    campaignId,
+    brouillonId,
+  } = await request.json();
+
+  // Enregistrement d'un brouillon : on fige le contenu de l'éditeur sur une
+  // ligne email_campaigns en statut 'brouillon', sans calculer de
+  // destinataires ni rien envoyer. Modifie la ligne existante si campaignId
+  // est fourni (on continue d'éditer le même brouillon), sinon en crée une.
+  if (brouillon) {
+    const blocs = contentBlocks || [];
+    const champs = {
+      subject: subject || "",
+      message: renderBlocksToText(blocs),
+      html: renderBlocksToHtml(blocs, { subject }),
+      content_blocks: blocs,
+      segment: segment || {},
+      segment_summary: resumeSegment(segment),
+      recipients_count: 0,
+      sent_count: 0,
+      mail_configured: isMailConfigured(),
+      status: "brouillon",
+      next_index: 0,
+      recipients: [],
+      benevoles_evenement_id: benevolesEvenementId || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    let ligne = null;
+    if (campaignId) {
+      const { data, error } = await auth.admin
+        .from("email_campaigns")
+        .update(champs)
+        .eq("id", campaignId)
+        .eq("status", "brouillon")
+        .select("id")
+        .maybeSingle();
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      ligne = data;
+    }
+    if (!ligne) {
+      const { data, error } = await auth.admin
+        .from("email_campaigns")
+        .insert({ ...champs, created_by: auth.parent.id })
+        .select("id")
+        .single();
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      ligne = data;
+    }
+    return NextResponse.json({ ok: true, brouillon: true, campaignId: ligne.id });
+  }
 
   const familles = await chargerFamilles(auth.admin);
   const correspondantes = famillesCorrespondantes(familles, segment);
@@ -277,6 +332,16 @@ export async function POST(request) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
+  // La campagne vient d'être créée pour de bon : si elle partait d'un
+  // brouillon, on retire ce dernier pour ne pas encombrer l'historique.
+  if (brouillonId) {
+    await auth.admin
+      .from("email_campaigns")
+      .delete()
+      .eq("id", brouillonId)
+      .eq("status", "brouillon");
+  }
+
   return NextResponse.json({
     ok: true,
     campaignId: campagne.id,
@@ -289,4 +354,30 @@ export async function POST(request) {
     // un envoi manuel en attendant.
     destinataires: mailConfigured ? undefined : destinataires,
   });
+}
+
+// Suppression d'un brouillon (jamais d'une campagne réellement envoyée : le
+// filtre status='brouillon' l'empêche).
+export async function DELETE(request) {
+  const auth = await requirePermission(request, "emails");
+  if (auth.error) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  const id = new URL(request.url).searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "Identifiant manquant." }, { status: 400 });
+  }
+
+  const { error } = await auth.admin
+    .from("email_campaigns")
+    .delete()
+    .eq("id", id)
+    .eq("status", "brouillon");
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
 }
