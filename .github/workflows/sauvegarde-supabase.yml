@@ -23,10 +23,18 @@ jobs:
         # quand même passée au vert, l'erreur n'est apparue que plus tard).
         shell: bash --noprofile --norc -o pipefail -e {0}
     steps:
-      - name: Installer psql et rclone
+      # pg_dump refuse de sauvegarder un serveur plus récent que sa propre
+      # version (protection normale de PostgreSQL, pas un bug) : le paquet
+      # "postgresql-client" standard d'Ubuntu est resté en version 16, alors
+      # que Supabase tourne en version 17 — on ajoute donc le dépôt officiel
+      # PostgreSQL pour installer la version 17 du client.
+      - name: Installer psql (version 17) et rclone
         run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           sudo apt-get update
-          sudo apt-get install -y postgresql-client rclone
+          sudo apt-get install -y postgresql-client-17 rclone
 
       - name: Préparer le dossier du jour
         run: |
