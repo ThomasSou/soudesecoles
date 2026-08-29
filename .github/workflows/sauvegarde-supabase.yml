@@ -14,12 +14,19 @@ on:
 jobs:
   sauvegarde:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Fait échouer explicitement l'étape si une commande au milieu d'un
+        # pipe (ex. `curl ... | bash`) échoue silencieusement — sans ça, une
+        # installation ratée peut passer inaperçue jusqu'à l'étape suivante
+        # (vécu : "curl | bash" pour rclone a échoué en silence, l'étape est
+        # quand même passée au vert, l'erreur n'est apparue que plus tard).
+        shell: bash --noprofile --norc -o pipefail -e {0}
     steps:
       - name: Installer psql et rclone
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
-          curl https://rclone.org/install.sh | sudo bash
+          sudo apt-get install -y postgresql-client rclone
 
       - name: Préparer le dossier du jour
         run: |
