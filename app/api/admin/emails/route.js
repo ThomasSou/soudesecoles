@@ -67,7 +67,29 @@ function famillesCorrespondantes(familles, segment) {
     });
 }
 
+// Découpe une saisie libre d'adresses (une par ligne, ou séparées par des
+// espaces / virgules / points-virgules) en liste d'e-mails dédupliquée.
+function normaliserAdresses(adresses) {
+  const brut = Array.isArray(adresses) ? adresses.join("\n") : String(adresses || "");
+  const vus = new Set();
+  const out = [];
+  for (const morceau of brut.split(/[\s,;]+/)) {
+    const e = morceau.trim();
+    if (!e || !e.includes("@")) continue;
+    const cle = e.toLowerCase();
+    if (vus.has(cle)) continue;
+    vus.add(cle);
+    out.push(e);
+  }
+  return out;
+}
+
 function resumeSegment(segment) {
+  if (segment?.scope === "liste") {
+    const n = normaliserAdresses(segment.adresses).length;
+    return `Liste d'adresses (${n})`;
+  }
+
   const { scope, classes = [], niveaux = [], adherents = "tous" } = segment || {};
   const parts = [];
   parts.push(scope === "toute" ? "Toute l'école" : "Sélection personnalisée");
@@ -111,6 +133,67 @@ function contactsDestinataires(contacts, dejaPris) {
       lastName: c.last_name,
       adherent: false,
     });
+  }
+  return out;
+}
+
+// Destinataires d'un envoi ciblé « liste d'adresses » : on prend exactement
+// les adresses saisies. Chacune est enrichie si elle correspond à un parent
+// (prénom, statut d'adhésion, lien de désinscription propre) ou à un contact
+// léger ; sinon elle part telle quelle. Les adresses désinscrites (parent ou
+// contact) sont exclues.
+async function destinatairesDeListe(admin, adresses) {
+  const emails = normaliserAdresses(adresses);
+  if (emails.length === 0) return [];
+
+  const [parentsRes, contactsRes, membershipsRes] = await Promise.all([
+    admin.from("parents").select("id, first_name, last_name, email, family_id, email_opt_out"),
+    admin.from("email_contacts").select("id, first_name, last_name, email, email_opt_out"),
+    admin.from("memberships").select("family_id, school_year, paid_at"),
+  ]);
+
+  const annee = currentSchoolYear();
+  const adhesionParFamille = new Map();
+  for (const m of membershipsRes.data || []) {
+    if (m.school_year === annee) adhesionParFamille.set(m.family_id, m);
+  }
+  const parentParEmail = new Map();
+  for (const p of parentsRes.data || []) {
+    if (p.email) parentParEmail.set(p.email.toLowerCase(), p);
+  }
+  const contactParEmail = new Map();
+  for (const c of contactsRes.data || []) {
+    if (c.email) contactParEmail.set(c.email.toLowerCase(), c);
+  }
+
+  const out = [];
+  for (const email of emails) {
+    const cle = email.toLowerCase();
+    const p = parentParEmail.get(cle);
+    if (p) {
+      if (p.email_opt_out) continue;
+      out.push({
+        parentId: p.id,
+        email: p.email,
+        firstName: p.first_name,
+        lastName: p.last_name,
+        adherent: isMembershipValid(adhesionParFamille.get(p.family_id)),
+      });
+      continue;
+    }
+    const c = contactParEmail.get(cle);
+    if (c) {
+      if (c.email_opt_out) continue;
+      out.push({
+        contactId: c.id,
+        email: c.email,
+        firstName: c.first_name,
+        lastName: c.last_name,
+        adherent: false,
+      });
+      continue;
+    }
+    out.push({ email, firstName: "", lastName: "", adherent: false });
   }
   return out;
 }
@@ -269,16 +352,21 @@ export async function POST(request) {
     return NextResponse.json({ ok: true, brouillon: true, campaignId: ligne.id });
   }
 
-  const familles = await chargerFamilles(auth.admin);
-  const correspondantes = famillesCorrespondantes(familles, segment);
-  const destinataires = destinatairesDe(correspondantes);
+  let destinataires;
+  if (segment?.scope === "liste") {
+    destinataires = await destinatairesDeListe(auth.admin, segment.adresses);
+  } else {
+    const familles = await chargerFamilles(auth.admin);
+    const correspondantes = famillesCorrespondantes(familles, segment);
+    destinataires = destinatairesDe(correspondantes);
 
-  if (inclutContacts(segment)) {
-    const { data: contacts } = await auth.admin
-      .from("email_contacts")
-      .select("id, first_name, last_name, email, email_opt_out");
-    const dejaPris = new Set(destinataires.map((d) => d.email.toLowerCase()));
-    destinataires.push(...contactsDestinataires(contacts, dejaPris));
+    if (inclutContacts(segment)) {
+      const { data: contacts } = await auth.admin
+        .from("email_contacts")
+        .select("id, first_name, last_name, email, email_opt_out");
+      const dejaPris = new Set(destinataires.map((d) => d.email.toLowerCase()));
+      destinataires.push(...contactsDestinataires(contacts, dejaPris));
+    }
   }
 
   if (dryRun) {

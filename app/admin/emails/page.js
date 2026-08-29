@@ -51,6 +51,8 @@ function EnvoiEmails({ token, parent }) {
   const [classes, setClasses] = useState([]);
   const [niveaux, setNiveaux] = useState([]);
   const [adherents, setAdherents] = useState("tous");
+  // Envoi ciblé sur une liste d'adresses collées (scope "liste").
+  const [adresses, setAdresses] = useState("");
   // Contacts légers (email_contacts) : adresses récoltées sans fiche famille.
   const [contactsCount, setContactsCount] = useState(0);
   const [inclureContacts, setInclureContacts] = useState(false);
@@ -110,6 +112,9 @@ function EnvoiEmails({ token, parent }) {
   }, [parent]);
 
   function segment() {
+    if (scope === "liste") {
+      return { scope: "liste", classes: [], niveaux: [], adherents: "tous", inclureContacts: false, adresses };
+    }
     return {
       scope,
       classes: scope === "toute" ? [] : classes,
@@ -118,6 +123,17 @@ function EnvoiEmails({ token, parent }) {
       inclureContacts,
     };
   }
+
+  // Nombre d'adresses valides distinctes dans la saisie libre (même règle que
+  // côté serveur), pour l'afficher en direct.
+  const nbAdresses = useMemo(() => {
+    const vus = new Set();
+    for (const m of (adresses || "").split(/[\s,;]+/)) {
+      const e = m.trim().toLowerCase();
+      if (e.includes("@")) vus.add(e);
+    }
+    return vus.size;
+  }, [adresses]);
 
   function toggle(list, setList, value) {
     setList((prev) =>
@@ -175,6 +191,10 @@ function EnvoiEmails({ token, parent }) {
   async function ouvrirConfirmation() {
     if (!subject.trim() || contenuVide) {
       setError("Merci de renseigner le sujet et au moins un bloc avec du contenu.");
+      return;
+    }
+    if (scope === "liste" && nbAdresses === 0) {
+      setError("Merci de coller au moins une adresse e-mail.");
       return;
     }
     setError("");
@@ -296,6 +316,8 @@ function EnvoiEmails({ token, parent }) {
     setBlocks(TEMPLATES[0].blocks());
     setBenevolesEvenementId("");
     setInclureContacts(false);
+    setScope("toute");
+    setAdresses("");
     setBrouillonId(null);
     setBrouillonMsg("");
     charger();
@@ -399,10 +421,17 @@ function EnvoiEmails({ token, parent }) {
     // Restaure aussi le segment (destinataires) — utile surtout pour reprendre
     // l'édition d'un brouillon là où on l'avait laissé.
     const seg = c.segment || {};
-    setScope(seg.scope === "personnalise" ? "personnalise" : "toute");
+    setScope(["personnalise", "liste"].includes(seg.scope) ? seg.scope : "toute");
     setClasses(Array.isArray(seg.classes) ? seg.classes : []);
     setNiveaux(Array.isArray(seg.niveaux) ? seg.niveaux : []);
     setAdherents(seg.adherents || "tous");
+    setAdresses(
+      typeof seg.adresses === "string"
+        ? seg.adresses
+        : Array.isArray(seg.adresses)
+        ? seg.adresses.join("\n")
+        : ""
+    );
     setInclureContacts(!!seg.inclureContacts);
     setBrouillonId(c.status === "brouillon" ? c.id : null);
     setBrouillonMsg("");
@@ -450,7 +479,35 @@ function EnvoiEmails({ token, parent }) {
           >
             Sélection personnalisée
           </button>
+          <button
+            onClick={() => setScope("liste")}
+            className={`px-3 py-1.5 rounded-full text-sm ${
+              scope === "liste" ? "bg-sou-blue text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            Liste d&apos;adresses
+          </button>
         </div>
+
+        {scope === "liste" && (
+          <div className="mb-4 border border-slate-200 rounded-xl p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+              Adresses e-mail des destinataires
+            </p>
+            <textarea
+              value={adresses}
+              onChange={(e) => setAdresses(e.target.value)}
+              rows={6}
+              placeholder="Une adresse par ligne (ou séparées par des virgules)."
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono"
+            />
+            <p className="text-xs text-slate-500 mt-2">
+              {nbAdresses} adresse{nbAdresses > 1 ? "s" : ""} valide{nbAdresses > 1 ? "s" : ""}.
+              L&apos;e-mail est personnalisé (prénom, statut) quand l&apos;adresse correspond à
+              une fiche connue. Les personnes désinscrites sont exclues automatiquement.
+            </p>
+          </div>
+        )}
 
         {scope === "personnalise" && (
           <div className="grid gap-6 sm:grid-cols-2 mb-4 border border-slate-200 rounded-xl p-4">
@@ -493,25 +550,27 @@ function EnvoiEmails({ token, parent }) {
           </div>
         )}
 
-        <div className="flex gap-2 mb-4">
-          {[
-            { key: "tous", label: "Tous statuts" },
-            { key: "adherents", label: "Adhérents à jour uniquement" },
-            { key: "non_adherents", label: "Non-adhérents uniquement" },
-          ].map((o) => (
-            <button
-              key={o.key}
-              onClick={() => setAdherents(o.key)}
-              className={`px-3 py-1.5 rounded-full text-sm ${
-                adherents === o.key ? "bg-sou-blue text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
+        {scope !== "liste" && (
+          <div className="flex gap-2 mb-4">
+            {[
+              { key: "tous", label: "Tous statuts" },
+              { key: "adherents", label: "Adhérents à jour uniquement" },
+              { key: "non_adherents", label: "Non-adhérents uniquement" },
+            ].map((o) => (
+              <button
+                key={o.key}
+                onClick={() => setAdherents(o.key)}
+                className={`px-3 py-1.5 rounded-full text-sm ${
+                  adherents === o.key ? "bg-sou-blue text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {contactsCount > 0 && (
+        {scope !== "liste" && contactsCount > 0 && (
           <label className="flex items-start gap-2 text-sm mb-4">
             <input
               type="checkbox"
