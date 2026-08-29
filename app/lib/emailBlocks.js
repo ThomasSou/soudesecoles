@@ -326,6 +326,13 @@ function mesureOuvertureHtml(subject) {
 }
 
 // Formate une plage horaire de créneau : "sam. 4 sept., 09:00 – 12:00".
+// Le fuseau est fixé explicitement : ce rendu se fait côté serveur (Netlify
+// tourne en UTC) alors que les créneaux sont des timestamptz. Sans ça, un
+// créneau saisi à 14h00 (heure de Montmerle) ressortirait "12:00" dans
+// l'e-mail l'été, et décalerait de jour pour un créneau proche de minuit —
+// en plus d'être incohérent avec la page /benevoles, formatée, elle, dans le
+// fuseau du navigateur du lecteur.
+const FUSEAU_CRENEAUX = "Europe/Paris";
 function formaterPlageCreneau(debut, fin) {
   try {
     const d = new Date(debut);
@@ -335,9 +342,14 @@ function formaterPlageCreneau(debut, fin) {
       weekday: "short",
       day: "numeric",
       month: "short",
+      timeZone: FUSEAU_CRENEAUX,
     });
     const h = (x) =>
-      x.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+      x.toLocaleTimeString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: FUSEAU_CRENEAUX,
+      });
     return Number.isNaN(f.getTime())
       ? `${jour}, ${h(d)}`
       : `${jour}, ${h(d)} – ${h(f)}`;
