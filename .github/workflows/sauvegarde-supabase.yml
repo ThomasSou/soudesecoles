@@ -48,7 +48,11 @@ jobs:
       # procédure à suivre en cas de restauration.
       - name: Exporter les données (base Postgres)
         run: |
-          pg_dump "${{ secrets.SUPABASE_DB_URL }}" --schema=public --no-owner --no-privileges \
+          # Chemin explicite : le runner a déjà un "pg_dump" plus ancien
+          # d'installé, et Ubuntu ne fait pas automatiquement pointer la
+          # commande générique vers la version la plus récente quand
+          # plusieurs coexistent.
+          /usr/lib/postgresql/17/bin/pg_dump "${{ secrets.SUPABASE_DB_URL }}" --schema=public --no-owner --no-privileges \
             | gzip > "sauvegarde/base-${{ env.DATE }}.sql.gz"
 
       - name: Configurer rclone (remotes Google Drive + Supabase Storage)
