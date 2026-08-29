@@ -63,7 +63,7 @@ import { fileURLToPath } from "node:url";
 const ICI = dirname(fileURLToPath(import.meta.url));
 
 const dossier = process.argv[2];
-const anneeScolaire = process.argv[3] || "2025-2026";
+const anneeScolaire = process.argv[3] || "2026-2027";
 
 if (!dossier) {
   console.error("Usage : node scripts/csv-vers-familles.mjs \"<dossier des listes>\" [annee]");
