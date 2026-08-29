@@ -415,6 +415,10 @@ export async function POST(request) {
       next_index: 0,
       recipients: aEnvoyer ? destinataires : [],
       benevoles_evenement_id: benevolesEvenementId || null,
+      // Ancien exprès : le verrou d'envoi (cf. /api/admin/emails/continuer)
+      // teste `updated_at < maintenant - 30 s` ; une date lointaine garantit
+      // que la toute première vague peut démarrer sans attendre.
+      updated_at: new Date(0).toISOString(),
     })
     .select("id")
     .single();

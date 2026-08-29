@@ -75,6 +75,9 @@ function EnvoiEmails({ token, parent }) {
   // Envoi par vagues en cours : { campaignId, sent, total, done, enPause, enErreur }.
   const [progres, setProgres] = useState(null);
   const stopRef = useRef(false);
+  // Id de la campagne pour laquelle une reprise automatique a déjà été
+  // tentée sur cette page (évite de la relancer à chaque re-render).
+  const autoRepriseRef = useRef(null);
 
   const [testEmail, setTestEmail] = useState("");
   const [busyTest, setBusyTest] = useState(false);
@@ -110,6 +113,60 @@ function EnvoiEmails({ token, parent }) {
     if (parent?.email && !testEmail) setTestEmail(parent.email);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parent]);
+
+  // Reprise automatique : si une campagne est restée « en cours » (onglet
+  // fermé, fonction coupée), on relance l'envoi dès l'ouverture de la page,
+  // sans attendre un clic. Le verrou serveur empêche un double envoi si un
+  // autre onglet fait pareil.
+  useEffect(() => {
+    const enCours = campagnes.find((c) => c.status === "en_cours");
+    if (!enCours) return;
+    if (progres && !progres.enPause && !progres.enErreur) return;
+    if (autoRepriseRef.current === enCours.id) return;
+    autoRepriseRef.current = enCours.id;
+    setProgres({
+      campaignId: enCours.id,
+      sent: enCours.sent_count,
+      total: enCours.recipients_count,
+      done: false,
+    });
+    boucleEnvoi(enCours.id, { depuisEditeur: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campagnes]);
+
+  // Progression « live » : tant qu'un envoi est en cours, on relit
+  // l'avancement toutes les 4 s. Le compteur bouge donc même quand la boucle
+  // d'envoi est entre deux vagues, et se rétablit après un rechargement de
+  // page (la reprise auto ci-dessus redémarre la boucle, ce polling reflète
+  // l'avancement en attendant).
+  useEffect(() => {
+    if (!progres || progres.done || progres.enErreur || !progres.campaignId) return;
+    const id = progres.campaignId;
+    const t = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/admin/emails/continuer?id=${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) return;
+        setProgres((p) =>
+          p && p.campaignId === id
+            ? { ...p, sent: d.sentCount, total: d.recipientsCount }
+            : p
+        );
+        if (d.status && d.status !== "en_cours") {
+          finaliser(
+            { campaignId: id, sent: d.sentCount, total: d.recipientsCount },
+            { depuisEditeur: false }
+          );
+        }
+      } catch {
+        /* le polling ne doit jamais casser la page */
+      }
+    }, 4000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progres?.campaignId, progres?.done, progres?.enErreur, token]);
 
   function segment() {
     if (scope === "liste") {
@@ -252,15 +309,15 @@ function EnvoiEmails({ token, parent }) {
     };
     setProgres(etat);
     if (data.done) {
-      finaliser(etat);
+      finaliser(etat, { depuisEditeur: true });
     } else {
-      boucleEnvoi(data.campaignId);
+      boucleEnvoi(data.campaignId, { depuisEditeur: true });
     }
   }
 
   // Enchaîne les vagues via /api/admin/emails/continuer, avec une pause
   // entre chaque, jusqu'à la fin ou une mise en pause.
-  async function boucleEnvoi(campaignId) {
+  async function boucleEnvoi(campaignId, { depuisEditeur = false } = {}) {
     stopRef.current = false;
     setProgres((p) => ({ ...(p || {}), campaignId, enPause: false, enErreur: false }));
     while (!stopRef.current) {
@@ -284,17 +341,24 @@ function EnvoiEmails({ token, parent }) {
         setError((e.message || "Erreur réseau") + " L'envoi peut être repris.");
         return;
       }
-      const etat = {
+      setProgres((p) => ({
+        ...(p || {}),
         campaignId,
         sent: data.sentCount,
         total: data.recipientsCount,
         done: data.done,
-      };
-      setProgres(etat);
+      }));
       if (data.done) {
-        finaliser(etat);
+        finaliser(
+          { campaignId, sent: data.sentCount, total: data.recipientsCount },
+          { depuisEditeur }
+        );
         return;
       }
+      // data.verrouille : une autre requête tient le verrou d'envoi (autre
+      // onglet, ou vague précédente pas encore terminée). On ne fait rien de
+      // particulier : la prochaine itération réessaiera, et le compteur reste
+      // à jour via data.sentCount.
     }
     // Sortie de boucle sans « done » = mise en pause manuelle.
     setProgres((p) => ({ ...(p || {}), enPause: true }));
@@ -304,7 +368,7 @@ function EnvoiEmails({ token, parent }) {
     stopRef.current = true;
   }
 
-  function finaliser(etat) {
+  function finaliser(etat, { depuisEditeur = true } = {}) {
     setResultat({
       mailConfigured: true,
       sentCount: etat.sent,
@@ -312,14 +376,19 @@ function EnvoiEmails({ token, parent }) {
     });
     setProgres(null);
     setApercu(null);
-    setSubject("");
-    setBlocks(TEMPLATES[0].blocks());
-    setBenevolesEvenementId("");
-    setInclureContacts(false);
-    setScope("toute");
-    setAdresses("");
-    setBrouillonId(null);
-    setBrouillonMsg("");
+    // On ne vide l'éditeur que si l'envoi qui vient de finir est celui qu'on
+    // venait de composer. Une reprise automatique d'une campagne plus ancienne
+    // ne doit pas effacer ce que l'utilisateur est en train d'écrire.
+    if (depuisEditeur) {
+      setSubject("");
+      setBlocks(TEMPLATES[0].blocks());
+      setBenevolesEvenementId("");
+      setInclureContacts(false);
+      setScope("toute");
+      setAdresses("");
+      setBrouillonId(null);
+      setBrouillonMsg("");
+    }
     charger();
   }
 
@@ -443,6 +512,7 @@ function EnvoiEmails({ token, parent }) {
   function reprendreEnvoi(c) {
     setError("");
     setResultat(null);
+    autoRepriseRef.current = c.id;
     setProgres({
       campaignId: c.id,
       sent: c.sent_count,
@@ -450,7 +520,7 @@ function EnvoiEmails({ token, parent }) {
       done: false,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
-    boucleEnvoi(c.id);
+    boucleEnvoi(c.id, { depuisEditeur: false });
   }
 
   if (loading) {
@@ -911,18 +981,33 @@ function EnvoiEmails({ token, parent }) {
                       !c.mail_configured &&
                       " (envoi non configuré au moment de l'envoi)"}
                   </p>
+                  {c.status === "en_cours" && c.segment?.canaux && (
+                    <p className="text-slate-400 text-xs">
+                      {c.segment.canaux.sender || 0} via Sender, {c.segment.canaux.smtp || 0} via SMTP
+                    </p>
+                  )}
                   <p className="text-slate-400 text-xs mt-1">
                     {new Date(c.created_at).toLocaleString("fr-FR")}
+                    {c.updated_at &&
+                      c.status === "en_cours" &&
+                      ` · maj ${new Date(c.updated_at).toLocaleTimeString("fr-FR")}`}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1.5 whitespace-nowrap">
                   {c.status === "en_cours" && (
                     <button
                       onClick={() => reprendreEnvoi(c)}
-                      disabled={!!progres}
+                      disabled={
+                        !!progres &&
+                        progres.campaignId === c.id &&
+                        !progres.enErreur &&
+                        !progres.enPause
+                      }
                       className="text-xs font-semibold text-white bg-sou-blue rounded-full px-3 py-1.5 hover:bg-sou-gold disabled:opacity-50"
                     >
-                      Reprendre l&apos;envoi
+                      {progres && progres.campaignId === c.id && !progres.enErreur && !progres.enPause
+                        ? "Envoi en cours…"
+                        : "Reprendre l'envoi"}
                     </button>
                   )}
                   <button

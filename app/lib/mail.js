@@ -75,6 +75,11 @@ export async function sendMail({ to, subject, text, html, replyTo, headers }) {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASSWORD,
       },
+      // Bornes : un SMTP lent ne doit pas faire déborder la fonction serveur
+      // ni le verrou d'envoi (cf. /api/admin/emails/continuer).
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 15000,
     });
 
     await transport.sendMail({
