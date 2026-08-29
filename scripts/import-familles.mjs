@@ -101,8 +101,20 @@ const stats = {
   parentsRerattaches: 0,
   enfantsCrees: 0,
   enfantsMisAJour: 0,
+  contactsNettoyes: 0,
   erreurs: 0,
 };
+
+// Un e-mail qui devient une vraie fiche parent n'a plus besoin de sa fiche
+// "contact léger" (email_contacts) — devenue redondante, elle serait sinon
+// un doublon silencieux pour l'envoi de campagnes (voir scripts/importer-
+// contacts-email.mjs). On la retire à chaque fois qu'un parent est créé ou
+// mis à jour avec cet e-mail.
+async function nettoyerContactSiExistant(email) {
+  if (!email) return;
+  const { data, error } = await admin.from("email_contacts").delete().eq("email", email).select("id");
+  if (!error && data?.length) stats.contactsNettoyes += data.length;
+}
 const parentsAInviterPlusTard = []; // { id, email, firstName, lastName }
 
 for (const fam of families) {
@@ -211,7 +223,10 @@ for (const fam of families) {
         }
         stats.parentsMisAJour++;
       }
-      if (emailRetenu) emailsDejaUtilisesDansCetteFamille.add(emailRetenu);
+      if (emailRetenu) {
+        emailsDejaUtilisesDansCetteFamille.add(emailRetenu);
+        await nettoyerContactSiExistant(emailRetenu);
+      }
       continue;
     }
 
@@ -237,6 +252,7 @@ for (const fam of families) {
     stats.parentsCrees++;
     if (emailRetenu) {
       emailsDejaUtilisesDansCetteFamille.add(emailRetenu);
+      await nettoyerContactSiExistant(emailRetenu);
       parentsAInviterPlusTard.push({
         id: nouveauParent.id,
         email: emailRetenu,
@@ -304,6 +320,9 @@ console.log(`Parents déjà existants mis à jour : ${stats.parentsMisAJour}`);
 console.log(`  dont rattachés à une famille différente de la précédente : ${stats.parentsRerattaches}`);
 console.log(`Enfants créés : ${stats.enfantsCrees}`);
 console.log(`Enfants déjà existants mis à jour (classe) : ${stats.enfantsMisAJour}`);
+if (stats.contactsNettoyes > 0) {
+  console.log(`Contacts légers devenus redondants, retirés (email_contacts) : ${stats.contactsNettoyes}`);
+}
 if (stats.erreurs > 0) console.log(`Erreurs rencontrées (voir ci-dessus) : ${stats.erreurs}`);
 console.log(`\nListe des parents (nouveaux) à inviter écrite dans : ${sortieAInviter}`);
 console.log(`\nAucune invitation n'a été envoyée. Vérifie les fiches créées/mises à jour dans le back-office`);
