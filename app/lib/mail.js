@@ -46,7 +46,7 @@ export async function sendMail({ to, subject, text, html, replyTo, headers }) {
   if (isSenderConfigured()) {
     try {
       await envoyerEmailTransactionnel({ to, subject, text, html, replyTo, headers });
-      return { sent: true };
+      return { sent: true, via: "sender" };
     } catch (error) {
       console.error("Envoi e-mail impossible (Sender) :", error?.message);
       // Sender est configuré mais a refusé l'envoi (compte gelé ou en cours de
@@ -87,7 +87,7 @@ export async function sendMail({ to, subject, text, html, replyTo, headers }) {
       headers,
     });
 
-    return { sent: true };
+    return { sent: true, via: "smtp" };
   } catch (error) {
     // On ne fait jamais échouer l'action de l'utilisateur à cause de l'e-mail :
     // la donnée est déjà enregistrée en base.

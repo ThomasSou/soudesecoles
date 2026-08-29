@@ -6,7 +6,7 @@ import {
   BLOCK_TYPES,
   CHAMPS_FUSION,
   COULEURS_TEXTE,
-  DEFAULT_RECIPIENT,
+  APERCU_RECIPIENT,
   EMOJIS,
   TAILLES_TEXTE,
   TEMPLATES,
@@ -161,10 +161,10 @@ function EnvoiEmails({ token, parent }) {
   }
 
   const previewRecipient = useMemo(() => {
-    if (previewChoix === "generique-adherent") return { ...DEFAULT_RECIPIENT, adherent: true, parentId: null };
-    if (previewChoix === "generique-non-adherent") return { ...DEFAULT_RECIPIENT, adherent: false, parentId: null };
+    if (previewChoix === "generique-adherent") return { ...APERCU_RECIPIENT, adherent: true, parentId: null };
+    if (previewChoix === "generique-non-adherent") return { ...APERCU_RECIPIENT, adherent: false, parentId: null };
     const contact = contacts.find((c) => c.parentId === previewChoix);
-    if (!contact) return { ...DEFAULT_RECIPIENT, adherent: true, parentId: null };
+    if (!contact) return { ...APERCU_RECIPIENT, adherent: true, parentId: null };
     return {
       firstName: contact.firstName,
       lastName: contact.lastName,

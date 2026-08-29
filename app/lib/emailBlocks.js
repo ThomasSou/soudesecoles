@@ -215,7 +215,19 @@ function blockToHtml(block, recipient) {
   }
 }
 
+// Valeurs par défaut appliquées au rendu d'un e-mail. Volontairement SANS
+// prénom : pour un envoi réel où le destinataire n'a pas de prénom connu,
+// « {{prenom}} » doit donner « Bonjour, » et jamais un nom d'exemple.
 export const DEFAULT_RECIPIENT = {
+  firstName: "",
+  lastName: "",
+  adherent: true,
+  parentId: null,
+};
+
+// Destinataire fictif pour l'APERÇU de l'éditeur uniquement (jamais un envoi
+// réel) : un prénom d'exemple rend l'aperçu plus parlant.
+export const APERCU_RECIPIENT = {
   firstName: "Camille",
   lastName: "Gour",
   adherent: true,

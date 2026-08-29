@@ -175,8 +175,11 @@ async function destinatairesDeListe(admin, adresses) {
       out.push({
         parentId: p.id,
         email: p.email,
-        firstName: p.first_name,
-        lastName: p.last_name,
+        // Toujours des chaînes : un undefined disparaîtrait à la
+        // sérialisation JSON de `recipients` et le rendu retomberait sur le
+        // destinataire par défaut (« Bonjour Camille »).
+        firstName: p.first_name || "",
+        lastName: p.last_name || "",
         adherent: isMembershipValid(adhesionParFamille.get(p.family_id)),
       });
       continue;
@@ -187,8 +190,8 @@ async function destinatairesDeListe(admin, adresses) {
       out.push({
         contactId: c.id,
         email: c.email,
-        firstName: c.first_name,
-        lastName: c.last_name,
+        firstName: c.first_name || "",
+        lastName: c.last_name || "",
         adherent: false,
       });
       continue;
