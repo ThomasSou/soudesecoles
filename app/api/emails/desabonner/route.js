@@ -4,14 +4,30 @@ import { createAdminClient } from "../../../lib/supabaseServerAdmin";
 export const dynamic = "force-dynamic";
 
 // Lien de désinscription en pied de chaque e-mail envoyé. Accessible sans
-// connexion (lien cliqué depuis la boîte mail) : marque simplement ce
-// parent comme ne souhaitant plus recevoir d'e-mails du Sou.
+// connexion (lien cliqué depuis la boîte mail) : marque simplement le
+// destinataire comme ne souhaitant plus recevoir d'e-mails du Sou.
+// Deux types de destinataires : un parent (?p=<id>, table parents) ou un
+// contact léger sans fiche famille (?c=<id>, table email_contacts).
 
-async function desinscrire(parentId) {
-  if (!parentId) return false;
+function cibleDesinscription(request) {
+  const params = new URL(request.url).searchParams;
+  return { parentId: params.get("p"), contactId: params.get("c") };
+}
+
+async function desinscrire({ parentId, contactId }) {
   const admin = createAdminClient();
-  const { error } = await admin.from("parents").update({ email_opt_out: true }).eq("id", parentId);
-  return !error;
+  if (parentId) {
+    const { error } = await admin.from("parents").update({ email_opt_out: true }).eq("id", parentId);
+    return !error;
+  }
+  if (contactId) {
+    const { error } = await admin
+      .from("email_contacts")
+      .update({ email_opt_out: true })
+      .eq("id", contactId);
+    return !error;
+  }
+  return false;
 }
 
 // Désinscription « en un clic » (RFC 8058) : quand l'e-mail porte les en-têtes
@@ -19,15 +35,14 @@ async function desinscrire(parentId) {
 // (Gmail, Apple Mail...) envoie un POST directement à cette URL depuis son
 // bouton natif « Se désinscrire », sans ouvrir de page. On répond sans corps.
 export async function POST(request) {
-  const parentId = new URL(request.url).searchParams.get("p");
-  const ok = await desinscrire(parentId);
+  const ok = await desinscrire(cibleDesinscription(request));
   return new NextResponse(null, { status: ok ? 200 : 400 });
 }
 
 // Lien cliqué manuellement dans le pied de l'e-mail : on renvoie une page de
 // confirmation lisible.
 export async function GET(request) {
-  const parentId = new URL(request.url).searchParams.get("p");
+  const cible = cibleDesinscription(request);
 
   const page = (message, ok) => new NextResponse(
     `<!doctype html><html lang="fr"><head><meta charset="utf-8" /><title>Désinscription</title>
@@ -37,11 +52,11 @@ export async function GET(request) {
     { status: ok ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8" } }
   );
 
-  if (!parentId) {
+  if (!cible.parentId && !cible.contactId) {
     return page("Lien de désinscription invalide.", false);
   }
 
-  const ok = await desinscrire(parentId);
+  const ok = await desinscrire(cible);
 
   if (!ok) {
     return page("Une erreur est survenue, merci de nous contacter directement.", false);

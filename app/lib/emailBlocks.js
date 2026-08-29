@@ -286,16 +286,26 @@ function partenairesHtml() {
   </td></tr></table>`;
 }
 
+// URL de désinscription pour un destinataire donné : lien direct si on
+// connaît son identifiant — parent (`p`) ou contact hors famille (`c`,
+// cf. table email_contacts). Sans identifiant (aperçu générique), on pointe
+// vers la page de contact plutôt que de risquer une désinscription à
+// l'aveugle.
+function lienDesabonnement(recipient) {
+  if (recipient?.parentId) return `${SITE_URL}/api/emails/desabonner?p=${recipient.parentId}`;
+  if (recipient?.contactId) return `${SITE_URL}/api/emails/desabonner?c=${recipient.contactId}`;
+  return `${SITE_URL}/contact`;
+}
+
 // En-têtes de désinscription (RFC 2369 + RFC 8058, « un clic »). Gmail et
 // Apple Mail affichent alors leur propre bouton « Se désinscrire » en haut du
 // message, et leur présence est un critère de délivrabilité pour les envois
-// en nombre. Nécessite un identifiant de destinataire (parentId) : sans lui
-// (aperçu générique), on ne renvoie aucun en-tête plutôt que de risquer une
-// désinscription à l'aveugle.
+// en nombre. Nécessite un identifiant de destinataire (parent ou contact) :
+// sans lui (aperçu générique), on ne renvoie aucun en-tête plutôt que de
+// risquer une désinscription à l'aveugle.
 export function entetesDesinscription(recipient, { contactEmail } = {}) {
-  if (!recipient || !recipient.parentId) return {};
-  const url = `${SITE_URL}/api/emails/desabonner?p=${recipient.parentId}`;
-  const cibles = [`<${url}>`];
+  if (!recipient || (!recipient.parentId && !recipient.contactId)) return {};
+  const cibles = [`<${lienDesabonnement(recipient)}>`];
   if (contactEmail) cibles.push(`<mailto:${contactEmail}?subject=desinscription>`);
   return {
     "List-Unsubscribe": cibles.join(", "),
@@ -303,14 +313,9 @@ export function entetesDesinscription(recipient, { contactEmail } = {}) {
   };
 }
 
-// Lien de désinscription (obligatoire pour un envoi de masse). Sans
-// identifiant de destinataire connu (aperçu générique), le lien pointe vers
-// une page d'information plutôt que de désinscrire quelqu'un par erreur.
+// Lien de désinscription (obligatoire pour un envoi de masse).
 function desabonnementHtml(recipient) {
-  const url = recipient.parentId
-    ? `${SITE_URL}/api/emails/desabonner?p=${recipient.parentId}`
-    : `${SITE_URL}/contact`;
-  return `<a href="${url}" style="color:#94a3b8;text-decoration:underline;">Se désinscrire de ces e-mails</a>`;
+  return `<a href="${lienDesabonnement(recipient)}" style="color:#94a3b8;text-decoration:underline;">Se désinscrire de ces e-mails</a>`;
 }
 
 // HTML complet, prêt à envoyer (table-based, styles en ligne pour la
@@ -525,9 +530,7 @@ export function renderBlocksToText(blocks, { recipient, planning } = {}) {
     .filter(Boolean)
     .join("\n\n");
 
-  const desabo = dest.parentId
-    ? `${SITE_URL}/api/emails/desabonner?p=${dest.parentId}`
-    : `${SITE_URL}/contact`;
+  const desabo = lienDesabonnement(dest);
 
   const planningTxt = planningCreneauxTexte(planning);
 

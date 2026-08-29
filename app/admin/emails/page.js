@@ -51,6 +51,9 @@ function EnvoiEmails({ token, parent }) {
   const [classes, setClasses] = useState([]);
   const [niveaux, setNiveaux] = useState([]);
   const [adherents, setAdherents] = useState("tous");
+  // Contacts légers (email_contacts) : adresses récoltées sans fiche famille.
+  const [contactsCount, setContactsCount] = useState(0);
+  const [inclureContacts, setInclureContacts] = useState(false);
   const [subject, setSubject] = useState("");
   const [blocks, setBlocks] = useState(() => TEMPLATES[0].blocks());
   const [previewChoix, setPreviewChoix] = useState("generique-adherent");
@@ -86,6 +89,7 @@ function EnvoiEmails({ token, parent }) {
     setClassesDisponibles(data.classes || []);
     setCampagnes(data.campagnes || []);
     setBenevolesEvenements(data.benevolesEvenements || []);
+    setContactsCount(data.contactsCount || 0);
     setContacts(dataContacts.contacts || []);
     setLoading(false);
   }, [token]);
@@ -100,7 +104,13 @@ function EnvoiEmails({ token, parent }) {
   }, [parent]);
 
   function segment() {
-    return { scope, classes: scope === "toute" ? [] : classes, niveaux: scope === "toute" ? [] : niveaux, adherents };
+    return {
+      scope,
+      classes: scope === "toute" ? [] : classes,
+      niveaux: scope === "toute" ? [] : niveaux,
+      adherents,
+      inclureContacts,
+    };
   }
 
   function toggle(list, setList, value) {
@@ -264,6 +274,7 @@ function EnvoiEmails({ token, parent }) {
     setSubject("");
     setBlocks(TEMPLATES[0].blocks());
     setBenevolesEvenementId("");
+    setInclureContacts(false);
     charger();
   }
 
@@ -403,6 +414,29 @@ function EnvoiEmails({ token, parent }) {
             </button>
           ))}
         </div>
+
+        {contactsCount > 0 && (
+          <label className="flex items-start gap-2 text-sm mb-4">
+            <input
+              type="checkbox"
+              checked={inclureContacts && adherents !== "adherents"}
+              disabled={adherents === "adherents"}
+              onChange={(e) => setInclureContacts(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span className={adherents === "adherents" ? "text-slate-400" : "text-slate-600"}>
+              Ajouter les {contactsCount} contact{contactsCount > 1 ? "s" : ""} sans fiche famille{" "}
+              <span className="text-xs text-slate-400">
+                (adresses récoltées ; doublons avec un parent déjà en base exclus)
+              </span>
+              {adherents === "adherents" && (
+                <span className="block text-xs text-amber-700">
+                  Indisponible avec « Adhérents à jour uniquement » : ces contacts n&apos;ont pas d&apos;adhésion.
+                </span>
+              )}
+            </span>
+          </label>
+        )}
 
         <button
           onClick={voirApercu}

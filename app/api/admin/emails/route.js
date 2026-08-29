@@ -80,7 +80,39 @@ function resumeSegment(segment) {
   }
   if (adherents === "adherents") parts.push("Adhérents à jour uniquement");
   if (adherents === "non_adherents") parts.push("Non-adhérents uniquement");
+  if (inclutContacts(segment)) parts.push("+ contacts hors familles");
   return parts.join(" — ");
+}
+
+// Faut-il joindre les contacts légers (email_contacts) à cet envoi ? Jamais
+// avec « Adhérents à jour uniquement » : par définition ces contacts n'ont
+// pas d'adhésion, les inclure serait un contresens.
+function inclutContacts(segment) {
+  return Boolean(segment?.inclureContacts) && segment?.adherents !== "adherents";
+}
+
+// Destinataires issus de la table email_contacts (personnes sans fiche
+// famille). On saute tout e-mail déjà pris par un parent OU par un autre
+// contact : jamais deux envois à la même adresse, et un parent l'emporte
+// toujours sur un contact homonyme (les e-mails parents sont ajoutés à
+// `dejaPris` avant l'appel).
+function contactsDestinataires(contacts, dejaPris) {
+  const vus = new Set(dejaPris);
+  const out = [];
+  for (const c of contacts || []) {
+    if (!c.email || c.email_opt_out) continue;
+    const cle = c.email.toLowerCase();
+    if (vus.has(cle)) continue;
+    vus.add(cle);
+    out.push({
+      contactId: c.id,
+      email: c.email,
+      firstName: c.first_name,
+      lastName: c.last_name,
+      adherent: false,
+    });
+  }
+  return out;
 }
 
 async function chargerFamilles(admin) {
@@ -153,10 +185,18 @@ export async function GET(request) {
     .eq("actif", true)
     .order("nom");
 
+  // Contacts légers (email_contacts) encore inscrits : proposés comme
+  // destinataires supplémentaires d'une campagne.
+  const { data: contactsActifs } = await auth.admin
+    .from("email_contacts")
+    .select("id")
+    .eq("email_opt_out", false);
+
   return NextResponse.json({
     campagnes: data || [],
     classes,
     benevolesEvenements: evenementsBenevoles || [],
+    contactsCount: (contactsActifs || []).length,
   });
 }
 
@@ -177,6 +217,14 @@ export async function POST(request) {
   const familles = await chargerFamilles(auth.admin);
   const correspondantes = famillesCorrespondantes(familles, segment);
   const destinataires = destinatairesDe(correspondantes);
+
+  if (inclutContacts(segment)) {
+    const { data: contacts } = await auth.admin
+      .from("email_contacts")
+      .select("id, first_name, last_name, email, email_opt_out");
+    const dejaPris = new Set(destinataires.map((d) => d.email.toLowerCase()));
+    destinataires.push(...contactsDestinataires(contacts, dejaPris));
+  }
 
   if (dryRun) {
     return NextResponse.json({
