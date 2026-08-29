@@ -61,3 +61,35 @@ export async function chargerPlanningEvenement(admin, evenementId) {
       .filter((a) => a.creneaux.length > 0),
   };
 }
+
+// Version bornée dans le temps de chargerPlanningEvenement, à utiliser dans
+// le parcours d'envoi (test + campagnes) : si le calcul du planning n'aboutit
+// pas (base lente ou indisponible, requête qui pend), on renvoie null au bout
+// de `msMax` et l'e-mail part sans le tableau des créneaux — plutôt que de
+// bloquer toute la fonction serveur jusqu'au time-out de Netlify, ce qui
+// faisait échouer l'envoi entier sans message clair.
+export async function chargerPlanningEvenementBorne(admin, evenementId, msMax = 6000) {
+  if (!evenementId) return null;
+
+  let minuteur;
+  const expiration = new Promise((resolve) => {
+    minuteur = setTimeout(() => resolve({ __expire: true }), msMax);
+  });
+
+  try {
+    const resultat = await Promise.race([
+      chargerPlanningEvenement(admin, evenementId),
+      expiration,
+    ]);
+    if (resultat && resultat.__expire) {
+      console.warn(`chargerPlanningEvenement : délai de ${msMax} ms dépassé, planning omis.`);
+      return null;
+    }
+    return resultat;
+  } catch (error) {
+    console.warn("chargerPlanningEvenement a échoué, planning omis :", error?.message);
+    return null;
+  } finally {
+    clearTimeout(minuteur);
+  }
+}

@@ -186,21 +186,31 @@ function EnvoiEmails({ token, parent }) {
     setBusyEnvoi(true);
     setError("");
     setResultat(null);
-    const res = await fetch("/api/admin/emails", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        segment: segment(),
-        subject,
-        contentBlocks: blocks,
-        benevolesEvenementId: benevolesEvenementId || null,
-      }),
-    });
-    const data = await res.json();
-    setBusyEnvoi(false);
-    if (!res.ok) {
-      setError(data.error || "Erreur.");
+    let data;
+    try {
+      const res = await fetch("/api/admin/emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          segment: segment(),
+          subject,
+          contentBlocks: blocks,
+          benevolesEvenementId: benevolesEvenementId || null,
+        }),
+      });
+      data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          data.error ||
+            `La campagne n'a pas pu démarrer (erreur ${res.status}). Le serveur a peut-être expiré — réessayez.`
+        );
+        return;
+      }
+    } catch (e) {
+      setError("Impossible de joindre le serveur. Réessayez dans un instant.");
       return;
+    } finally {
+      setBusyEnvoi(false);
     }
     if (!data.mailConfigured) {
       setResultat(data);
@@ -236,11 +246,15 @@ function EnvoiEmails({ token, parent }) {
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ campaignId }),
         });
-        data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Erreur pendant l'envoi.");
+        data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            data.error || `Erreur ${res.status} pendant l'envoi (le serveur a peut-être expiré).`
+          );
+        }
       } catch (e) {
         setProgres((p) => ({ ...(p || {}), enErreur: true }));
-        setError(e.message + " L'envoi peut être repris.");
+        setError((e.message || "Erreur réseau") + " L'envoi peut être repris.");
         return;
       }
       const etat = {
@@ -286,24 +300,40 @@ function EnvoiEmails({ token, parent }) {
     setBusyTest(true);
     setTestResultat(null);
     setError("");
-    const res = await fetch("/api/admin/emails/test", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        to: testEmail,
-        subject,
-        contentBlocks: blocks,
-        recipient: previewRecipient,
-        benevolesEvenementId: benevolesEvenementId || null,
-      }),
-    });
-    const data = await res.json();
-    setBusyTest(false);
-    if (!res.ok) {
-      setTestResultat({ ok: false, message: data.error || "Erreur." });
-      return;
+    try {
+      const res = await fetch("/api/admin/emails/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          to: testEmail,
+          subject,
+          contentBlocks: blocks,
+          recipient: previewRecipient,
+          benevolesEvenementId: benevolesEvenementId || null,
+        }),
+      });
+      // Le serveur peut renvoyer une page d'erreur HTML (timeout de la
+      // fonction) au lieu de JSON : on ne laisse pas res.json() planter, sinon
+      // le bouton resterait bloqué sur « Envoi... » sans message.
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setTestResultat({
+          ok: false,
+          message:
+            data.error ||
+            `L'envoi n'a pas abouti (erreur ${res.status}). Le serveur a peut-être expiré — réessayez.`,
+        });
+        return;
+      }
+      setTestResultat({ ok: true, message: `Test envoyé à ${testEmail}.` });
+    } catch (e) {
+      setTestResultat({
+        ok: false,
+        message: "Impossible de joindre le serveur d'envoi. Réessayez ; si ça persiste, l'envoi est momentanément indisponible.",
+      });
+    } finally {
+      setBusyTest(false);
     }
-    setTestResultat({ ok: true, message: `Test envoyé à ${testEmail}.` });
   }
 
   function reprendreCampagne(c) {

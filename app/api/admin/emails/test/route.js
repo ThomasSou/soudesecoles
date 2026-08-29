@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 import { CONTACT_EMAIL, isMailConfigured, sendMail } from "../../../../lib/mail";
 import { entetesDesinscription, renderBlocksToHtml, renderBlocksToText } from "../../../../lib/emailBlocks";
-import { chargerPlanningEvenement } from "../../../../lib/benevolesPlanning";
+import { chargerPlanningEvenementBorne } from "../../../../lib/benevolesPlanning";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +29,7 @@ export async function POST(request) {
 
   const dest = recipient || {};
   const planning = benevolesEvenementId
-    ? await chargerPlanningEvenement(auth.admin, benevolesEvenementId)
+    ? await chargerPlanningEvenementBorne(auth.admin, benevolesEvenementId)
     : null;
   // Pas de préfixe « [TEST] » dans l'objet : un mot entre crochets en
   // majuscules est un déclencheur classique des filtres anti-spam, et on veut

@@ -4,7 +4,7 @@ import {
   renderBlocksToHtml,
   renderBlocksToText,
 } from "./emailBlocks";
-import { chargerPlanningEvenement } from "./benevolesPlanning";
+import { chargerPlanningEvenementBorne } from "./benevolesPlanning";
 
 // Envoi des campagnes e-mail par vagues.
 //
@@ -32,7 +32,7 @@ export async function envoyerVague(admin, campagne) {
   // restantes reflètent l'instant de l'envoi (les vagues s'étalent sur
   // plusieurs minutes).
   const planning = campagne.benevoles_evenement_id
-    ? await chargerPlanningEvenement(admin, campagne.benevoles_evenement_id)
+    ? await chargerPlanningEvenementBorne(admin, campagne.benevoles_evenement_id)
     : null;
 
   let index = campagne.next_index || 0;
