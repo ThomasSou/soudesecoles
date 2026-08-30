@@ -16,6 +16,11 @@ function ActiverCompteForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const jeton = searchParams.get("jeton");
+  // Espace cible après activation. Sert aux comptes partenaires (invitation
+  // avec ?espace=partenaire). Défaut : espace famille, comportement inchangé.
+  const espace = searchParams.get("espace");
+  const destinationApresActivation =
+    espace === "partenaire" ? "/partenaire" : "/espace-adherent";
 
   const [status, setStatus] = useState("chargement"); // chargement | pret | erreur
   const [errorMsg, setErrorMsg] = useState("");
@@ -126,7 +131,7 @@ function ActiverCompteForm() {
         });
         if (signInError) throw signInError;
 
-        router.push("/espace-adherent");
+        router.push(destinationApresActivation);
       } catch (err) {
         setFormError(err.message);
       } finally {
