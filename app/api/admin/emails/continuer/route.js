@@ -6,11 +6,14 @@ import { envoyerVague } from "../../../../lib/emailCampagne";
 export const dynamic = "force-dynamic";
 
 // Fenêtre du verrou d'envoi. Tant qu'une vague écrit `updated_at` plus
-// souvent que ça (elle l'écrit après chaque e-mail), aucune autre requête
-// /continuer ne se lance en parallèle sur la même campagne. Passé ce délai
-// sans écriture, on considère la vague précédente morte (fonction coupée) et
-// on reprend.
-const VERROU_MS = 30000;
+// souvent que ça (elle l'écrit avant ET après chaque e-mail), aucune autre
+// requête /continuer ne se lance en parallèle sur la même campagne. Passé ce
+// délai sans écriture, on considère la vague précédente morte (fonction
+// coupée) et on reprend.
+// 90 s : très au-dessus de la durée maximale d'un seul envoi (Sender borné à
+// 8 s + SMTP borné à ~18 s, cf. app/lib/mail.js) — le verrou ne peut donc
+// pas expirer au milieu d'une vague et laisser un autre onglet ré-envoyer.
+const VERROU_MS = 90000;
 
 // Lecture légère de l'avancement d'une campagne : le front l'interroge en
 // boucle courte pour afficher une progression qui bouge même quand la boucle

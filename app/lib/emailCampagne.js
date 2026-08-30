@@ -55,6 +55,14 @@ export async function envoyerVague(admin, campagne) {
     const dest = tous[i];
     if (i > index) await attendre(PAUSE_ENTRE_ENVOIS_MS);
 
+    // Rafraîchit le verrou juste avant l'envoi : même si celui-ci traîne, la
+    // date reste fraîche et aucune autre requête /continuer ne peut décrocher
+    // le verrou et ré-envoyer pendant ce temps.
+    await admin
+      .from("email_campaigns")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", campagne.id);
+
     let statut = "ignore";
     let canal = null;
     if (dest && dest.email) {
