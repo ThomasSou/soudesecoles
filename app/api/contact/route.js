@@ -45,18 +45,24 @@ export async function POST(request) {
     }
   }
 
-  const ligne = {
+  const base = {
     name: name.trim(),
     email: email.trim(),
     subject: subject?.trim() || null,
     message: message.trim(),
   };
-  if (parentId) {
-    ligne.from_type = "parent";
-    ligne.sender_parent_id = parentId;
-  }
+  const ligne = parentId
+    ? { ...base, from_type: "parent", sender_parent_id: parentId }
+    : base;
 
-  const { error } = await admin.from("contact_messages").insert(ligne);
+  let { error } = await admin.from("contact_messages").insert(ligne);
+
+  // Repli si la migration 0040 (colonnes d'origine) n'est pas encore
+  // appliquée : on réenregistre le message sans from_type / sender_parent_id
+  // plutôt que de perdre le message.
+  if (error && parentId) {
+    ({ error } = await admin.from("contact_messages").insert(base));
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
