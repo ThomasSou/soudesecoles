@@ -38,13 +38,16 @@ export async function GET(request) {
   return NextResponse.json({
     ok: true,
     avantages: avantages.map((a) => {
-      const fois = (parAvantage[a.id] || []).length;
+      const usages = parAvantage[a.id] || [];
+      const fois = usages.length;
+      // limite 0 ou nulle = usage illimité : jamais considéré comme utilisé.
+      const illimite = !a.limite || a.limite <= 0;
       return {
         ...a,
         fois,
-        utilise: fois >= a.limite,
-        usedAt: parAvantage[a.id]?.[0]?.used_at || null,
-        usedBy: parAvantage[a.id]?.[0]?.used_by || null,
+        utilise: !illimite && fois >= a.limite,
+        usedAt: usages[0]?.used_at || null,
+        usedBy: usages[0]?.used_by || null,
       };
     }),
   });

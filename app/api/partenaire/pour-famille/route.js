@@ -35,7 +35,7 @@ export async function POST(request) {
 
   const { data: utilisations } = await admin
     .from("avantage_utilisations")
-    .select("avantage_id, used_at")
+    .select("avantage_id, used_at, used_by")
     .eq("family_id", familyId)
     .in("avantage_id", avantages.map((a) => a.id))
     .order("used_at", { ascending: false });
@@ -49,13 +49,17 @@ export async function POST(request) {
     ok: true,
     partenaireNom: partenaire.nom,
     avantages: avantages.map((a) => {
-      const fois = (parAvantage[a.id] || []).length;
+      const usages = parAvantage[a.id] || [];
+      const fois = usages.length;
+      const illimite = !a.limite || a.limite <= 0;
       return {
         id: a.id,
         label: a.label,
         limite: a.limite,
         fois,
-        usedAt: parAvantage[a.id]?.[0]?.used_at || null,
+        utilise: !illimite && fois >= a.limite,
+        usedAt: usages[0]?.used_at || null,
+        usedBy: usages[0]?.used_by || null,
         bloque: a.requiert_adhesion && !adhesionValide,
       };
     }),
