@@ -12,6 +12,10 @@ export default function FormulaireContact({
   defaultEmail = "",
   locked = false,
   context,
+  // Jeton Supabase du parent connecté (espace adhérent). Transmis à
+  // /api/contact pour marquer le message from_type='parent' ; absent sur la
+  // page publique, où le message reste 'public'.
+  accessToken = null,
   compact = false,
 }) {
   const [name, setName] = useState(defaultName);
@@ -35,7 +39,10 @@ export default function FormulaireContact({
     try {
       const res = await fetch("/api/contact", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({ name, email, subject, message, context }),
       });
       const result = await res.json();

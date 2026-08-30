@@ -6,10 +6,10 @@ export const dynamic = "force-dynamic";
 
 // Formulaire de contact de l'espace partenaire. Le message atterrit dans le
 // MÊME "Messages reçus" du back-office (table contact_messages), mais avec
-// source = 'partenaire' et l'identité de l'expéditeur, pour que le bureau
+// from_type = 'partenaire' et sender_partenaire_id, pour que le bureau
 // distingue d'un coup d'œil un message de partenaire d'un message public ou
 // de parent. Le nom et l'e-mail viennent du compte connecté, pas d'un champ
-// libre.
+// libre. (Colonnes créées par 0040_contact_messages_origine.sql.)
 export async function POST(request) {
   const session = await resolvePartenaireSession(request);
   if (session.error) return NextResponse.json({ error: session.error }, { status: session.status });
@@ -28,8 +28,8 @@ export async function POST(request) {
     email,
     subject,
     message,
-    source: "partenaire",
-    auteur_partenaire_id: partenaire.id,
+    from_type: "partenaire",
+    sender_partenaire_id: partenaire.id,
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

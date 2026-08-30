@@ -807,6 +807,7 @@ export default function EspaceAdherentPage() {
               defaultEmail={userEmail}
               locked={Boolean(nomAdherent && userEmail)}
               context="espace-adherent"
+              accessToken={accessToken}
               compact
             />
           </div>
