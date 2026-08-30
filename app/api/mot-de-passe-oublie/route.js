@@ -198,9 +198,9 @@ async function envoyerLienReset(admin, email, nom) {
           Choisir un nouveau mot de passe
         </a>
       </p>
-      <p style="font-size: 13px; color: #64748b;">Ce lien est valable une heure et à usage unique. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : votre mot de passe reste inchangé.</p>
+      <p style="font-size: 13px; color: #64748b;">Ce lien est temporaire et à usage unique. S'il ne fonctionne plus, refaites une demande sur <a href="https://sou-montmerle.fr/mot-de-passe-oublie" style="color: #0b3d91;">sou-montmerle.fr/mot-de-passe-oublie</a> et vous en recevrez un nouveau. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : votre mot de passe reste inchangé.</p>
     </div>
   `,
-    text: `${salutation}\n\nVous avez demandé à réinitialiser le mot de passe de votre espace du Sou des Écoles. Choisissez un nouveau mot de passe en suivant ce lien :\n${lien}\n\nCe lien est valable une heure et à usage unique. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : votre mot de passe reste inchangé.`,
+    text: `${salutation}\n\nVous avez demandé à réinitialiser le mot de passe de votre espace du Sou des Écoles. Choisissez un nouveau mot de passe en suivant ce lien :\n${lien}\n\nCe lien est temporaire et à usage unique. S'il ne fonctionne plus, refaites une demande sur https://sou-montmerle.fr/mot-de-passe-oublie et vous en recevrez un nouveau. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : votre mot de passe reste inchangé.`,
   });
 }
