@@ -708,6 +708,36 @@ export default function EspaceAdherentPage() {
                 </ul>
               </div>
             )}
+            {/* Rassure la famille qui vient de payer en ligne : le retour de
+                paiement HelloAsso peut tarder (webhook, navigateur fermé trop
+                tôt...). On n'affiche ce mot que pour un vrai paiement en ligne
+                lancé cette année (helloasso_payment_id posé), jamais pour un
+                simple reliquat d'import d'année passée. */}
+            {memberships.some(
+              (m) =>
+                !m.paid_at &&
+                m.helloasso_payment_id &&
+                m.school_year === anneeEnCours
+            ) && (
+              <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <p className="font-semibold">
+                  Une cotisation est en attente de confirmation
+                </p>
+                <p className="mt-1">
+                  Si vous venez de payer, la confirmation par HelloAsso peut
+                  prendre quelques minutes. Cette page se mettra à jour ensuite :
+                  revenez y jeter un œil dans un moment, ou rafraîchissez-la.
+                </p>
+                <p className="mt-1">
+                  Si le statut n&apos;a pas changé au bout de 24 h, ou si vous
+                  n&apos;êtes pas allé jusqu&apos;au bout du paiement,{" "}
+                  <a href="/contact" className="underline font-medium">
+                    contactez-nous
+                  </a>{" "}
+                  : nous vérifierons avec vous.
+                </p>
+              </div>
+            )}
           </div>
 
           {isAdherent && adhesionEnCours && (
