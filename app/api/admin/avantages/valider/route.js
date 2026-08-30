@@ -43,16 +43,23 @@ export async function POST(request) {
     .eq("family_id", familyId)
     .order("used_at", { ascending: false });
 
-  if ((existantes || []).length >= avantage.limite) {
+  const usages = existantes || [];
+  // limite 0 ou nulle = usage illimité : aucun plafond n'est opposé.
+  const illimite = !avantage.limite || avantage.limite <= 0;
+
+  // Contrôle serveur : on ne se repose jamais sur l'UI pour empêcher un
+  // dépassement. Si la limite est atteinte, on renvoie la date et l'auteur
+  // de la dernière utilisation pour l'affichage « déjà utilisé ».
+  if (!illimite && usages.length >= avantage.limite) {
     return NextResponse.json(
       {
         ok: false,
         dejaUtilise: true,
         limiteAtteinte: true,
         limite: avantage.limite,
-        fois: existantes.length,
-        usedAt: existantes[0]?.used_at || null,
-        usedBy: existantes[0]?.used_by || null,
+        fois: usages.length,
+        usedAt: usages[0]?.used_at || null,
+        usedBy: usages[0]?.used_by || null,
       },
       { status: 409 }
     );
@@ -66,5 +73,5 @@ export async function POST(request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true, fois: (existantes || []).length + 1, limite: avantage.limite });
+  return NextResponse.json({ ok: true, fois: usages.length + 1, limite: avantage.limite });
 }
