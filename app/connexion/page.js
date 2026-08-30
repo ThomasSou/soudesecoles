@@ -78,17 +78,46 @@ export default function ConnexionPage() {
           {loading ? "Connexion..." : "Se connecter"}
         </button>
 
-        <p className="text-sm text-slate-500 text-center">
+        {/* Ce lien sert AUSSI aux familles importées : la route associée
+            leur envoie un lien d'activation quand elles n'ont jamais choisi
+            de mot de passe. On le garde donc bien visible, en gras. */}
+        <p className="text-center">
           <Link
             href="/mot-de-passe-oublie"
-            className="text-sou-blue underline"
+            className="text-sou-blue font-semibold underline"
           >
             Mot de passe oublié ?
           </Link>
         </p>
 
+        {/* Cas le plus fréquent à la rentrée : la famille a été importée
+            depuis les listes de classe. Son espace existe déjà, mais elle
+            n'a jamais défini de mot de passe. Sans ce bloc, ces parents
+            cliquent « Créer mon espace famille », remplissent /inscription
+            et se heurtent à « Un compte existe déjà ». On met donc ce cas
+            en avant, avec un vrai bouton vers le choix du mot de passe. */}
+        <div className="bg-sou-blue/5 border border-sou-blue/20 rounded-xl p-5 space-y-3">
+          <p className="font-semibold text-sou-blue">
+            Vous avez reçu un e-mail du Sou mais vous n'avez pas encore de mot
+            de passe ?
+          </p>
+          <p className="text-sm text-slate-600">
+            C'est normal : votre espace famille existe déjà. Il a été créé
+            automatiquement par le Sou à partir des listes de classe. Il vous
+            reste seulement à choisir votre mot de passe.
+          </p>
+          <Link
+            href="/mot-de-passe-oublie"
+            className="inline-block bg-sou-blue text-white font-semibold px-5 py-2.5 rounded-full hover:bg-sou-gold transition-colors"
+          >
+            Choisir mon mot de passe
+          </Link>
+        </div>
+
+        {/* Cas minoritaire : famille réellement nouvelle, jamais connue du
+            Sou (aucun enfant scolarisé l'an dernier). */}
         <p className="text-sm text-slate-500 text-center">
-          Vous n'avez pas encore de compte ?{" "}
+          Votre famille n'est pas encore connue du Sou ?{" "}
           <Link href="/inscription" className="text-sou-blue underline">
             Créer mon espace famille
           </Link>

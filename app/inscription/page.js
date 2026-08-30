@@ -106,6 +106,29 @@ export default function InscriptionPage() {
         l&apos;association.
       </p>
 
+      {/* Beaucoup de familles ont été importées depuis les listes de classe :
+          leur espace existe déjà, elles n'ont simplement jamais choisi de mot
+          de passe. Sans cet avertissement en tête de page, elles remplissent
+          ce formulaire pour rien et tombent sur « Un compte existe déjà ».
+          On les réoriente d'emblée vers le choix du mot de passe. */}
+      <div className="bg-sou-gold/10 border border-sou-gold/40 rounded-xl p-5 mb-6">
+        <p className="font-semibold text-sou-blue mb-1">
+          Votre famille est peut-être déjà connue du Sou
+        </p>
+        <p className="text-sm text-slate-600">
+          Si vos enfants étaient déjà scolarisés l&apos;an dernier, ou si vous
+          avez reçu un e-mail de notre part, votre espace famille existe déjà.
+          N&apos;utilisez pas ce formulaire :{" "}
+          <Link
+            href="/mot-de-passe-oublie"
+            className="font-semibold text-sou-blue underline"
+          >
+            choisissez votre mot de passe ici
+          </Link>{" "}
+          pour accéder à votre espace.
+        </p>
+      </div>
+
       <div className="bg-sou-blue/5 border border-sou-blue/20 rounded-xl p-5 mb-8">
         <p className="font-semibold text-sou-blue mb-1">
           Qui peut faire cette demande ?
@@ -262,17 +285,26 @@ export default function InscriptionPage() {
         </div>
 
         {compteExistant ? (
-          <p className="text-red-600 text-sm">
-            Un compte existe déjà avec cette adresse e-mail. Utilisez la{" "}
-            <Link href="/connexion" className="underline">
-              page de connexion
+          /* Ce n'est pas une erreur mais une bonne nouvelle : l'espace
+             existe déjà (famille importée depuis les listes de classe).
+             On l'affiche en vert, sans dramatiser, avec un vrai bouton
+             vers le choix du mot de passe plutôt qu'un lien noyé. */
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 space-y-3">
+            <p className="font-semibold text-emerald-800">
+              Bonne nouvelle : votre espace famille existe déjà
+            </p>
+            <p className="text-sm text-slate-600">
+              Il a été créé automatiquement par le Sou à partir des listes de
+              classe. Vous n&apos;avez rien à créer ici : il vous reste
+              seulement à choisir votre mot de passe pour y accéder.
+            </p>
+            <Link
+              href="/mot-de-passe-oublie"
+              className="inline-block bg-sou-blue text-white font-semibold px-5 py-2.5 rounded-full hover:bg-sou-gold transition-colors"
+            >
+              Choisir mon mot de passe
             </Link>
-            , ou{" "}
-            <Link href="/mot-de-passe-oublie" className="underline">
-              réinitialisez votre mot de passe
-            </Link>
-            .
-          </p>
+          </div>
         ) : (
           error && <p className="text-red-600 text-sm">{error}</p>
         )}
