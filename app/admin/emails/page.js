@@ -333,9 +333,19 @@ function EnvoiEmails({ token, parent }) {
 
   // Enchaîne les vagues via /api/admin/emails/continuer, avec une pause
   // entre chaque, jusqu'à la fin ou une mise en pause.
+  //
+  // Résilient aux erreurs passagères : quand l'API Sender est lente, la
+  // fonction serveur peut dépasser le plafond Netlify et renvoyer un 504
+  // (Gateway Timeout). Ce n'est pas grave — le curseur (next_index) et le
+  // verrou d'envoi garantissent qu'aucun destinataire n'est servi deux fois.
+  // On ne s'arrête donc plus au premier échec : on patiente et on relance la
+  // vague suivante, et on n'abandonne qu'après plusieurs échecs d'affilée
+  // (vrai incident : fonction cassée, réseau coupé).
   async function boucleEnvoi(campaignId, { depuisEditeur = false } = {}) {
     stopRef.current = false;
     setProgres((p) => ({ ...(p || {}), campaignId, enPause: false, enErreur: false }));
+    let echecsConsecutifs = 0;
+    const MAX_ECHECS_CONSECUTIFS = 6;
     while (!stopRef.current) {
       await attendre(PAUSE_ENTRE_VAGUES_MS);
       if (stopRef.current) break;
@@ -352,10 +362,24 @@ function EnvoiEmails({ token, parent }) {
             data.error || `Erreur ${res.status} pendant l'envoi (le serveur a peut-être expiré).`
           );
         }
+        echecsConsecutifs = 0;
       } catch (e) {
-        setProgres((p) => ({ ...(p || {}), enErreur: true }));
-        setError((e.message || "Erreur réseau") + " L'envoi peut être repris.");
-        return;
+        echecsConsecutifs += 1;
+        if (echecsConsecutifs >= MAX_ECHECS_CONSECUTIFS) {
+          setProgres((p) => ({ ...(p || {}), enErreur: true }));
+          setError(
+            (e.message || "Erreur réseau") +
+              ` L'envoi s'est arrêté après ${MAX_ECHECS_CONSECUTIFS} tentatives. Il peut être repris.`
+          );
+          return;
+        }
+        // Échec ponctuel (typiquement un 504 quand Sender traîne) : la vague a
+        // peut-être quand même été envoyée en partie côté serveur. On patiente
+        // un peu plus longtemps et on réessaie — sans marquer l'envoi en
+        // erreur, pour que la progression continue de s'afficher.
+        setProgres((p) => ({ ...(p || {}), enErreur: false }));
+        await attendre(4000);
+        continue;
       }
       setProgres((p) => ({
         ...(p || {}),

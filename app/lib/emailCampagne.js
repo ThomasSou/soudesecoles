@@ -17,8 +17,11 @@ import { chargerPlanningEvenementBorne } from "./benevolesPlanning";
 // front enchaîne les vagues avec une courte pause. Si l'envoi est
 // interrompu (onglet fermé, fonction coupée), il reprend à next_index.
 // Petites vagues : chaque appel /continuer doit finir largement avant le
-// plafond d'exécution Netlify, même si Sender répond lentement.
-export const TAILLE_VAGUE = 5;
+// plafond d'exécution Netlify (~10 s), même si Sender répond lentement.
+// Ramené à 2 après un envoi réel où des vagues de 5 dépassaient le plafond
+// (504 Gateway Timeout) dès que l'API Sender mettait ~2 s par e-mail : avec
+// 2 envois par appel, une vague tient largement sous la limite.
+export const TAILLE_VAGUE = 2;
 
 // Pause entre deux envois d'une même vague. Un compte Sender neuf se met à
 // ralentir/refuser s'il reçoit une rafale ; on espace donc les appels.
@@ -39,8 +42,11 @@ export async function envoyerVague(admin, campagne) {
   // Planning bénévoles éventuel : rechargé à chaque vague pour que les places
   // restantes reflètent l'instant de l'envoi (les vagues s'étalent sur
   // plusieurs minutes).
+  // Borne courte (2,5 s) : ce calcul tourne au début de CHAQUE vague et
+  // grignote le budget d'exécution Netlify. Au-delà, on part sans le tableau
+  // des créneaux plutôt que de risquer un time-out de la fonction.
   const planning = campagne.benevoles_evenement_id
-    ? await chargerPlanningEvenementBorne(admin, campagne.benevoles_evenement_id)
+    ? await chargerPlanningEvenementBorne(admin, campagne.benevoles_evenement_id, 2500)
     : null;
 
   let index = campagne.next_index || 0;
