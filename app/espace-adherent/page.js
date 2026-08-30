@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import FormulaireContact from "../formulaire-contact";
@@ -473,6 +473,9 @@ export default function EspaceAdherentPage() {
   const [userEmail, setUserEmail] = useState("");
   const [estAdmin, setEstAdmin] = useState(false);
   const [creneauxBenevoles, setCreneauxBenevoles] = useState([]);
+  // Filet de sécurité : on ne relance la revérification d'une cotisation
+  // "en attente" qu'une seule fois par chargement de page (jamais en rafale).
+  const reverifAdhesionFaite = useRef(false);
 
   async function fetchFamilyData(supabase) {
     const [familyRes, parentsRes, childrenRes, purchasesRes, membershipRes] = await Promise.all([
@@ -496,6 +499,36 @@ export default function EspaceAdherentPage() {
     setChildren(childrenRes.data || []);
     setPurchases(purchasesRes.data || []);
     setMemberships(membershipRes.data || []);
+
+    return membershipRes.data || [];
+  }
+
+  // Le retour de paiement HelloAsso (?adhesion=retour) est le seul mécanisme
+  // qui écrivait `paid_at` sur une cotisation payée en ligne : si le navigateur
+  // est fermé trop tôt, ou l'onglet perdu, la cotisation reste "en attente"
+  // pour toujours alors que l'argent est bien encaissé. Ici, à chaque
+  // chargement de l'espace, si une cotisation a un paiement HelloAsso lancé
+  // (`helloasso_payment_id`) mais pas de `paid_at`, on redemande UNE fois à
+  // HelloAsso où en est le paiement. Une cotisation déjà `paid_at` (y compris
+  // encaissée à la main par le bureau) n'est jamais touchée : la route ne
+  // revérifie que les lignes `paid_at IS NULL`.
+  async function reverifierAdhesionEnAttente(membershipsData, token) {
+    if (reverifAdhesionFaite.current) return false;
+    const aUnPaiementEnAttente = (membershipsData || []).some(
+      (m) => !m.paid_at && m.helloasso_payment_id
+    );
+    if (!aUnPaiementEnAttente) return false;
+
+    reverifAdhesionFaite.current = true;
+    try {
+      const res = await fetch("/api/espace-adherent/adhesion-statut", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      return Boolean(data?.paid);
+    } catch {
+      return false;
+    }
   }
 
   useEffect(() => {
@@ -528,7 +561,18 @@ export default function EspaceAdherentPage() {
         .then((d) => setCreneauxBenevoles(d.inscriptions || []))
         .catch(() => setCreneauxBenevoles([]));
 
-      await fetchFamilyData(supabase);
+      const membershipsData = await fetchFamilyData(supabase);
+
+      // Filet de sécurité contre un retour de paiement raté (voir plus haut).
+      // Marche que la famille soit déjà affichée adhérente ou non.
+      const cotisationConfirmee = await reverifierAdhesionEnAttente(
+        membershipsData,
+        session.access_token
+      );
+      if (cotisationConfirmee) {
+        await fetchFamilyData(supabase);
+      }
+
       setLoading(false);
     }
 
