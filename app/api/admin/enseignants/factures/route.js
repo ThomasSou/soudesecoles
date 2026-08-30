@@ -13,7 +13,7 @@ export async function GET(request) {
   const { data, error } = await auth.admin
     .from("teacher_invoices")
     .select(
-      "id, teacher_id, quote_id, label, supplier_name, description, amount_cents, school_year, status, invoice_file_path, rib_id, rib_file_path, admin_note, created_at, reimbursed_at, reimbursed_by"
+      "id, teacher_id, quote_id, label, supplier_name, description, amount_cents, school_year, status, invoice_file_path, rib_id, rib_file_path, rib_received, admin_note, created_at, reimbursed_at, reimbursed_by"
     )
     .order("created_at", { ascending: false });
 
@@ -42,7 +42,10 @@ export async function GET(request) {
     ...f,
     teacher: teacherById[f.teacher_id] || null,
     classes: classesParFacture[f.id] || [],
-    a_rib: Boolean(f.rib_id || f.rib_file_path),
+    // Fichier RIB encore consultable (il est purgé au remboursement, D8).
+    rib_consultable: Boolean(f.rib_id || f.rib_file_path),
+    // Un RIB a été fourni à un moment (même si le fichier a été purgé depuis).
+    a_rib: Boolean(f.rib_id || f.rib_file_path || f.rib_received),
   }));
 
   return NextResponse.json({ ok: true, factures });

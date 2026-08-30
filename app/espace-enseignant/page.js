@@ -39,6 +39,21 @@ function fichierEnDataUrl(file) {
   });
 }
 
+// Ouvre une pièce déposée par l'enseignant (D6). L'URL signée ne vit que
+// 5 minutes : on la demande au moment du clic.
+async function ouvrirMaPiece(token, params) {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`/api/enseignant/fichier?${qs}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    alert(data.error || "Impossible d'ouvrir ce fichier.");
+    return;
+  }
+  window.open(data.url, "_blank", "noopener,noreferrer");
+}
+
 // Sélecteur multi-classes. Si la liste dérivée des fiches enfants est vide
 // (import de l'année pas encore fait), on bascule sur une saisie libre.
 function SelecteurClasses({ classesConnues, valeur, onChange }) {
@@ -250,6 +265,13 @@ function MesDevis({ token, classesConnues }) {
                       {d.description && <p className="text-slate-400 text-xs">{d.description}</p>}
                       <BadgesClasses classes={d.classes} />
                       <p className="text-slate-400 text-xs mt-0.5">{dateCourte(d.created_at)}</p>
+                      <button
+                        type="button"
+                        onClick={() => ouvrirMaPiece(token, { kind: "devis", id: d.id })}
+                        className="text-sou-blue underline text-xs mt-1"
+                      >
+                        Voir le devis
+                      </button>
                       {d.status === "refuse" && d.admin_note && (
                         <p className="text-red-600 text-xs mt-1">Motif : {d.admin_note}</p>
                       )}
@@ -413,11 +435,13 @@ function MesFactures({ token, classesConnues }) {
           >
             <option value="aucun">Aucun pour l&apos;instant</option>
             <option value="nouveau">Déposer un nouveau RIB (fichier)</option>
-            {ribs.map((r) => (
-              <option key={r.id} value={r.id}>
-                Réutiliser : {r.label || `RIB du ${dateCourte(r.created_at)}`}
-              </option>
-            ))}
+            {ribs
+              .filter((r) => !r.purged_at)
+              .map((r) => (
+                <option key={r.id} value={r.id}>
+                  Réutiliser : {r.label || `RIB du ${dateCourte(r.created_at)}`}
+                </option>
+              ))}
           </select>
           {ribChoice === "nouveau" && (
             <input
@@ -460,8 +484,34 @@ function MesFactures({ token, classesConnues }) {
                       <BadgesClasses classes={f.classes} />
                       <p className="text-slate-400 text-xs mt-0.5">
                         {dateCourte(f.created_at)}
-                        {f.a_rib ? " — RIB joint" : " — RIB manquant"}
+                        {f.rib_consultable
+                          ? " — RIB joint"
+                          : f.a_rib
+                          ? " — RIB reçu (supprimé après remboursement)"
+                          : " — RIB manquant"}
                       </p>
+                      <div className="flex flex-wrap gap-3 mt-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            ouvrirMaPiece(token, { kind: "facture", id: f.id, partie: "facture" })
+                          }
+                          className="text-sou-blue underline text-xs"
+                        >
+                          Voir la facture
+                        </button>
+                        {f.rib_consultable && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              ouvrirMaPiece(token, { kind: "facture", id: f.id, partie: "rib" })
+                            }
+                            className="text-sou-blue underline text-xs"
+                          >
+                            Voir le RIB
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-medium text-slate-700">{euros(f.amount_cents)}</p>
@@ -569,9 +619,24 @@ function MesRibs({ token }) {
         ) : (
           <ul className="divide-y divide-slate-100">
             {ribs.map((r) => (
-              <li key={r.id} className="py-2 flex justify-between text-sm">
+              <li key={r.id} className="py-2 flex justify-between items-center gap-3 text-sm">
                 <span className="text-slate-700">{r.label || "RIB"}</span>
-                <span className="text-slate-400 text-xs">{dateCourte(r.created_at)}</span>
+                <span className="flex items-center gap-3 shrink-0">
+                  {r.purged_at ? (
+                    <span className="text-slate-400 text-xs">
+                      supprimé après remboursement
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => ouvrirMaPiece(token, { kind: "rib", id: r.id })}
+                      className="text-sou-blue underline text-xs"
+                    >
+                      Voir
+                    </button>
+                  )}
+                  <span className="text-slate-400 text-xs">{dateCourte(r.created_at)}</span>
+                </span>
               </li>
             ))}
           </ul>

@@ -196,7 +196,7 @@ function CarteFacture({ facture, token, onChange }) {
         >
           Voir la facture
         </button>
-        {facture.a_rib ? (
+        {facture.rib_consultable ? (
           <button
             onClick={() =>
               ouvrirFichier(token, `/api/admin/enseignants/factures/${facture.id}/fichier?type=rib`)
@@ -205,6 +205,8 @@ function CarteFacture({ facture, token, onChange }) {
           >
             Voir le RIB
           </button>
+        ) : facture.a_rib ? (
+          <span className="text-xs text-slate-400">RIB reçu — supprimé après remboursement</span>
         ) : (
           <span className="text-xs text-red-500">RIB manquant</span>
         )}
@@ -373,12 +375,18 @@ function OngletRibs({ token }) {
               {nomEnseignant(r.teacher)} — {dateCourte(r.created_at)}
             </p>
           </div>
-          <button
-            onClick={() => ouvrirFichier(token, `/api/admin/enseignants/rib/${r.id}/fichier`)}
-            className="text-sou-blue underline shrink-0"
-          >
-            Voir le RIB
-          </button>
+          {r.purged_at ? (
+            <span className="text-slate-400 text-xs shrink-0">
+              supprimé le {dateCourte(r.purged_at)} (après remboursement)
+            </span>
+          ) : (
+            <button
+              onClick={() => ouvrirFichier(token, `/api/admin/enseignants/rib/${r.id}/fichier`)}
+              className="text-sou-blue underline shrink-0"
+            >
+              Voir le RIB
+            </button>
+          )}
         </li>
       ))}
     </ul>
@@ -417,7 +425,9 @@ function OngletComptes({ token }) {
     });
     const data = await res.json();
     setEnvoi(false);
-    setMessage(res.ok ? "Invitation envoyée." : data.error || "Échec de l'envoi.");
+    setMessage(
+      res.ok ? data.message || "Invitation envoyée." : data.error || "Échec de l'envoi."
+    );
     if (res.ok) {
       setFirstName("");
       setLastName("");
@@ -528,9 +538,151 @@ function OngletComptes({ token }) {
   );
 }
 
+function StatCard({ label, montant, sousLabel }) {
+  return (
+    <div className="border border-slate-200 rounded-xl p-4">
+      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
+      <p className="text-xl font-bold text-sou-blue mt-1">{euros(montant)}</p>
+      {sousLabel && <p className="text-xs text-slate-400 mt-0.5">{sousLabel}</p>}
+    </div>
+  );
+}
+
+function OngletBilan({ token }) {
+  const [bilan, setBilan] = useState(null);
+  const [annee, setAnnee] = useState("");
+  const [chargement, setChargement] = useState(true);
+
+  const recharger = useCallback(
+    (an) => {
+      setChargement(true);
+      const qs = an ? `?annee=${encodeURIComponent(an)}` : "";
+      fetch(`/api/admin/enseignants/bilan${qs}`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((d) => {
+          setBilan(d);
+          if (d.annee) setAnnee(d.annee);
+        })
+        .finally(() => setChargement(false));
+    },
+    [token]
+  );
+
+  useEffect(() => {
+    recharger();
+  }, [recharger]);
+
+  if (chargement && !bilan) return <p className="text-slate-500 text-sm">Chargement...</p>;
+  if (!bilan || bilan.error) {
+    return <p className="text-slate-500 text-sm">{bilan?.error || "Bilan indisponible."}</p>;
+  }
+
+  const t = bilan.totaux;
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-5">
+        <label className="text-sm text-slate-600">Année scolaire</label>
+        <select
+          value={annee}
+          onChange={(e) => {
+            setAnnee(e.target.value);
+            recharger(e.target.value);
+          }}
+          className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm"
+        >
+          {(bilan.annees || [annee]).map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="grid sm:grid-cols-3 gap-3 mb-4">
+        <StatCard
+          label="Engagé cette année"
+          montant={t.engage_cents}
+          sousLabel="devis validés + factures"
+        />
+        <StatCard
+          label="Devis validés"
+          montant={t.devis_valides.total_cents}
+          sousLabel={`${t.devis_valides.count} devis`}
+        />
+        <StatCard
+          label="Factures remboursées"
+          montant={t.factures_remboursees.total_cents}
+          sousLabel={`${t.factures_remboursees.count} sur ${t.factures_toutes.count}`}
+        />
+      </div>
+      <div className="grid sm:grid-cols-3 gap-3 mb-8">
+        <StatCard
+          label="Devis en attente"
+          montant={t.devis_soumis.total_cents}
+          sousLabel={`${t.devis_soumis.count} à traiter`}
+        />
+        <StatCard
+          label="Factures en attente"
+          montant={t.factures_en_attente.total_cents}
+          sousLabel={`${t.factures_en_attente.count} à rembourser`}
+        />
+        <StatCard
+          label="Total factures"
+          montant={t.factures_toutes.total_cents}
+          sousLabel={`${t.factures_toutes.count} factures`}
+        />
+      </div>
+
+      <h3 className="font-semibold text-slate-700 mb-1">Financement par classe</h3>
+      <p className="text-xs text-slate-400 mb-3">
+        Le montant entier d&apos;un devis ou d&apos;une facture est compté pour chaque classe
+        concernée : les lignes peuvent se recouper (un car partagé compte pour chaque classe).
+      </p>
+      {bilan.classes.length === 0 ? (
+        <p className="text-slate-500 text-sm">
+          Aucune classe rattachée à un devis ou une facture cette année.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-slate-500 border-b border-slate-200">
+                <th className="py-2 pr-4">Classe</th>
+                <th className="py-2 pr-4">Devis validés</th>
+                <th className="py-2 pr-4">Factures</th>
+                <th className="py-2">Total classe</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bilan.classes.map((c) => (
+                <tr key={c.classe} className="border-b border-slate-100">
+                  <td className="py-2 pr-4 font-medium text-slate-700">{c.classe}</td>
+                  <td className="py-2 pr-4">
+                    {euros(c.devis_valides_cents)}{" "}
+                    <span className="text-slate-400 text-xs">({c.devis_valides_count})</span>
+                  </td>
+                  <td className="py-2 pr-4">
+                    {euros(c.factures_cents)}{" "}
+                    <span className="text-slate-400 text-xs">({c.factures_count})</span>
+                  </td>
+                  <td className="py-2 font-semibold text-slate-800">
+                    {euros(c.devis_valides_cents + c.factures_cents)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EnseignantsAdmin({ accessToken }) {
-  const [onglet, setOnglet] = useState("devis");
+  const [onglet, setOnglet] = useState("bilan");
   const onglets = [
+    { key: "bilan", label: "Bilan" },
     { key: "devis", label: "Devis" },
     { key: "factures", label: "Factures" },
     { key: "ribs", label: "RIB" },
@@ -562,6 +714,7 @@ function EnseignantsAdmin({ accessToken }) {
         ))}
       </div>
 
+      {onglet === "bilan" && <OngletBilan token={accessToken} />}
       {onglet === "devis" && <OngletDevis token={accessToken} />}
       {onglet === "factures" && <OngletFactures token={accessToken} />}
       {onglet === "ribs" && <OngletRibs token={accessToken} />}

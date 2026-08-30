@@ -67,7 +67,7 @@ export async function POST(request) {
     teacher = cree;
   }
 
-  const { error: inviteError } = await envoyerInvitationEnseignant(auth.admin, {
+  const { data: inviteData, error: inviteError } = await envoyerInvitationEnseignant(auth.admin, {
     email: teacher.email,
     firstName: teacher.first_name,
     lastName: teacher.last_name,
@@ -79,12 +79,24 @@ export async function POST(request) {
       return NextResponse.json(
         {
           error:
-            "Ce compte a déjà été activé (mot de passe défini) : proposez plutôt le lien « mot de passe oublié ».",
+            "Ce compte existe déjà : proposez plutôt le lien « mot de passe oublié ».",
         },
         { status: 409 }
       );
     }
     return NextResponse.json({ error: `Envoi impossible : ${inviteError.message}` }, { status: 500 });
+  }
+
+  // D1 : la personne avait déjà un compte (parent / bureau). La fiche
+  // enseignant y a été rattachée, aucun e-mail n'est parti.
+  if (inviteData?.compteExistant) {
+    return NextResponse.json({
+      ok: true,
+      id: teacher.id,
+      compteExistant: true,
+      message:
+        "Cette personne a déjà un compte sur le site : la fiche enseignant y a été rattachée. Elle se connecte avec son mot de passe habituel — pas d'e-mail d'invitation envoyé.",
+    });
   }
 
   return NextResponse.json({ ok: true, id: teacher.id });

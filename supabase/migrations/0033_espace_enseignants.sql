@@ -14,8 +14,10 @@
 --      découplée du compte de connexion comme l'est déjà `parents`.
 --   2. `invitations.teacher_id` — réutilise le circuit d'activation maison.
 --   3. `teacher_quotes` (devis) + `teacher_quote_classes` (classes concernées).
---   4. `teacher_ribs` — RIB déposés en fichier (aucune saisie IBAN/BIC).
+--   4. `teacher_ribs` — RIB déposés en fichier (aucune saisie IBAN/BIC ;
+--      `purged_at` : le fichier est supprimé au remboursement — décision D8).
 --   5. `teacher_invoices` (factures) + `teacher_invoice_classes`.
+--      `rib_received` garde la trace d'un RIB fourni puis purgé (D8).
 --   6. `contact_messages` — colonnes d'origine (parent / partenaire /
 --      enseignant / public) + identité expéditeur. Non destructif :
 --      `from_type` par défaut 'public', les lignes et le formulaire public
@@ -38,6 +40,14 @@
 -- fiche) est découplée du compte de connexion. `auth_user_id` porte le lien
 -- vers auth.users quand le compte a été activé ; il reste nul entre la
 -- création de la fiche et l'activation de l'invitation.
+--
+-- Décision D1 : un même compte auth.users PEUT être rattaché à la fois à une
+-- fiche `parents` et à une fiche `teachers` (une directrice qui est aussi
+-- parent d'élève, par exemple). Rien ne l'empêche : l'unicité
+-- `teachers_auth_user_id_key` ci-dessous ne porte que sur `teachers`, elle
+-- est indépendante de `parents_auth_user_id_key`. La redirection après
+-- connexion tranche l'ambiguïté : bureau > enseignant > parent
+-- (cf. app/lib/redirectionRole.js).
 create table if not exists teachers (
   id uuid primary key default gen_random_uuid(),
   auth_user_id uuid references auth.users(id) on delete set null,
@@ -128,11 +138,18 @@ alter table teacher_quote_classes enable row level security;
 -- (RIB personnel, RIB de la coopérative de classe...). Une facture réutilise
 -- ensuite un RIB via teacher_invoices.rib_id. Créée AVANT teacher_invoices
 -- parce que celle-ci la référence.
+--
+-- Rétention (décision D8) : le fichier RIB ne survit pas au remboursement.
+-- Dès qu'une facture qui utilise ce RIB passe à 'remboursee' ET qu'aucune
+-- autre facture non remboursée ne le référence, le fichier du bucket est
+-- supprimé, `rib_file_path` repasse à NULL et `purged_at` est horodaté. La
+-- ligne est conservée pour l'historique (« ce RIB a existé »).
 create table if not exists teacher_ribs (
   id uuid primary key default gen_random_uuid(),
   teacher_id uuid not null references teachers(id) on delete cascade,
   label text,
-  rib_file_path text not null,
+  rib_file_path text,          -- NULL une fois le fichier purgé après remboursement
+  purged_at timestamptz,       -- date de suppression du fichier
   created_at timestamptz not null default now()
 );
 
@@ -149,6 +166,10 @@ alter table teacher_ribs enable row level security;
 -- utile quand la facture correspond à un devis déjà validé.
 -- Le RIB peut être joint directement à la facture (`rib_file_path`) OU
 -- pointer vers un RIB déjà déposé (`rib_id`, cf. teacher_ribs).
+-- Décision D8 : au passage à 'remboursee', le fichier RIB (joint ou
+-- réutilisé) est SUPPRIMÉ du bucket — une fois le virement fait, le
+-- bénéficiaire est enregistré côté banque, le RIB ne sert plus. `rib_received`
+-- garde la trace qu'un RIB avait bien été fourni.
 create table if not exists teacher_invoices (
   id uuid primary key default gen_random_uuid(),
   teacher_id uuid not null references teachers(id) on delete cascade,
@@ -162,7 +183,8 @@ create table if not exists teacher_invoices (
     check (status in ('soumise', 'remboursee')),
   invoice_file_path text not null,
   rib_id uuid references teacher_ribs(id) on delete set null,
-  rib_file_path text,
+  rib_file_path text,           -- NULL après purge (remboursement) ou si rib_id utilisé
+  rib_received boolean not null default false,  -- un RIB a été fourni à un moment
   admin_note text,
   reimbursed_at timestamptz,
   reimbursed_by uuid references parents(id) on delete set null,
@@ -222,6 +244,10 @@ alter table contact_messages
 --       rôle (bureau → /admin, enseignant → /espace-enseignant, sinon
 --       /espace-adherent). Voir app/lib/redirectionRole.js (fourni) et
 --       docs/conception-espace-enseignants.md.
---   - app/confidentialite : mentionner le stockage des RIB (bucket privé,
---       URL signées de courte durée, accès bureau uniquement).
+--   - app/confidentialite : mentionner le stockage des RIB — bucket privé,
+--       URL signées de courte durée, accès bureau uniquement, ET suppression
+--       automatique du fichier RIB dès le remboursement de la facture (D8).
+--   - app/admin/messages : badge + filtre d'origine (from_type) — intégration
+--       partagée, PAS faite dans cette livraison (seule l'écriture
+--       from_type='enseignant' l'est).
 -- ============================================================================

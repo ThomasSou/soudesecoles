@@ -13,7 +13,7 @@ export async function GET(request) {
 
   const { data, error } = await auth.admin
     .from("teacher_ribs")
-    .select("id, label, created_at")
+    .select("id, label, created_at, purged_at")
     .eq("teacher_id", auth.teacher.id)
     .order("created_at", { ascending: false });
 

@@ -16,6 +16,12 @@ export async function GET(request, { params }) {
     .maybeSingle();
 
   if (error || !rib) return NextResponse.json({ error: "RIB introuvable." }, { status: 404 });
+  if (!rib.rib_file_path) {
+    return NextResponse.json(
+      { error: "Ce RIB a été supprimé après remboursement (D8)." },
+      { status: 404 }
+    );
+  }
 
   const { url, error: urlError } = await urlSignee(auth.admin, rib.rib_file_path);
   if (urlError) return NextResponse.json({ error: urlError }, { status: 500 });

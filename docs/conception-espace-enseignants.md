@@ -3,11 +3,16 @@
 Document de conception rédigé pendant un travail de nuit autonome.
 **Rien n'est en production.** Cette livraison contient : le modèle de données,
 une migration SQL **non appliquée**, l'échafaudage des pages et des routes API
-(le build `npm run build` passe), et la liste des décisions qui restent à
-prendre. Le branchement de la page de connexion et des permissions est
-volontairement laissé pour « le matin » (points d'intégration ci-dessous).
+(le build `npm run build` passe), et la liste des décisions.
+Le branchement de la page de connexion et des permissions est volontairement
+laissé pour « le matin » (points d'intégration ci-dessous).
 
-Date : 29 août 2026.
+Date : 29 août 2026. **Mise à jour 30 août 2026 : les 12 décisions de Thomas
+ont été appliquées** (voir §10 pour le détail de ce qui a changé). Les
+nouveautés de cette 2ᵉ passe : purge automatique du RIB au remboursement (D8),
+re-consultation de ses pièces par l'enseignant (D6), tableau de bord + récap
+par classe dans le back-office (D11), rattachement d'une fiche enseignant à un
+compte parent/bureau existant (D1).
 
 ---
 
@@ -122,11 +127,14 @@ teacher_ribs
   id             uuid PK
   teacher_id     uuid → teachers (cascade)
   label          text — ex. "Coopérative CE2", "compte perso"
-  rib_file_path  text NOT NULL
+  rib_file_path  text — NULL une fois le fichier purgé après remboursement (D8)
+  purged_at      timestamptz — date de suppression du fichier
   created_at     timestamptz
 ```
 
-Aucune colonne IBAN/BIC : uniquement le chemin du fichier.
+Aucune colonne IBAN/BIC : uniquement le chemin du fichier. La ligne est
+**conservée après purge** (trace « ce RIB a existé »), seul le fichier
+disparaît et `purged_at` est horodaté.
 
 ### 3.6 `teacher_invoices` — factures
 
@@ -143,7 +151,8 @@ teacher_invoices
   status             text 'soumise' | 'remboursee'  (défaut 'soumise')
   invoice_file_path  text NOT NULL
   rib_id             uuid → teacher_ribs (nullable) — RIB réutilisé
-  rib_file_path      text — OU RIB joint directement à cette facture
+  rib_file_path      text — OU RIB joint directement (NULL après purge / si rib_id)
+  rib_received       boolean NOT NULL défaut false — un RIB a été fourni à un moment
   admin_note         text
   reimbursed_at      timestamptz
   reimbursed_by      uuid → parents
@@ -152,7 +161,8 @@ teacher_invoices
 
 Le RIB d'une facture peut venir de deux sources : `rib_file_path` (fichier
 joint au moment du dépôt) **ou** `rib_id` (un RIB déjà déposé). La route de
-consultation gère les deux.
+consultation gère les deux. **Au passage à `remboursee` (D8), le fichier RIB
+est supprimé** (voir §6.6) ; `rib_received` reste à `true` pour l'historique.
 
 ### 3.7 `teacher_invoice_classes` — classes d'une facture (1..n)
 
@@ -225,44 +235,58 @@ Sections (une page, pas d'onglets) :
 
 1. **Mes devis** — formulaire (intitulé, détail, montant, sélecteur multi-
    classes **obligatoire**, fichier PDF/photo **obligatoire**) + historique
-   avec statut et motif de refus le cas échéant.
+   avec statut, lien **« Voir le devis »** (D6), et motif de refus le cas échéant.
 2. **Mes factures** — formulaire (intitulé, prestataire, montant, sélecteur
    multi-classes obligatoire, fichier facture obligatoire, RIB : aucun /
-   nouveau fichier / réutiliser un RIB déjà déposé) + historique avec statut
-   et indication « RIB joint / RIB manquant ».
-3. **Mes RIB** — dépôt d'un RIB en fichier (libellé facultatif) + liste.
+   nouveau fichier / réutiliser un RIB déjà déposé) + historique avec statut,
+   liens **« Voir la facture » / « Voir le RIB »** (D6), et mention
+   « RIB joint » / « RIB reçu (supprimé après remboursement) » / « RIB manquant ».
+3. **Mes RIB** — dépôt d'un RIB en fichier (libellé facultatif) + liste avec
+   lien **« Voir »** ou mention « supprimé après remboursement ».
 4. **Écrire au bureau** — sujet + message → `contact_messages`.
 
+Re-consultation des pièces (D6) : `GET /api/enseignant/fichier?kind=…&id=…`
+vérifie que la ligne appartient bien à l'enseignant du jeton, puis renvoie une
+URL signée 5 min. Les RIB purgés renvoient un 404 explicite.
+
 Rattachement facultatif d'une facture à un devis : **prévu dans la route API**
-(`quoteId`, vérifié comme appartenant à l'enseignant) mais **pas encore
-exposé dans le formulaire** (décision D3). Le back-office affiche déjà
+(`quoteId`, vérifié comme appartenant à l'enseignant) mais **pas exposé dans
+le formulaire** (décision D3 confirmée). Le back-office affiche déjà
 « rattachée à un devis » quand le lien existe.
 
 ### 5.2 Back-office — `/admin/enseignants` (`app/admin/enseignants/page.js`)
 
-Via `AdminShell`, permission `enseignants`. Quatre onglets internes :
+Via `AdminShell`, permission `enseignants`. Cinq onglets internes :
 
+- **Bilan** (D11) — sélecteur d'année scolaire ; cartes chiffrées (engagé sur
+  l'année = devis validés + factures, devis validés / en attente, factures
+  remboursées / en attente / total) ; **tableau de financement par classe**
+  (montant des devis validés et des factures concernant chaque classe).
+  Source : `GET /api/admin/enseignants/bilan?annee=YYYY-YYYY`.
 - **Devis** — filtre « À traiter » / « Tous ». Carte par devis : enseignant,
   classes (badges), montant, statut, « Voir le devis » (URL signée), note
   interne, boutons **Valider** / **Refuser** / **Remettre en attente**.
 - **Factures** — filtre « À rembourser » / « Toutes ». Carte : enseignant,
   prestataire, classes, montant, statut, « Voir la facture », « Voir le RIB »
-  (ou « RIB manquant » en rouge), note, boutons **Marquer remboursée** /
-  **Remettre en attente**.
+  (ou « RIB reçu — supprimé après remboursement », ou « RIB manquant » en
+  rouge), note, boutons **Marquer remboursée** / **Remettre en attente**.
 - **RIB** — liste de tous les RIB déposés (enseignant, libellé, date) +
-  « Voir le RIB » (URL signée).
+  « Voir le RIB » (URL signée) ou mention « supprimé le … (après remboursement) ».
 - **Comptes** — formulaire d'invitation (prénom, nom, e-mail, rôle) + liste
   des comptes avec état (« invitation en attente » / « compte activé » /
   « désactivé »), boutons **Basculer rôle** et **Désactiver / Réactiver**.
+  Si l'e-mail correspond à un compte déjà existant (parent / bureau), la fiche
+  enseignant y est rattachée sans e-mail d'invitation (D1) et un message
+  l'explique.
 
 ### 5.3 Messages reçus — back-office existant
 
-La distinction d'origine est **écrite en base** (`from_type`,
-`sender_teacher_id`) mais **pas encore affichée** : la page
-`app/admin/messages/page.js` n'est **pas** modifiée dans cette livraison
-(pour ne pas toucher au périmètre en cours). Ajout prévu §8 / décision D5 :
-un badge « Parent » / « Partenaire » / « Enseignant » / « Site » sur chaque
-message, et un filtre par origine.
+La distinction d'origine est **écrite en base** (`from_type = 'enseignant'`,
+`sender_teacher_id`). L'**affichage** du badge et du filtre dans
+`app/admin/messages/page.js` est un **point d'intégration partagé** (I6) —
+non fait ici pour ne pas empiéter sur le chantier en cours. Décision D5 :
+badge « Parent » / « Partenaire » / « Enseignant » / « Site » + filtre par
+origine, même boîte, même notification `CONTACT_EMAIL`.
 
 ---
 
@@ -273,7 +297,11 @@ message, et un filtre par origine.
 1. Bureau : onglet **Comptes** → saisit prénom/nom/e-mail/rôle → `POST
    /api/admin/enseignants/comptes`.
 2. La route crée la fiche `teachers` (si l'e-mail n'existe pas déjà) puis
-   appelle `envoyerInvitationEnseignant` :
+   appelle `envoyerInvitationEnseignant`, qui distingue trois cas :
+   - **Compte déjà existant et confirmé** (D1 — la personne est déjà parent ou
+     membre du bureau) : aucune création, aucun e-mail. La fiche `teachers`
+     est simplement rattachée à ce `auth.users`. Réponse `compteExistant:true`
+     + message expliquant qu'elle se connecte avec son mot de passe habituel.
    - **Sender configuré** : `createUser` (confirmé d'emblée) → jeton maison
      dans `invitations` (`teacher_id` renseigné) → e-mail Sender vers
      `/activer-compte?jeton=…`.
@@ -284,8 +312,7 @@ message, et un filtre par origine.
 4. `teachers.auth_user_id` est renseigné → l'enseignant peut se connecter.
 
 **Renvoi d'invitation** : re-`POST` sur le même e-mail régénère un jeton (la
-fiche existe déjà, on ne la recrée pas). Message spécifique si le compte est
-déjà activé (proposer « mot de passe oublié »).
+fiche existe déjà, on ne la recrée pas).
 
 ### 6.2 Connexion et redirection par rôle — **À BRANCHER (voir §7)**
 
@@ -329,22 +356,53 @@ maintenant, `decided_by` = membre du bureau connecté. C'est **ce changement**
 qui fait apparaître « Validé »/« Refusé » côté enseignant — jamais avant.
 En cas de refus, `admin_note` sert de motif et s'affiche à l'enseignant.
 
-### 6.6 Remboursement d'une facture (bureau)
+### 6.6 Remboursement d'une facture + purge du RIB (bureau, D8)
 
 `PATCH /api/admin/enseignants/factures/[id]` avec `{status, adminNote}`.
 `status ∈ {soumise, remboursee}`. Sur `remboursee` : `reimbursed_at`,
 `reimbursed_by`. **Le virement lui-même reste manuel** : ce statut ne fait
 que suivre l'état, comme pour les remboursements parents.
 
-### 6.7 Consultation des fichiers (bureau)
+**Purge automatique du RIB (D8).** Logique de Thomas : une fois le virement
+fait, le bénéficiaire est enregistré côté banque, le RIB ne sert plus et ne
+doit pas rester stocké. Au passage à `remboursee` (et seulement à la
+transition, pas si la facture y était déjà) :
 
+1. On note `rib_received = true` sur la facture (trace « un RIB avait été
+   fourni »).
+2. Si `rib_file_path` (fichier joint à la facture) : le fichier du bucket est
+   supprimé, la colonne repasse à `NULL`.
+3. Si `rib_id` (RIB réutilisable de `teacher_ribs`) : on vérifie qu'**aucune
+   autre facture non remboursée** ne référence ce même `rib_id`. Si c'est le
+   cas, le fichier du bucket est supprimé, `teacher_ribs.rib_file_path`
+   repasse à `NULL` et `purged_at` est horodaté. La **ligne `teacher_ribs`
+   est conservée** (trace). Si une autre facture non remboursée l'utilise
+   encore, on ne touche pas au fichier (il sera purgé au dernier
+   remboursement).
+4. La suppression de fichier se fait **après** le changement de statut : si
+   elle échoue, la facture est quand même « remboursée » (réponse avec un
+   `avertissement`), on ne bloque pas le suivi comptable.
+
+Conséquences côté lecture : `rib_consultable` (fichier encore présent) vs
+`a_rib` (un RIB a existé). Les routes de consultation (`/fichier`) renvoient
+un 404 explicite « supprimé après remboursement » quand le fichier a été
+purgé. Remettre une facture en `soumise` **ne restaure pas** le fichier
+(irréversible) — le cas est rare et documenté ; l'enseignant peut re-déposer
+un RIB si besoin.
+
+### 6.7 Consultation des fichiers
+
+**Bureau :**
 `GET /api/admin/enseignants/devis/[id]/fichier`
 `GET /api/admin/enseignants/factures/[id]/fichier?type=facture|rib`
 `GET /api/admin/enseignants/rib/[id]/fichier`
-Chacune renvoie une **URL signée valable 5 minutes** vers le bucket privé.
-Aucune URL publique. Les enseignants ne peuvent pas re-consulter leurs
-propres fichiers via l'interface (comme les parents pour leurs factures) —
-décision D6.
+
+**Enseignant (D6) :** `GET /api/enseignant/fichier?kind=devis|facture|rib&id=…`
+(`&partie=facture|rib` pour une facture). La route vérifie **strictement**
+que la ligne appartient au `teacher_id` du jeton avant de signer l'URL.
+
+Toutes renvoient une **URL signée valable 5 minutes** vers le bucket privé,
+aucune URL publique. Un RIB purgé (D8) renvoie un 404 explicite.
 
 ### 6.8 Message au bureau
 
@@ -353,6 +411,21 @@ décision D6.
 fiche `teachers` (jamais du client). E-mail de notification au bureau en bonus
 (échec sans conséquence sur l'enregistrement), sujet suffixé « (espace
 enseignant) ».
+
+### 6.9 Bilan / tableau de bord (bureau, D11)
+
+`GET /api/admin/enseignants/bilan?annee=YYYY-YYYY` (année en cours par défaut).
+Renvoie :
+- `annees` : les années scolaires présentes dans `teacher_quotes` /
+  `teacher_invoices` (pour le sélecteur).
+- `totaux` : par statut (devis validés / soumis / refusés, factures totales /
+  remboursées / en attente) en montant + nombre ; `engage_cents` = devis
+  validés + total factures.
+- `classes` : une ligne par `class_label` rencontré, avec le cumul des devis
+  validés et des factures **qui concernent cette classe**. Le montant entier
+  est attribué à chaque classe concernée (un car partagé par 3 classes compte
+  pour les 3) : les lignes peuvent se recouper, c'est voulu. `note_double_compte`
+  rappelle qu'une facture rattachée à un devis validé est comptée dans les deux.
 
 ---
 
@@ -398,8 +471,8 @@ côté de « Espace adhérent ». La redirection par rôle depuis `/connexion` s
 fonctionnellement ; un lien direct est un confort.
 
 ### I5 — Page `/confidentialite` (RGPD)
-Ajouter une ligne sur les RIB (voir §9). Fichier concerné :
-`app/confidentialite/page.js`.
+Ajouter une ligne sur les RIB (voir §9), en mentionnant la **suppression
+automatique au remboursement** (D8). Fichier : `app/confidentialite/page.js`.
 
 ### I6 — Affichage de l'origine dans « Messages reçus »
 `app/admin/messages/page.js` + `app/api/admin/messages/route.js` : renvoyer
@@ -424,57 +497,71 @@ campagne de rentrée.
 - Idem `from_type = 'partenaire'` côté espace partenaire.
 - Notification e-mail au(x) membre(s) du bureau ayant le droit `enseignants`
   à chaque nouveau devis/facture (aujourd'hui : rien, il faut aller voir).
-- Filtrer les devis/factures par année scolaire dans le back-office.
+- Filtrer les devis/factures par année scolaire dans le back-office (le Bilan
+  a déjà le filtre ; l'étendre aux onglets Devis et Factures).
 - Export CSV des factures remboursées pour la trésorerie.
-- Récapitulatif par classe : « combien le Sou a financé pour la classe X
-  cette année » (les tables `*_classes` le permettent déjà).
 - Laisser l'enseignant rattacher une facture à un de ses devis validés
-  directement dans le formulaire (la route l'accepte déjà).
-- Laisser l'enseignant re-télécharger ses propres pièces.
+  directement dans le formulaire (la route l'accepte déjà — D3 : non exposé
+  pour l'instant).
+- Purge des devis/factures anciens : politique de rétention à définir (D8 ne
+  couvre que le fichier RIB).
+
+**Fait dans la 2ᵉ passe (30 août) :** re-consultation des pièces par
+l'enseignant (D6), récap par classe + tableau de bord (D11), purge RIB au
+remboursement (D8), compte partagé parent/enseignant (D1).
 
 ---
 
 ## 9. RGPD — RIB (donnée sensible)
 
 Le RIB (coordonnées bancaires) est une donnée personnelle sensible.
-Dispositions déjà prises dans le code :
+Dispositions prises dans le code :
 
 - Stockage dans le bucket Supabase **privé** `remboursements` (jamais d'URL
   publique).
-- Accès en lecture **uniquement** via des routes serveur protégées par la
-  permission `enseignants`, qui renvoient une **URL signée expirant en
-  5 minutes**.
+- Accès en lecture **uniquement** via des routes serveur : côté bureau,
+  permission `enseignants` ; côté enseignant, vérification stricte de
+  propriété. Les deux renvoient une **URL signée expirant en 5 minutes**.
 - Aucune coordonnée bancaire n'est saisie ni stockée en clair en base : que
   le **chemin d'un fichier**.
 - Le back-office ne liste jamais le contenu d'un RIB, seulement son libellé et
   sa date.
+- **Rétention minimale (D8)** : le fichier RIB est **supprimé automatiquement
+  du bucket dès que la facture correspondante passe à « remboursée »**. Une
+  fois le virement fait, le RIB ne sert plus. Seule reste une trace booléenne
+  (« un RIB avait été fourni ») + la date de suppression. Un RIB réutilisable
+  (`teacher_ribs`) n'est purgé qu'au dernier remboursement qui l'utilise.
 
 **À faire (I5)** : ajouter sur `/confidentialite` une mention du type —
-« Les enseignants et prestataires peuvent déposer un relevé d'identité
+« Les enseignants et les prestataires peuvent déposer un relevé d'identité
 bancaire (RIB) pour être remboursés de frais engagés pour l'association. Ce
-document est stocké de façon privée, accessible aux seuls membres du bureau
-habilités, et conservé le temps du traitement comptable puis supprimé. »
-Prévoir aussi une procédure de purge (suppression des fichiers RIB après
-N mois) — décision D8.
+document est stocké de façon privée, n'est accessible qu'aux membres du bureau
+habilités, et est **supprimé automatiquement dès que le remboursement
+correspondant a été effectué**. »
 
 ---
 
-## 10. Décisions / ambiguïtés à trancher (Thomas)
+## 10. Décisions (tranchées par Thomas le 30 août — appliquées)
 
-| # | Question | Hypothèse retenue dans l'échafaudage |
+| # | Décision | Ce qui a été fait dans le code |
 |---|---|---|
-| **D1** | Les enseignants sont-ils une entité **séparée** des parents, ou un enseignant qui est aussi parent a-t-il **un seul compte** ? | Table `teachers` **séparée**. Un enseignant-parent aura potentiellement deux comptes (deux e-mails, ou le même e-mail refusé par l'unicité `auth.users`). À trancher : autoriser un même compte `auth.users` à être lié à la fois à un `parents` et un `teachers` ? La redirection par rôle donne alors priorité au bureau, puis enseignant, puis parent. |
-| **D2** | Qui peut inviter des enseignants et traiter leurs devis/factures ? | Permission unique `enseignants`. Faut-il séparer « inviter » de « traiter » ? Faut-il donner ce droit à la direction elle-même (un compte `teachers` avec accès à l'onglet Comptes) ? Non prévu : l'onglet Comptes est back-office only. |
-| **D3** | Rattacher une facture à un devis : utile dans le formulaire enseignant ? | Prévu dans l'API, **pas exposé** dans le formulaire. À confirmer : les enseignants voudront-ils faire ce lien, ou c'est au bureau de le constater ? |
-| **D4** | Montant : le devis et la facture ont-ils **toujours** un montant connu à la saisie ? | Oui, montant **obligatoire** > 0. Si une facture peut arriver « montant à déterminer », il faut assouplir. |
-| **D5** | « Messages reçus » : un simple badge d'origine suffit-il, ou faut-il router les messages enseignants vers une autre boîte / d'autres destinataires ? | Badge + filtre (I6). Même boîte `contact_messages`, même notification `CONTACT_EMAIL`. |
-| **D6** | Les enseignants peuvent-ils **re-consulter** leurs pièces déposées (devis, facture, RIB) ? | Non (aligné sur les parents). Facile à ajouter (route `/api/enseignant/fichier` avec vérification de propriété). |
-| **D7** | Libellés de classes saisis en **saisie libre** (avant import) : que faire quand l'import arrive avec des libellés différents ? | Rien d'automatique. Le bureau corrige à la main les `*_classes` des dépôts concernés si besoin. Acceptable vu le volume attendu (quelques dépôts en tout début d'année). |
-| **D8** | Durée de conservation des RIB et des factures ? Purge automatique ? | Non implémentée. À définir (ex. suppression des fichiers RIB 6 mois après le dernier remboursement associé). |
-| **D9** | Rôle `direction` : a-t-il des droits **en plus** de `enseignant` dans l'espace enseignant (voir les devis des collègues, valider à la place du bureau…) ? | Non. `direction` est aujourd'hui juste une étiquette. Même espace, mêmes possibilités qu'un enseignant. |
-| **D10** | Taille max des fichiers : 8 Mo (repris des remboursements parents). OK pour des devis/factures scannés ? | Conservé à 8 Mo, image ou PDF uniquement. |
-| **D11** | Faut-il un montant total / tableau de bord « budget enseignants engagé cette année » dans le back-office ? | Non fait. Les données le permettent (voir §8). |
-| **D12** | Nom de l'espace et de l'URL : `/espace-enseignant` au singulier. OK ? Les remplaçants, ATSEM, intervenants extérieurs sont-ils concernés ? | `/espace-enseignant`. Périmètre = enseignants titulaires + direction. Élargir si besoin (rôle supplémentaire dans le `check`). |
+| **D1** | Un même compte `auth.users` **peut** être lié à la fois à `parents` et à `teachers`. Redirection : **bureau > enseignant > parent**. | Aucune unicité inter-tables ne l'empêche (commentaire ajouté dans la migration). `envoyerInvitationEnseignant` : si le compte existe déjà et est confirmé, on **rattache la fiche `teachers` sans créer de compte ni envoyer d'e-mail** ; l'UI Comptes affiche un message dédié. Ordre de priorité documenté et implémenté dans `redirectionRole.js`. |
+| **D2** | Une seule permission `enseignants` (bureau). La direction **n'a pas** accès à l'onglet Comptes. Rôle `direction` = simple étiquette. | Inchangé : l'onglet Comptes est back-office (`requirePermission("enseignants")`). `role` n'ouvre aucun droit supplémentaire. |
+| **D3** | Rattachement facture→devis : reste dans l'API, **pas** dans le formulaire. | Inchangé (route `POST /api/enseignant/factures` accepte `quoteId` avec contrôle de propriété ; formulaire sans ce champ). |
+| **D4** | Montant **obligatoire > 0** sur devis et facture. | Inchangé (validation serveur + `check (amount_cents > 0)`). |
+| **D5** | Messages enseignants = badge + filtre dans « Messages reçus », même boîte. L'affichage est un **point d'intégration partagé** (I6). | Ici : seule l'**écriture** `from_type='enseignant'` + `sender_teacher_id`. L'affichage n'est pas touché. |
+| **D6** | **CHANGEMENT** : les enseignants **peuvent** re-consulter leurs pièces. | Nouvelle route `GET /api/enseignant/fichier?kind=…&id=…` avec vérification stricte de propriété + URL signée 5 min. Liens « Voir » ajoutés dans l'espace enseignant (devis, facture, RIB). |
+| **D7** | Saisie libre des classes avant import ; « officialisées » à l'import. Rien d'auto, le bureau corrige. | Inchangé (repli saisie libre quand la liste dérivée est vide). |
+| **D8** | **CHANGEMENT** : le fichier RIB est **supprimé au passage de la facture à `remboursee`**. | Migration : `teacher_ribs.rib_file_path` nullable + `purged_at` ; `teacher_invoices.rib_received`. `PATCH .../factures/[id]` purge le fichier (joint ou réutilisé si plus aucune facture non remboursée ne le référence). RGPD §9 + I5 mis à jour. UI : « RIB reçu — supprimé après remboursement ». |
+| **D9** | = D2. | — |
+| **D10** | 8 Mo, image ou PDF. | Inchangé. |
+| **D11** | **OUI** : tableau de bord dans `/admin/enseignants` — total engagé sur l'année + **récap par classe** + filtre par année. | Nouvel onglet **Bilan** + route `GET /api/admin/enseignants/bilan?annee=…` (cartes chiffrées, table par classe sur `teacher_quote_classes` / `teacher_invoice_classes`). |
+| **D12** | `/espace-enseignant`, périmètre titulaires + direction. | Inchangé. |
+
+**Points encore ouverts (non bloquants)** : rétention des devis/factures
+anciens (D8 ne couvre que le RIB) ; comportement exact si une facture
+remboursée est repassée en « soumise » (le fichier RIB ne peut pas être
+restauré — l'enseignant re-dépose si besoin).
 
 ---
 
@@ -486,26 +573,30 @@ N mois) — décision D8.
 **Modules `app/lib/`**
 - `enseignantAuth.js` — `requireEnseignant(request)` (calque de `adminAuth.js`)
 - `classes.js` — `listerClassesAnnee(admin, schoolYear)`
-- `enseignantFichiers.js` — décodage Data URL, upload bucket privé, URL signée
-- `invitationsEnseignants.js` — `envoyerInvitationEnseignant` (calque de `invitations.js`)
+- `enseignantFichiers.js` — décodage Data URL, upload bucket privé, URL signée, `BUCKET`
+- `invitationsEnseignants.js` — `envoyerInvitationEnseignant` (calque de `invitations.js`, + cas compte existant D1)
 - `redirectionRole.js` — `resoudreEspace(admin, authUserId)` (à câbler, I3)
 
 **Routes API espace enseignant** (`app/api/enseignant/…`, toutes `force-dynamic`)
 - `moi/route.js` · `classes/route.js` · `devis/route.js` (GET/POST) ·
   `factures/route.js` (GET/POST) · `rib/route.js` (GET/POST) ·
-  `messages/route.js` (POST)
+  `messages/route.js` (POST) · **`fichier/route.js` (GET — D6, re-consultation
+  de ses propres pièces)**
 
 **Routes API back-office** (`app/api/admin/enseignants/…`, toutes `force-dynamic`, permission `enseignants`)
+- **`bilan/route.js` (GET — D11, tableau de bord + récap par classe)**
 - `devis/route.js` (GET) · `devis/[id]/route.js` (PATCH) · `devis/[id]/fichier/route.js` (GET)
-- `factures/route.js` (GET) · `factures/[id]/route.js` (PATCH) · `factures/[id]/fichier/route.js` (GET)
+- `factures/route.js` (GET) · `factures/[id]/route.js` (PATCH — **purge RIB D8**) · `factures/[id]/fichier/route.js` (GET)
 - `rib/route.js` (GET) · `rib/[id]/fichier/route.js` (GET)
 - `comptes/route.js` (GET/POST/PATCH)
 
 **Pages**
-- `app/espace-enseignant/page.js` — espace enseignant (squelette fonctionnel)
-- `app/admin/enseignants/page.js` — back-office (onglets Devis / Factures / RIB / Comptes)
+- `app/espace-enseignant/page.js` — espace enseignant (mes devis / mes factures /
+  mes RIB / contact bureau, liens « Voir » D6)
+- `app/admin/enseignants/page.js` — back-office (onglets **Bilan** / Devis /
+  Factures / RIB / Comptes)
 
 **Doc**
 - `docs/conception-espace-enseignants.md` (ce fichier)
 
-`npm run build` passe (60 pages générées, aucune erreur de type ni de lint).
+`npm run build` passe (63 routes, aucune erreur de type ni de lint).

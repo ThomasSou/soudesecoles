@@ -37,6 +37,31 @@ function gabaritInvitationEnseignant({ firstName, actionLink }) {
 export async function envoyerInvitationEnseignant(admin, { email, firstName, lastName, teacherId, redirectTo }) {
   const trimmedEmail = email.trim();
 
+  // Décision D1 : la personne invitée a peut-être DÉJÀ un compte (parent, ou
+  // membre du bureau). Dans ce cas on ne recrée rien et on n'envoie AUCUN
+  // e-mail d'activation : on rattache simplement la fiche `teachers` à ce
+  // compte existant. La personne se connectera avec son mot de passe habituel
+  // et sera aiguillée vers /espace-enseignant par la redirection de rôle.
+  const { data: liste, error: listeError } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  if (listeError) return { data: null, error: listeError };
+
+  const existant = (liste?.users || []).find(
+    (u) => u.email?.toLowerCase() === trimmedEmail.toLowerCase()
+  );
+
+  if (existant && (existant.email_confirmed_at || existant.confirmed_at)) {
+    if (teacherId) {
+      await admin
+        .from("teachers")
+        .update({ auth_user_id: existant.id, invited_at: new Date().toISOString() })
+        .eq("id", teacherId);
+    }
+    return {
+      data: { user: { id: existant.id, email: trimmedEmail }, compteExistant: true },
+      error: null,
+    };
+  }
+
   if (!isSenderConfigured()) {
     const lien = redirectTo || `${SITE_URL}/activer-compte`;
     const result = await admin.auth.admin.inviteUserByEmail(trimmedEmail, { redirectTo: lien });
@@ -47,20 +72,6 @@ export async function envoyerInvitationEnseignant(admin, { email, firstName, las
         .eq("id", teacherId);
     }
     return result;
-  }
-
-  const { data: liste, error: listeError } = await admin.auth.admin.listUsers({ perPage: 1000 });
-  if (listeError) return { data: null, error: listeError };
-
-  const existant = (liste?.users || []).find(
-    (u) => u.email?.toLowerCase() === trimmedEmail.toLowerCase()
-  );
-
-  if (existant?.email_confirmed_at || existant?.confirmed_at) {
-    return {
-      data: null,
-      error: { message: "A user with this email address has already been registered" },
-    };
   }
 
   let userId = existant?.id;

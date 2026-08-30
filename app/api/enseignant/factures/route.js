@@ -13,7 +13,7 @@ export async function GET(request) {
   const { data, error } = await auth.admin
     .from("teacher_invoices")
     .select(
-      "id, quote_id, label, supplier_name, description, amount_cents, school_year, status, admin_note, rib_id, rib_file_path, created_at, reimbursed_at"
+      "id, quote_id, label, supplier_name, description, amount_cents, school_year, status, admin_note, rib_id, rib_file_path, rib_received, created_at, reimbursed_at"
     )
     .eq("teacher_id", auth.teacher.id)
     .order("created_at", { ascending: false });
@@ -36,7 +36,10 @@ export async function GET(request) {
   const factures = (data || []).map((f) => ({
     ...f,
     classes: classesParFacture[f.id] || [],
-    a_rib: Boolean(f.rib_id || f.rib_file_path),
+    // RIB consultable seulement s'il existe encore un fichier (il est purgé
+    // au remboursement, D8) ; `rib_received` garde la trace qu'il a existé.
+    rib_consultable: Boolean(f.rib_id || f.rib_file_path),
+    a_rib: Boolean(f.rib_id || f.rib_file_path || f.rib_received),
   }));
   return NextResponse.json({ ok: true, factures });
 }
