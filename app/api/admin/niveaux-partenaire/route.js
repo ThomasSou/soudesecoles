@@ -3,7 +3,7 @@ import { requirePermission } from "../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 
-const PERM = "avantages";
+const PERM = "partenaires";
 const NIVEAUX = ["or", "argent", "bronze"];
 
 // GET : les 3 niveaux de partenariat avec leurs contreparties et quotas.

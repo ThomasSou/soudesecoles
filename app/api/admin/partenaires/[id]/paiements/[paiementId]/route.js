@@ -3,7 +3,7 @@ import { requirePermission } from "../../../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 
-const PERM = "avantages";
+const PERM = "partenaires";
 const MOYENS = ["virement", "cheque", "especes", "autre"];
 
 // PATCH : corriger une ligne de paiement. DELETE : la supprimer (saisie

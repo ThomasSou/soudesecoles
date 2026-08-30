@@ -4,7 +4,7 @@ import { envoyerInvitationPartenaire } from "../../../../../lib/partenaires";
 
 export const dynamic = "force-dynamic";
 
-const PERM = "avantages";
+const PERM = "partenaires";
 
 // Envoie (ou renvoie) au partenaire l'invitation à activer son espace :
 // même circuit que pour les familles (jeton maison + Sender si configuré,

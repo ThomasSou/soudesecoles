@@ -3,7 +3,7 @@ import { requirePermission } from "../../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 
-const PERM = "avantages";
+const PERM = "partenaires";
 const NIVEAUX = ["or", "argent", "bronze"];
 
 // POST : ajoute une période d'adhésion / de partenariat à un partenaire.

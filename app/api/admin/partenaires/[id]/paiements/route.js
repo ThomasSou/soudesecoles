@@ -3,7 +3,7 @@ import { requirePermission } from "../../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 
-const PERM = "avantages";
+const PERM = "partenaires";
 const MOYENS = ["virement", "cheque", "especes", "autre"];
 
 // POST : enregistre un paiement reçu d'un partenaire (saisie manuelle, le

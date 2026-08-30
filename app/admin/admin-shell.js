@@ -14,9 +14,8 @@ const ONGLETS = [
   { href: "/admin/boutique", label: "Boutique", perm: "boutique" },
   { href: "/admin/encaissements", label: "Encaissements libres", perm: "encaissements" },
   { href: "/admin/avantages", label: "Avantages", perm: "avantages" },
-  // Réutilise la permission "avantages" en attendant une permission dédiée
-  // "partenaires" (cf. docs/conception-espace-partenaires.md).
-  { href: "/admin/partenaires", label: "Partenaires", perm: "avantages" },
+  { href: "/admin/partenaires", label: "Partenaires", perm: "partenaires" },
+  { href: "/admin/enseignants", label: "Enseignants", perm: "enseignants" },
   { href: "/admin/remboursements", label: "Remboursements", perm: "remboursements" },
   { href: "/admin/benevoles", label: "Bénévoles", perm: "benevoles" },
   { href: "/admin/messages", label: "Messages reçus", perm: "messages" },

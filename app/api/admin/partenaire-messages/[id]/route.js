@@ -3,7 +3,7 @@ import { requirePermission } from "../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 
-const PERM = "avantages";
+const PERM = "partenaires";
 
 // GET : URL signée (5 min) vers l'image du message, pour l'aperçu bureau.
 export async function GET(request, { params }) {

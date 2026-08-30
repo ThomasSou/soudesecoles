@@ -3,10 +3,10 @@ import { requirePermission } from "../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 
-// Permission utilisée pour tout le module partenaires. À SCINDER plus tard en
-// une permission dédiée "partenaires" (une ligne à ajouter dans le tableau
-// PERMISSIONS de app/lib/adminAuth.js), cf. docs/conception-espace-partenaires.md.
-const PERM = "avantages";
+// Permission dédiée au module partenaires (fiches, périodes, paiements,
+// documents, messages, niveaux). Le module Avantages garde sa propre
+// permission "avantages".
+const PERM = "partenaires";
 
 function genererPin() {
   return String(Math.floor(1000 + Math.random() * 9000));

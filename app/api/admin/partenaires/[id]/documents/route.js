@@ -3,7 +3,7 @@ import { requirePermission } from "../../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 
-const PERM = "avantages";
+const PERM = "partenaires";
 const MAX_BYTES = 10 * 1024 * 1024; // 10 Mo (contrats scannés)
 
 function decodeDataUrl(dataUrl) {

@@ -11,6 +11,8 @@ export const PERMISSIONS = [
   { key: "boutique", label: "Boutique en ligne (produits et commandes)" },
   { key: "encaissements", label: "Encaissements libres (hors boutique et cotisation)" },
   { key: "avantages", label: "Avantages (boisson offerte, offres partenaires)" },
+  { key: "partenaires", label: "Partenaires (fiches, périodes, paiements, messages, documents)" },
+  { key: "enseignants", label: "Devis et factures des enseignants" },
   { key: "remboursements", label: "Demandes de remboursement des parents" },
   { key: "benevoles", label: "Créneaux bénévoles" },
   { key: "statistiques", label: "Statistiques de fréquentation" },

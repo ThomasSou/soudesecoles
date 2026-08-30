@@ -3,7 +3,7 @@ import { requirePermission } from "../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 
-const PERM = "avantages";
+const PERM = "partenaires";
 
 // GET : messages "nouveautés" des partenaires pour l'écran de modération du
 // bureau. Filtre par statut (?statut=soumis par défaut ; "tous" pour tout).

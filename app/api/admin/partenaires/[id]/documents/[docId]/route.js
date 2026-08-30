@@ -3,7 +3,7 @@ import { requirePermission } from "../../../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 
-const PERM = "avantages";
+const PERM = "partenaires";
 
 // GET : URL signée (5 min) vers le fichier, pour que le bureau puisse le
 // relire. DELETE : retire le document (ligne + fichier).

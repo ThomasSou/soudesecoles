@@ -3,7 +3,7 @@ import { requirePermission } from "../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 
-const PERM = "avantages";
+const PERM = "partenaires";
 
 // GET : fiche complète d'un partenaire pour l'écran de détail du back-office
 // (coordonnées, périodes, paiements, avantages + utilisations, historique

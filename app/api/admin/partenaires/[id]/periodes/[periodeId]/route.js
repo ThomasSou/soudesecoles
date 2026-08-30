@@ -3,7 +3,7 @@ import { requirePermission } from "../../../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 
-const PERM = "avantages";
+const PERM = "partenaires";
 const NIVEAUX = ["or", "argent", "bronze"];
 
 // PATCH : corriger une période, ou l'annuler (annulee = true) sans la
