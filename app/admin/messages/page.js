@@ -11,10 +11,26 @@ export default function AdminMessagesPage() {
   );
 }
 
+// Libellé + style du badge d'origine d'un message (colonne from_type,
+// migration 0040). Les messages antérieurs à la migration n'ont pas de
+// from_type : on les traite comme « Site ».
+const ORIGINES = {
+  public: { label: "Site", classe: "bg-slate-100 text-slate-600" },
+  parent: { label: "Parent", classe: "bg-sky-100 text-sky-700" },
+  partenaire: { label: "Partenaire", classe: "bg-amber-100 text-amber-700" },
+  enseignant: { label: "Enseignant", classe: "bg-emerald-100 text-emerald-700" },
+};
+
+function origineDe(m) {
+  return ORIGINES[m.from_type] ? m.from_type : "public";
+}
+
 function ListeMessages({ token }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [voirTraites, setVoirTraites] = useState(false);
+  // Filtre par origine : "tous" ou une clé de ORIGINES.
+  const [origine, setOrigine] = useState("tous");
   // Id du message dont le formulaire de réponse est ouvert.
   const [reponseOuverte, setReponseOuverte] = useState(null);
   const [brouillon, setBrouillon] = useState("");
@@ -89,10 +105,41 @@ function ListeMessages({ token }) {
     return <p className="text-slate-500">Chargement des messages...</p>;
   }
 
-  const visibles = voirTraites ? messages : messages.filter((m) => !m.handled);
+  const visibles = messages
+    .filter((m) => voirTraites || !m.handled)
+    .filter((m) => origine === "tous" || origineDe(m) === origine);
+
+  // Nombre de messages par origine (sur l'ensemble chargé), pour les onglets.
+  const comptes = messages.reduce((acc, m) => {
+    const o = origineDe(m);
+    acc[o] = (acc[o] || 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <div>
+      <div className="flex flex-wrap gap-1 mb-4">
+        {["tous", ...Object.keys(ORIGINES)].map((cle) => {
+          const actif = origine === cle;
+          const libelle = cle === "tous" ? "Toutes origines" : ORIGINES[cle].label;
+          const n = cle === "tous" ? messages.length : comptes[cle] || 0;
+          return (
+            <button
+              key={cle}
+              onClick={() => setOrigine(cle)}
+              className={`px-3 py-1.5 text-sm rounded-full border ${
+                actif
+                  ? "border-sou-blue bg-sou-blue text-white"
+                  : "border-slate-200 text-slate-600 hover:border-sou-blue"
+              }`}
+            >
+              {libelle}
+              <span className={actif ? "opacity-80" : "text-slate-400"}> ({n})</span>
+            </button>
+          );
+        })}
+      </div>
+
       <label className="flex items-center gap-2 text-sm text-slate-600 mb-6">
         <input
           type="checkbox"
@@ -117,7 +164,16 @@ function ListeMessages({ token }) {
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="font-semibold text-sou-blue">{m.name}</p>
+                  <p className="font-semibold text-sou-blue flex items-center gap-2">
+                    {m.name}
+                    <span
+                      className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        ORIGINES[origineDe(m)].classe
+                      }`}
+                    >
+                      {ORIGINES[origineDe(m)].label}
+                    </span>
+                  </p>
                   <a
                     href={`mailto:${m.email}`}
                     className="text-sm text-slate-600 underline"

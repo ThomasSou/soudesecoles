@@ -86,9 +86,38 @@ export default function ConfidentialitePage() {
             ouverts, et nos liens passent par une redirection qui compte les clics. Ces mesures sont
             <strong> globales</strong> : elles ne nous disent pas qui a ouvert ni qui a cliqué.
           </p>
+          {/* TEXTE LÉGAL — à valider par Thomas */}
+          <p>
+            Lorsque nous envoyons une campagne d&apos;information, nous conservons pendant
+            <strong> 12 mois</strong>, pour chaque envoi, l&apos;adresse e-mail destinataire,
+            l&apos;état de remise (envoyé, échec) et le canal technique utilisé. Ces données servent
+            uniquement à vérifier qu&apos;un message est bien parti et à diagnostiquer un problème
+            d&apos;acheminement. Le nombre d&apos;ouvertures est un compteur anonyme par campagne ;
+            nous ne suivons pas les clics individuellement.
+          </p>
           <p>
             Chaque e-mail comporte un lien de désinscription en bas de page. Un clic suffit, sans
             justification à fournir.
+          </p>
+        </Section>
+
+        {/* TEXTE LÉGAL — à valider par Thomas */}
+        <Section titre="Espaces partenaires et enseignants">
+          <p>
+            Les entreprises et commerçants qui soutiennent le Sou disposent d&apos;un espace en
+            ligne. Nous y conservons leurs coordonnées (raison sociale, personne référente, adresse,
+            e-mail, téléphone), l&apos;historique de leur partenariat et de leurs versements, ainsi
+            que les messages « nouveautés » qu&apos;ils nous soumettent en vue d&apos;une diffusion
+            aux familles. Ces données servent à la gestion du partenariat et ne sont pas transmises à
+            des tiers.
+          </p>
+          <p>
+            Les enseignants et les prestataires peuvent déposer un relevé d&apos;identité bancaire
+            (RIB) pour être remboursés de frais engagés pour l&apos;association. Ce document est
+            stocké de façon privée, n&apos;est accessible qu&apos;aux membres du bureau habilités, et
+            est <strong>supprimé automatiquement dès que le remboursement correspondant a été
+            effectué</strong>. Aucune coordonnée bancaire n&apos;est saisie ni conservée en clair :
+            seul le fichier déposé l&apos;est, puis il est effacé.
           </p>
         </Section>
 
@@ -111,6 +140,13 @@ export default function ConfidentialitePage() {
             <li>Pièces comptables (cotisations, commandes) : 10 ans, comme l&apos;impose la loi.</li>
             <li>Messages du formulaire de contact : 1 an.</li>
             <li>Statistiques de fréquentation : 2 ans, sous forme de compteurs uniquement.</li>
+            {/* TEXTE LÉGAL — à valider par Thomas */}
+            <li>Journal d&apos;envoi des campagnes e-mail (adresse, état de remise, canal) : 12 mois.</li>
+            {/* TEXTE LÉGAL — à valider par Thomas */}
+            <li>
+              RIB des enseignants et prestataires : supprimé dès le remboursement effectué (seule
+              subsiste la trace qu&apos;un RIB avait été fourni).
+            </li>
           </ul>
         </Section>
 

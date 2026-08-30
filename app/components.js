@@ -120,6 +120,21 @@ export function Footer() {
             Contact
           </Link>
         </div>
+        {/* Accès discrets aux espaces connectés : la redirection par rôle de
+            /connexion suffit fonctionnellement, ces liens sont un confort. */}
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+          <Link href="/espace-adherent" className="hover:text-white transition-colors">
+            Espace adhérent
+          </Link>
+          <span aria-hidden="true">·</span>
+          <Link href="/partenaire" className="hover:text-white transition-colors">
+            Espace partenaire
+          </Link>
+          <span aria-hidden="true">·</span>
+          <Link href="/espace-enseignant" className="hover:text-white transition-colors">
+            Espace enseignant
+          </Link>
+        </div>
         <p>© {new Date().getFullYear()} Sou des Écoles Montmerle-Lurcy — site en construction</p>
       </div>
     </footer>

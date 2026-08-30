@@ -7,7 +7,7 @@ import { isSenderConfigured, envoyerEmailTransactionnel } from "./senderMail";
 // même repli sur inviteUserByEmail quand Sender n'est pas configuré.
 //
 // Seule différence : on rattache la fiche `teachers` (colonne
-// invitations.teacher_id, ajoutée par la migration 0033) au lieu de `parents`.
+// invitations.teacher_id, ajoutée par la migration 0034) au lieu de `parents`.
 //
 // PISTE POUR LE MATIN (cf. docs) : fusionner ce fichier avec invitations.js
 // en généralisant le paramètre de rattachement ({ table, id }) plutôt que de
