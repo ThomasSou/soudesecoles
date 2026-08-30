@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { createClient } from "../lib/supabaseClient";
 
 export default function MotDePasseOubliePage() {
   const [email, setEmail] = useState("");
@@ -15,20 +14,25 @@ export default function MotDePasseOubliePage() {
     setError("");
     setLoading(true);
 
-    const supabase = createClient();
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email.trim(),
-      { redirectTo: `${window.location.origin}/activer-compte` }
-    );
-    setLoading(false);
-
-    if (resetError) {
+    // On passe par une route serveur (et non par resetPasswordForEmail côté
+    // client) : elle sait aussi traiter les familles importées qui n'ont pas
+    // encore de compte de connexion, en leur envoyant un lien d'activation
+    // plutôt qu'un simple reset qui ne pourrait rien faire.
+    try {
+      const res = await fetch("/api/mot-de-passe-oublie", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      setSent(true);
+    } catch {
       setError(
         "L'envoi n'a pas pu aboutir. Merci de réessayer dans quelques minutes ou de nous contacter."
       );
-      return;
+    } finally {
+      setLoading(false);
     }
-    setSent(true);
   }
 
   if (sent) {
@@ -40,12 +44,12 @@ export default function MotDePasseOubliePage() {
         </h1>
         <p className="text-slate-600">
           Si un compte existe avec l&apos;adresse <strong>{email}</strong>, vous
-          allez recevoir un e-mail contenant un lien pour choisir un nouveau
-          mot de passe.
+          allez recevoir un e-mail contenant un lien pour choisir votre mot de
+          passe.
         </p>
         <p className="text-sm text-slate-500 mt-4">
-          Pensez à vérifier vos courriers indésirables. Le lien est valable une
-          heure.
+          Pensez à vérifier vos courriers indésirables. Le lien peut mettre
+          quelques minutes à arriver.
         </p>
         <Link
           href="/connexion"
@@ -64,7 +68,7 @@ export default function MotDePasseOubliePage() {
       </h1>
       <p className="text-slate-600 mb-8">
         Indiquez l&apos;adresse e-mail de votre compte : nous vous enverrons un
-        lien pour en choisir un nouveau.
+        lien pour choisir votre mot de passe.
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
