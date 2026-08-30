@@ -1,4 +1,4 @@
--- ÉCHAFAUDAGE — espace partenaires. Numéro provisoire, À RENUMÉROTER.
+-- ESPACE PARTENAIRES — NON APPLIQUÉ. Série d'intégration des 4 chantiers.
 --
 -- Messages "nouveautés" proposés par les partenaires. Un partenaire rédige
 -- un message (titre, texte, 1 image, 1 lien), le soumet, le bureau valide ou

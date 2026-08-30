@@ -1,4 +1,4 @@
--- ÉCHAFAUDAGE — espace partenaires. Numéro provisoire, À RENUMÉROTER.
+-- ESPACE PARTENAIRES — NON APPLIQUÉ. Série d'intégration des 4 chantiers.
 --
 -- Suivi de l'HISTORIQUE des avantages proposés par les partenaires. La
 -- CONSOMMATION par les familles est déjà tracée par `avantage_utilisations`

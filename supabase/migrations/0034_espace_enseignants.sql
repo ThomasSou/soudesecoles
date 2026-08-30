@@ -1,13 +1,13 @@
 -- ============================================================================
--- ESPACE ENSEIGNANTS / DIRECTION — échafaudage (NON APPLIQUÉ)
+-- ESPACE ENSEIGNANTS / DIRECTION — NON APPLIQUÉ
 -- ----------------------------------------------------------------------------
--- Numéro PROVISOIRE : renuméroter (0033, 0034... selon l'état du dossier
--- supabase/migrations/ au moment de l'application) AVANT de coller dans
--- l'éditeur SQL Supabase. Comme toutes les migrations du projet, celle-ci
--- n'est PAS exécutée automatiquement : elle ne prendra effet qu'une fois
--- collée et lancée à la main dans le tableau de bord Supabase, puis vérifiée
--- par un `select` indépendant (le message « Success » de l'éditeur peut être
--- périmé).
+-- Migration 0034 de la série d'intégration des 4 chantiers. Ordre : après
+-- 0033_email_campaign_suivi.sql, avant les migrations partenaires
+-- (0035..0039) et avant 0040_contact_messages_origine.sql. Comme toutes les
+-- migrations du projet, celle-ci n'est PAS exécutée automatiquement : elle ne
+-- prendra effet qu'une fois collée et lancée à la main dans le tableau de bord
+-- Supabase, puis vérifiée par un `select` indépendant (le message « Success »
+-- de l'éditeur peut être périmé).
 --
 -- Contenu :
 --   1. Table `teachers`  — identité + rôle des enseignants / direction,
@@ -18,10 +18,11 @@
 --      `purged_at` : le fichier est supprimé au remboursement — décision D8).
 --   5. `teacher_invoices` (factures) + `teacher_invoice_classes`.
 --      `rib_received` garde la trace d'un RIB fourni puis purgé (D8).
---   6. `contact_messages` — colonnes d'origine (parent / partenaire /
---      enseignant / public) + identité expéditeur. Non destructif :
---      `from_type` par défaut 'public', les lignes et le formulaire public
---      existants ne changent pas.
+--
+-- Les colonnes d'origine de `contact_messages` (from_type + sender_*) sont
+-- créées par une migration DÉDIÉE et COMMUNE aux chantiers partenaires et
+-- enseignants : `0040_contact_messages_origine.sql` (placée après `teachers`
+-- et `partenaires` car elle référence les deux).
 --
 -- RLS activé partout, AUCUNE policy publique : tout passe par des routes API
 -- serveur (clé de service), comme le reste du back-office et l'espace
@@ -208,46 +209,22 @@ alter table teacher_invoice_classes enable row level security;
 
 
 -- ----------------------------------------------------------------------------
--- 6. contact_messages — origine du message + identité expéditeur
+-- 6. contact_messages — DÉPLACÉ vers 0040_contact_messages_origine.sql
 -- ----------------------------------------------------------------------------
--- « Messages reçus » du back-office regroupe déjà les messages du formulaire
--- public. On y ajoute la distinction d'origine sans rien casser :
---   - from_type 'public'      → formulaire public (comportement actuel, défaut)
---   - from_type 'parent'      → depuis l'espace adhérent (à brancher plus tard)
---   - from_type 'partenaire'  → depuis l'espace partenaire (fichiers verrouillés)
---   - from_type 'enseignant'  → depuis l'espace enseignant (cette livraison)
--- Les colonnes sender_* pointent vers la fiche d'origine quand elle existe.
-alter table contact_messages
-  add column if not exists from_type text not null default 'public';
-
-alter table contact_messages
-  drop constraint if exists contact_messages_from_type_check;
-alter table contact_messages
-  add constraint contact_messages_from_type_check
-  check (from_type in ('public', 'parent', 'partenaire', 'enseignant'));
-
-alter table contact_messages
-  add column if not exists sender_parent_id uuid references parents(id) on delete set null;
-alter table contact_messages
-  add column if not exists sender_teacher_id uuid references teachers(id) on delete set null;
-alter table contact_messages
-  add column if not exists sender_partenaire_id uuid references partenaires(id) on delete set null;
+-- Les colonnes d'origine (from_type + sender_parent_id + sender_teacher_id +
+-- sender_partenaire_id) sont créées par la migration commune
+-- 0040_contact_messages_origine.sql, exécutée APRÈS celle-ci et après les
+-- migrations partenaires : elle référence `teachers(id)` (créée ici) ET
+-- `partenaires(id)`.
 
 
 -- ============================================================================
--- Rappels d'intégration (hors SQL, à faire dans le code le matin) :
---   - app/lib/adminAuth.js  : ajouter { key: "enseignants", label: "Devis et
---       factures des enseignants" } au tableau PERMISSIONS.
---   - app/admin/admin-shell.js : ajouter l'onglet
---       { href: "/admin/enseignants", label: "Enseignants", perm: "enseignants" }.
---   - app/connexion/page.js + app/activer-compte/page.js : rediriger selon le
---       rôle (bureau → /admin, enseignant → /espace-enseignant, sinon
---       /espace-adherent). Voir app/lib/redirectionRole.js (fourni) et
---       docs/conception-espace-enseignants.md.
---   - app/confidentialite : mentionner le stockage des RIB — bucket privé,
---       URL signées de courte durée, accès bureau uniquement, ET suppression
---       automatique du fichier RIB dès le remboursement de la facture (D8).
---   - app/admin/messages : badge + filtre d'origine (from_type) — intégration
---       partagée, PAS faite dans cette livraison (seule l'écriture
---       from_type='enseignant' l'est).
+-- Rappels d'intégration (FAITS lors de l'intégration des 4 chantiers) :
+--   - app/lib/adminAuth.js       : permission "enseignants" ajoutée.
+--   - app/admin/admin-shell.js   : onglet /admin/enseignants ajouté.
+--   - app/connexion + activer-compte : redirection par rôle via
+--       GET /api/moi/espace (helper resoudreEspace, app/lib/redirectionRole.js).
+--   - app/confidentialite        : mention RIB (bucket privé + purge au
+--       remboursement) ajoutée, à relire par Thomas.
+--   - app/admin/messages         : badge + filtre d'origine (from_type) ajoutés.
 -- ============================================================================

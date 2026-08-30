@@ -1,4 +1,4 @@
--- ÉCHAFAUDAGE — espace partenaires. Numéro provisoire, À RENUMÉROTER.
+-- ESPACE PARTENAIRES — NON APPLIQUÉ. Série d'intégration des 4 chantiers.
 --
 -- Documents déposés par le BUREAU à destination d'un partenaire (contrats,
 -- conventions de partenariat, reçus...). Visibles dans l'espace du

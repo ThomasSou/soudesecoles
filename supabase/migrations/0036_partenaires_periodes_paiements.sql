@@ -1,4 +1,4 @@
--- ÉCHAFAUDAGE — espace partenaires. Numéro provisoire, À RENUMÉROTER.
+-- ESPACE PARTENAIRES — NON APPLIQUÉ. Série d'intégration des 4 chantiers.
 --
 -- Niveaux de partenariat (Or / Argent / Bronze) + période d'adhésion d'un
 -- partenaire + historique de ses paiements, saisis MANUELLEMENT par le

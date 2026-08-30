@@ -1,7 +1,8 @@
--- ÉCHAFAUDAGE — espace partenaires (travail de nuit, à relire avant application).
--- Numéro provisoire : À RENUMÉROTER (0033..0037) en une seule série continue
--- juste avant de l'exécuter dans l'éditeur SQL Supabase, si d'autres
--- migrations ont été ajoutées entre-temps.
+-- ESPACE PARTENAIRES — NON APPLIQUÉ (à relire avant application).
+-- Migration 0035 de la série d'intégration des 4 chantiers. Ordre : après
+-- 0034_espace_enseignants.sql, avant 0036..0039 (partenaires) puis
+-- 0040_contact_messages_origine.sql. À exécuter à la main dans l'éditeur SQL
+-- Supabase, puis vérifier par un `select` indépendant.
 --
 -- Objet de ce fichier : donner aux partenaires un VRAI compte de connexion
 -- (e-mail + mot de passe, même circuit d'invitation que les familles) et
