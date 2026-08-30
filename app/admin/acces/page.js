@@ -11,11 +11,19 @@ export default function AdminAccesPage() {
   );
 }
 
+// Une personne « a un accès » dès qu'elle est admin ou qu'au moins un droit
+// précis est coché. Sert au filtre « Avec / Sans accès » et à ses compteurs.
+function aUnAcces(m) {
+  return Boolean(m.isAdmin) || Object.values(m.permissions || {}).some(Boolean);
+}
+
 function GestionAcces({ token, moi }) {
   const [membres, setMembres] = useState([]);
   const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [recherche, setRecherche] = useState("");
+  // Filtre par état d'accès : "tous", "avec" ou "sans".
+  const [filtreAcces, setFiltreAcces] = useState("tous");
 
   const charger = useCallback(async () => {
     if (!token) return;
@@ -34,13 +42,21 @@ function GestionAcces({ token, moi }) {
 
   const visibles = useMemo(() => {
     const q = recherche.trim().toLowerCase();
-    if (!q) return membres;
-    return membres.filter((m) =>
-      `${m.firstName || ""} ${m.lastName || ""} ${m.email || ""}`
+    return membres.filter((m) => {
+      if (filtreAcces === "avec" && !aUnAcces(m)) return false;
+      if (filtreAcces === "sans" && aUnAcces(m)) return false;
+      if (!q) return true;
+      return `${m.firstName || ""} ${m.lastName || ""} ${m.email || ""}`
         .toLowerCase()
-        .includes(q)
-    );
-  }, [membres, recherche]);
+        .includes(q);
+    });
+  }, [membres, recherche, filtreAcces]);
+
+  // Compteurs affichés dans les onglets, calculés sur la liste complète.
+  const comptes = useMemo(() => {
+    const avec = membres.filter(aUnAcces).length;
+    return { tous: membres.length, avec, sans: membres.length - avec };
+  }, [membres]);
 
   if (loading) {
     return <p className="text-slate-500">Chargement...</p>;
@@ -58,8 +74,35 @@ function GestionAcces({ token, moi }) {
         placeholder="Rechercher un parent par nom ou e-mail..."
         value={recherche}
         onChange={(e) => setRecherche(e.target.value)}
-        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-6"
+        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-4"
       />
+
+      <div className="flex flex-wrap gap-1 mb-6">
+        {[
+          { cle: "tous", libelle: "Tous" },
+          { cle: "avec", libelle: "Avec accès" },
+          { cle: "sans", libelle: "Sans accès" },
+        ].map(({ cle, libelle }) => {
+          const actif = filtreAcces === cle;
+          return (
+            <button
+              key={cle}
+              onClick={() => setFiltreAcces(cle)}
+              className={`px-3 py-1.5 text-sm rounded-full border ${
+                actif
+                  ? "border-sou-blue bg-sou-blue text-white"
+                  : "border-slate-200 text-slate-600 hover:border-sou-blue"
+              }`}
+            >
+              {libelle}
+              <span className={actif ? "opacity-80" : "text-slate-400"}>
+                {" "}
+                ({comptes[cle]})
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
       <div className="space-y-3">
         {visibles.map((m) => (
@@ -73,7 +116,7 @@ function GestionAcces({ token, moi }) {
           />
         ))}
         {visibles.length === 0 && (
-          <p className="text-slate-400 italic">Aucun parent ne correspond à cette recherche.</p>
+          <p className="text-slate-400 italic">Aucun parent ne correspond à ces critères.</p>
         )}
       </div>
     </div>
