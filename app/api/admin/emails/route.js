@@ -85,9 +85,11 @@ function normaliserAdresses(adresses) {
 }
 
 function resumeSegment(segment) {
+  const horsServis = segment?.exclureDejaServis ? " — hors déjà destinataires" : "";
+
   if (segment?.scope === "liste") {
     const n = normaliserAdresses(segment.adresses).length;
-    return `Liste d'adresses (${n})`;
+    return `Liste d'adresses (${n})${horsServis}`;
   }
 
   const { scope, classes = [], niveaux = [], adherents = "tous" } = segment || {};
@@ -103,6 +105,7 @@ function resumeSegment(segment) {
   if (adherents === "adherents") parts.push("Adhérents à jour uniquement");
   if (adherents === "non_adherents") parts.push("Non-adhérents uniquement");
   if (inclutContacts(segment)) parts.push("+ contacts hors familles");
+  if (segment?.exclureDejaServis) parts.push("hors déjà destinataires");
   return parts.join(" — ");
 }
 
@@ -111,6 +114,21 @@ function resumeSegment(segment) {
 // pas d'adhésion, les inclure serait un contresens.
 function inclutContacts(segment) {
   return Boolean(segment?.inclureContacts) && segment?.adherents !== "adherents";
+}
+
+// Adresses (en minuscules) ayant déjà reçu un e-mail d'une campagne
+// précédente — pour l'option « ne pas renvoyer aux personnes déjà servies »,
+// utile quand on envoie une même communication en plusieurs vagues sur
+// plusieurs jours. On ne compte que les envois réussis (statut 'envoye') :
+// un échec précédent doit pouvoir être retenté.
+async function adressesDejaServies(admin) {
+  const { data, error } = await admin
+    .from("email_campaign_recipients")
+    .select("email")
+    .eq("statut", "envoye")
+    .limit(50000);
+  if (error) return new Set(); // table absente : on n'exclut personne
+  return new Set((data || []).map((r) => (r.email || "").toLowerCase()).filter(Boolean));
 }
 
 // Destinataires issus de la table email_contacts (personnes sans fiche
@@ -372,10 +390,19 @@ export async function POST(request) {
     }
   }
 
+  let exclusDejaServis = 0;
+  if (segment?.exclureDejaServis) {
+    const servies = await adressesDejaServies(auth.admin);
+    const avant = destinataires.length;
+    destinataires = destinataires.filter((d) => !servies.has((d.email || "").toLowerCase()));
+    exclusDejaServis = avant - destinataires.length;
+  }
+
   if (dryRun) {
     return NextResponse.json({
       destinataires,
       count: destinataires.length,
+      exclusDejaServis,
       mailConfigured: isMailConfigured(),
       canal: canalEnvoi(),
       segmentSummary: resumeSegment(segment),

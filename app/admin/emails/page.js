@@ -56,6 +56,10 @@ function EnvoiEmails({ token, parent }) {
   // Contacts légers (email_contacts) : adresses récoltées sans fiche famille.
   const [contactsCount, setContactsCount] = useState(0);
   const [inclureContacts, setInclureContacts] = useState(false);
+  // Ne pas renvoyer aux adresses déjà destinataires d'une campagne
+  // précédente (lit email_campaign_recipients). Utile pour envoyer une même
+  // communication en plusieurs jours sans jamais écrire deux fois à quelqu'un.
+  const [exclureDejaServis, setExclureDejaServis] = useState(false);
   const [subject, setSubject] = useState("");
   const [blocks, setBlocks] = useState(() => TEMPLATES[0].blocks());
   const [previewChoix, setPreviewChoix] = useState("generique-adherent");
@@ -173,7 +177,15 @@ function EnvoiEmails({ token, parent }) {
 
   function segment() {
     if (scope === "liste") {
-      return { scope: "liste", classes: [], niveaux: [], adherents: "tous", inclureContacts: false, adresses };
+      return {
+        scope: "liste",
+        classes: [],
+        niveaux: [],
+        adherents: "tous",
+        inclureContacts: false,
+        adresses,
+        exclureDejaServis,
+      };
     }
     return {
       scope,
@@ -181,6 +193,7 @@ function EnvoiEmails({ token, parent }) {
       niveaux: scope === "toute" ? [] : niveaux,
       adherents,
       inclureContacts,
+      exclureDejaServis,
     };
   }
 
@@ -387,6 +400,7 @@ function EnvoiEmails({ token, parent }) {
       setBlocks(TEMPLATES[0].blocks());
       setBenevolesEvenementId("");
       setInclureContacts(false);
+      setExclureDejaServis(false);
       setScope("toute");
       setAdresses("");
       setBrouillonId(null);
@@ -527,6 +541,7 @@ function EnvoiEmails({ token, parent }) {
         : ""
     );
     setInclureContacts(!!seg.inclureContacts);
+    setExclureDejaServis(!!seg.exclureDejaServis);
     setBrouillonId(c.status === "brouillon" ? c.id : null);
     setBrouillonMsg("");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -688,6 +703,23 @@ function EnvoiEmails({ token, parent }) {
           </label>
         )}
 
+        <label className="flex items-start gap-2 text-sm mb-4">
+          <input
+            type="checkbox"
+            checked={exclureDejaServis}
+            onChange={(e) => setExclureDejaServis(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span className="text-slate-600">
+            Ne pas renvoyer aux personnes déjà destinataires d&apos;une campagne
+            précédente{" "}
+            <span className="text-xs text-slate-400">
+              (utile pour étaler un même message sur plusieurs jours sans jamais
+              écrire deux fois à la même adresse)
+            </span>
+          </span>
+        </label>
+
         <button
           onClick={voirApercu}
           disabled={busyApercu}
@@ -704,6 +736,15 @@ function EnvoiEmails({ token, parent }) {
               {!apercu.mailConfigured &&
                 " — Envoi non configuré : l'envoi ne partira pas réellement pour l'instant."}
             </p>
+            {apercu.exclusDejaServis > 0 && (
+              <p className="text-xs">
+                {apercu.exclusDejaServis} adresse
+                {apercu.exclusDejaServis > 1 ? "s" : ""} retirée
+                {apercu.exclusDejaServis > 1 ? "s" : ""} : déjà destinataire
+                {apercu.exclusDejaServis > 1 ? "s" : ""} d&apos;une campagne
+                précédente.
+              </p>
+            )}
             {apercu.canal && (
               <p className="text-xs">
                 Canal d&apos;envoi : {CANAUX[apercu.canal] || apercu.canal}
