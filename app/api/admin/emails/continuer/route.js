@@ -10,10 +10,17 @@ export const dynamic = "force-dynamic";
 // requête /continuer ne se lance en parallèle sur la même campagne. Passé ce
 // délai sans écriture, on considère la vague précédente morte (fonction
 // coupée) et on reprend.
-// 90 s : très au-dessus de la durée maximale d'un seul envoi (Sender borné à
-// 8 s + SMTP borné à ~18 s, cf. app/lib/mail.js) — le verrou ne peut donc
-// pas expirer au milieu d'une vague et laisser un autre onglet ré-envoyer.
-const VERROU_MS = 90000;
+//
+// 20 s : c'est aussi le délai minimum entre deux vagues d'une MÊME boucle
+// d'envoi — la vague précédente vient d'écrire `updated_at`, donc la
+// suivante doit attendre que cette écriture ait 20 s pour reprendre la
+// main. 90 s bridait l'envoi à ~1 vague / 90 s (≈ 1,3 e-mail/min). Une
+// vague dure au pire ~13 s (planning borné 2,5 s + 2 envois à ~5 s), donc
+// 20 s laisse une marge suffisante : le verrou ne peut pas expirer au
+// milieu d'une vague. Le curseur `next_index` (écrit après CHAQUE e-mail)
+// limite de toute façon à un seul e-mail l'exposition si deux requêtes se
+// chevauchaient.
+const VERROU_MS = 20000;
 
 // Lecture légère de l'avancement d'une campagne : le front l'interroge en
 // boucle courte pour afficher une progression qui bouge même quand la boucle
