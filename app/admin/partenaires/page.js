@@ -147,11 +147,20 @@ function PartenairesListe({ accessToken }) {
   return (
     <div>
       <h1 className="text-2xl font-bold text-sou-blue mb-1">Partenaires</h1>
-      <p className="text-slate-500 text-sm mb-6">
+      <p className="text-slate-500 text-sm mb-4">
         Entreprises et commerçants partenaires du Sou des Écoles. Chaque fiche regroupe les
         coordonnées, la période de partenariat, l&apos;historique des versements (saisis à la main),
         les avantages offerts aux familles et leur utilisation, et les documents partagés.
       </p>
+
+      <div className="flex flex-wrap gap-3 mb-6 text-sm">
+        <Link href="/admin/partenaires/messages" className="text-sou-blue underline">
+          Messages « nouveautés » à modérer →
+        </Link>
+        <Link href="/admin/partenaires/niveaux" className="text-sou-blue underline">
+          Niveaux et quotas →
+        </Link>
+      </div>
 
       <div className="mb-6">
         <NouveauPartenaireForm

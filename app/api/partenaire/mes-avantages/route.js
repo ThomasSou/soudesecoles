@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { resolvePartenaireSession, tracerEvenementAvantage } from "../../../lib/partenaires";
+import {
+  resolvePartenaireSession,
+  tracerEvenementAvantage,
+  niveauActifPartenaire,
+} from "../../../lib/partenaires";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +27,30 @@ export async function POST(request) {
   const quantiteParFamille = Number(body?.quantiteParFamille ?? body?.limite) || 1;
   if (quantiteParFamille < 1) {
     return NextResponse.json({ error: "La quantité par famille doit être d'au moins 1." }, { status: 400 });
+  }
+
+  // Quota d'avantages actifs selon le niveau de la période active
+  // (null = illimité ; pas de période active = pas de limite ici, le
+  // partenaire garde la main sur ses avantages même hors période).
+  const { data: periodes } = await admin
+    .from("partenaire_periodes")
+    .select("*")
+    .eq("partenaire_id", partenaire.id);
+  const { config } = await niveauActifPartenaire(admin, periodes || []);
+  if (config?.quota_avantages != null) {
+    const { count } = await admin
+      .from("avantages")
+      .select("id", { count: "exact", head: true })
+      .eq("partenaire_id", partenaire.id)
+      .eq("active", true);
+    if ((count || 0) >= config.quota_avantages) {
+      return NextResponse.json(
+        {
+          error: `Votre niveau ${config.libelle} permet ${config.quota_avantages} avantage${config.quota_avantages > 1 ? "s" : ""} actif${config.quota_avantages > 1 ? "s" : ""}. Masquez-en un avant d'en ajouter.`,
+        },
+        { status: 409 }
+      );
+    }
   }
 
   const { data, error } = await admin

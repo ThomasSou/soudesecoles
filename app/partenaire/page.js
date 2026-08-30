@@ -21,6 +21,146 @@ function dateFr(iso) {
   if (!iso) return "";
   return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 }
+function fichierEnDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+const STATUT_MESSAGE = {
+  brouillon: "Brouillon",
+  soumis: "En attente de validation",
+  valide: "Validé",
+  refuse: "Refusé",
+  publie: "Publié",
+};
+
+// --- Messages « nouveautés » -----------------------------------------
+function MesMessagesNouveautes({ accessToken }) {
+  const [data, setData] = useState(null);
+  const [ouvert, setOuvert] = useState(false);
+  const [titre, setTitre] = useState("");
+  const [texte, setTexte] = useState("");
+  const [lien, setLien] = useState("");
+  const [image, setImage] = useState(null);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState("");
+
+  const recharger = useCallback(() => {
+    return fetch("/api/partenaire/messages", { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then((r) => r.json())
+      .then(setData)
+      .catch(() => {});
+  }, [accessToken]);
+
+  useEffect(() => {
+    recharger();
+  }, [recharger]);
+
+  async function soumettre(e) {
+    e.preventDefault();
+    setErreur("");
+    setEnvoi(true);
+    try {
+      const imageDataUrl = image ? await fichierEnDataUrl(image) : null;
+      const res = await fetch("/api/partenaire/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ type: "email", titre, texte, lien, imageDataUrl, soumettre: true }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Une erreur est survenue.");
+      setTitre(""); setTexte(""); setLien(""); setImage(null); setOuvert(false);
+      recharger();
+    } catch (err) {
+      setErreur(err.message);
+    } finally {
+      setEnvoi(false);
+    }
+  }
+
+  if (!data) return <p className="text-slate-500 text-sm">Chargement...</p>;
+
+  const q = data.quota || {};
+  const peutSoumettre = (q.restantEmail ?? 0) > 0;
+
+  return (
+    <div>
+      <p className="text-sm text-slate-500 mb-4">
+        Proposez une actualité (promo, nouveauté, événement) : après validation par le bureau, elle
+        paraîtra dans l&apos;e-mail mensuel « Les nouveautés de nos partenaires » envoyé aux familles.
+        {q.libelleNiveau
+          ? ` Niveau ${q.libelleNiveau} : ${q.quotaEmail} message(s) / mois — ${q.restantEmail} restant(s) pour ${q.moisCible}.`
+          : " Aucune période de partenariat active : soumission indisponible."}
+      </p>
+
+      {!ouvert ? (
+        <button
+          onClick={() => setOuvert(true)}
+          disabled={!peutSoumettre}
+          className="bg-sou-blue text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-sou-gold transition-colors disabled:opacity-50"
+        >
+          + Rédiger un message
+        </button>
+      ) : (
+        <form onSubmit={soumettre} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+          {erreur && <p className="text-sm text-red-600">{erreur}</p>}
+          <label className="block text-sm">
+            <span className="text-xs font-semibold text-slate-500">Titre</span>
+            <input required value={titre} onChange={(e) => setTitre(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </label>
+          <label className="block text-sm">
+            <span className="text-xs font-semibold text-slate-500">Texte</span>
+            <textarea required rows={4} value={texte} onChange={(e) => setTexte(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </label>
+          <label className="block text-sm">
+            <span className="text-xs font-semibold text-slate-500">Lien (facultatif)</span>
+            <input value={lien} onChange={(e) => setLien(e.target.value)} placeholder="https://..."
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </label>
+          <label className="block text-sm">
+            <span className="text-xs font-semibold text-slate-500">Image (facultatif, 10 Mo max)</span>
+            <input type="file" accept="image/*" onChange={(e) => setImage(e.target.files?.[0] || null)}
+              className="block w-full text-sm" />
+          </label>
+          <div className="flex gap-2">
+            <button type="submit" disabled={envoi}
+              className="bg-sou-blue text-white text-sm font-semibold px-4 py-2 rounded-full disabled:opacity-50">
+              {envoi ? "Envoi..." : "Soumettre au bureau"}
+            </button>
+            <button type="button" onClick={() => setOuvert(false)} className="text-sm text-slate-500 px-4 py-2">
+              Annuler
+            </button>
+          </div>
+        </form>
+      )}
+
+      {data.messages?.length > 0 && (
+        <ul className="divide-y divide-slate-100 mt-4">
+          {data.messages.map((m) => (
+            <li key={m.id} className="py-2 text-sm">
+              <div className="flex justify-between gap-3">
+                <span className="text-slate-700">{m.titre}</span>
+                <span className="text-xs text-slate-500 whitespace-nowrap">
+                  {STATUT_MESSAGE[m.statut] || m.statut}
+                  {m.mois_cible ? ` · ${m.mois_cible}` : ""}
+                </span>
+              </div>
+              {m.statut === "refuse" && m.motif_refus && (
+                <p className="text-xs text-red-600">Motif : {m.motif_refus}</p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 // --- Avantages : création + édition par le partenaire lui-même --------
 function NouvelAvantage({ accessToken, onCree }) {
@@ -322,12 +462,16 @@ export default function PartenairePage() {
           {aJour ? (
             <p className="text-green-700 font-medium text-sm">
               ✓ Partenariat à jour
+              {data.niveauLibelle ? ` — niveau ${data.niveauLibelle}` : ""}
               {periodeCourante ? ` (jusqu'au ${dateFr(periodeCourante.fin)})` : ""}
             </p>
           ) : (
             <p className="text-slate-600 text-sm">
               Aucune période de partenariat en cours. Contactez le bureau pour la renouveler.
             </p>
+          )}
+          {data.niveauContreparties && (
+            <p className="text-xs text-slate-500 mt-2">{data.niveauContreparties}</p>
           )}
         </div>
 
@@ -419,6 +563,11 @@ export default function PartenairePage() {
               ))}
             </ul>
           )}
+        </div>
+
+        <div className="border border-slate-200 rounded-xl p-6">
+          <h2 className="font-semibold text-sou-blue mb-1">Mes messages « nouveautés »</h2>
+          <MesMessagesNouveautes accessToken={accessToken} />
         </div>
 
         <div className="border border-slate-200 rounded-xl p-6">

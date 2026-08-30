@@ -42,6 +42,41 @@ export function statutPeriodePartenaire(periodes) {
   return { aJour: Boolean(courante), periodeCourante: courante || null };
 }
 
+// Mois courant au format 'AAAA-MM' (mois cible par défaut d'un message
+// "nouveautés" de type e-mail).
+export function moisCourant() {
+  return new Date().toISOString().slice(0, 7);
+}
+
+// Niveau applicable à un partenaire = celui de sa période active (figé sur la
+// période). Renvoie la ligne `niveaux_partenaire` correspondante (quotas
+// compris) ou null si aucune période active / aucun niveau posé.
+export async function niveauActifPartenaire(admin, periodes) {
+  const { periodeCourante } = statutPeriodePartenaire(periodes);
+  if (!periodeCourante?.niveau) return { niveau: null, config: null, periodeCourante: periodeCourante || null };
+
+  const { data: config } = await admin
+    .from("niveaux_partenaire")
+    .select("*")
+    .eq("niveau", periodeCourante.niveau)
+    .maybeSingle();
+
+  return { niveau: periodeCourante.niveau, config: config || null, periodeCourante };
+}
+
+// Nombre de messages "nouveautés" déjà déposés par un partenaire pour un mois
+// donné (les brouillons et les refusés ne comptent pas dans le quota).
+export async function compterMessagesMois(admin, partenaireId, type, moisCible) {
+  const { count } = await admin
+    .from("partenaire_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("partenaire_id", partenaireId)
+    .eq("type", type)
+    .eq("mois_cible", moisCible)
+    .in("statut", ["soumis", "valide", "publie"]);
+  return count || 0;
+}
+
 // --- Historique des offres d'avantages --------------------------------
 // Best-effort : on n'échoue jamais l'action de l'utilisateur si l'écriture
 // de l'historique rate.

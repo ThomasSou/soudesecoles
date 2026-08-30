@@ -29,6 +29,8 @@ const MOYENS = {
   autre: "Autre",
 };
 
+const NIVEAUX_LABEL = { or: "Or", argent: "Argent", bronze: "Bronze" };
+
 // --- Section : coordonnées + compte -----------------------------------
 function SectionCoordonnees({ accessToken, partenaire, onMaj }) {
   const [form, setForm] = useState(() => ({
@@ -213,7 +215,7 @@ function SectionPeriodes({ accessToken, partenaireId, periodes, onRecharger }) {
             <li key={p.id} className="py-2 flex flex-wrap justify-between gap-2 text-sm">
               <span className={p.annulee ? "line-through text-slate-400" : "text-slate-700"}>
                 {dateFr(p.debut)} → {dateFr(p.fin)}
-                {p.niveau ? ` · ${p.niveau}` : ""}
+                {p.niveau ? ` · ${NIVEAUX_LABEL[p.niveau] || p.niveau}` : ""}
                 {p.montant_annonce_cents != null ? ` · ${euros(p.montant_annonce_cents)} annoncés` : ""}
                 {p.note ? ` · ${p.note}` : ""}
               </span>
@@ -243,9 +245,14 @@ function SectionPeriodes({ accessToken, partenaireId, periodes, onRecharger }) {
             className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
         </label>
         <label className="text-sm">
-          <span className="text-xs font-semibold text-slate-500">Niveau (facultatif)</span>
-          <input value={niveau} onChange={(e) => setNiveau(e.target.value)} placeholder="Gold / Silver / Bronze"
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <span className="text-xs font-semibold text-slate-500">Niveau (figé sur la période)</span>
+          <select value={niveau} onChange={(e) => setNiveau(e.target.value)}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <option value="">— aucun —</option>
+            <option value="or">Or</option>
+            <option value="argent">Argent</option>
+            <option value="bronze">Bronze</option>
+          </select>
         </label>
         <label className="text-sm">
           <span className="text-xs font-semibold text-slate-500">Montant annoncé € (facultatif)</span>

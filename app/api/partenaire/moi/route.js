@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { resolvePartenaireSession, statutPeriodePartenaire } from "../../../lib/partenaires";
+import {
+  resolvePartenaireSession,
+  statutPeriodePartenaire,
+  niveauActifPartenaire,
+} from "../../../lib/partenaires";
 
 export const dynamic = "force-dynamic";
 
@@ -33,9 +37,14 @@ export async function GET(request) {
   }
 
   const { aJour, periodeCourante } = statutPeriodePartenaire(periodes || []);
+  const { niveau, config: niveauConfig } = await niveauActifPartenaire(admin, periodes || []);
 
   return NextResponse.json({
     ok: true,
+    niveau,
+    niveauLibelle: niveauConfig?.libelle || null,
+    niveauContreparties: niveauConfig?.contreparties || null,
+    quotaAvantages: niveauConfig?.quota_avantages ?? null,
     partenaire: {
       id: partenaire.id,
       nom: partenaire.nom,

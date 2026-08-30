@@ -4,8 +4,11 @@ import { requirePermission } from "../../../../../lib/adminAuth";
 export const dynamic = "force-dynamic";
 
 const PERM = "avantages";
+const NIVEAUX = ["or", "argent", "bronze"];
 
 // POST : ajoute une période d'adhésion / de partenariat à un partenaire.
+// Dates 100 % libres (aucun calage sur l'année scolaire). Le niveau est
+// figé sur la période (liste fermée Or / Argent / Bronze).
 // La liste est renvoyée par GET /api/admin/partenaires/[id].
 export async function POST(request, { params }) {
   const auth = await requirePermission(request, PERM);
@@ -21,12 +24,17 @@ export async function POST(request, { params }) {
     return NextResponse.json({ error: "La date de fin doit suivre la date de début." }, { status: 400 });
   }
 
+  const niveau = body?.niveau?.trim() || null;
+  if (niveau && !NIVEAUX.includes(niveau)) {
+    return NextResponse.json({ error: "Niveau inconnu (Or, Argent ou Bronze)." }, { status: 400 });
+  }
+
   const montant = body?.montantAnnonceEuros;
   const insert = {
     partenaire_id: params.id,
     debut,
     fin,
-    niveau: body?.niveau?.trim() || null,
+    niveau,
     montant_annonce_cents:
       montant === undefined || montant === null || montant === ""
         ? null
