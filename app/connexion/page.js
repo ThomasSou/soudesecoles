@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "../lib/supabaseClient";
+import { espaceApresConnexion } from "../lib/espaceClient";
 
 export default function ConnexionPage() {
   const router = useRouter();
@@ -19,7 +20,7 @@ export default function ConnexionPage() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -30,7 +31,9 @@ export default function ConnexionPage() {
       return;
     }
 
-    router.push("/espace-adherent");
+    // Aiguillage selon le rôle : bureau > enseignant > partenaire > parent.
+    // En cas de pépin, on retombe sur l'espace famille.
+    router.push(await espaceApresConnexion(data?.session?.access_token));
   }
 
   return (

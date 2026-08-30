@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "../lib/supabaseClient";
+import { espaceApresConnexion } from "../lib/espaceClient";
 
 export default function ActiverComptePage() {
   return (
@@ -16,10 +17,12 @@ function ActiverCompteForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const jeton = searchParams.get("jeton");
-  // Espace cible après activation. Sert aux comptes partenaires (invitation
-  // avec ?espace=partenaire). Défaut : espace famille, comportement inchangé.
+  // Après activation, on appelle /api/moi/espace pour aiguiller selon le rôle
+  // (bureau > enseignant > partenaire > parent). Le paramètre ?espace= de
+  // l'invitation ne sert plus que de repli si cette route échoue : une
+  // invitation partenaire retombe alors sur /partenaire, sinon /espace-adherent.
   const espace = searchParams.get("espace");
-  const destinationApresActivation =
+  const repliApresActivation =
     espace === "partenaire" ? "/partenaire" : "/espace-adherent";
 
   const [status, setStatus] = useState("chargement"); // chargement | pret | erreur
@@ -125,13 +128,19 @@ function ActiverCompteForm() {
         if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
 
         const supabase = createClient();
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: data.email,
-          password,
-        });
+        const { data: signInData, error: signInError } =
+          await supabase.auth.signInWithPassword({
+            email: data.email,
+            password,
+          });
         if (signInError) throw signInError;
 
-        router.push(destinationApresActivation);
+        router.push(
+          await espaceApresConnexion(
+            signInData?.session?.access_token,
+            repliApresActivation
+          )
+        );
       } catch (err) {
         setFormError(err.message);
       } finally {
@@ -142,14 +151,20 @@ function ActiverCompteForm() {
 
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({ password });
-    setSaving(false);
 
     if (error) {
+      setSaving(false);
       setFormError("Erreur : " + error.message);
       return;
     }
 
-    router.push("/espace-adherent");
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    setSaving(false);
+    router.push(
+      await espaceApresConnexion(session?.access_token, repliApresActivation)
+    );
   }
 
   if (status === "chargement") {
