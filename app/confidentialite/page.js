@@ -33,8 +33,9 @@ export default function ConfidentialitePage() {
 
         <Section titre="Qui est responsable de vos données">
           <p>
-            Le Sou des Écoles Laïques de Montmerle-Lurcy, association loi 1901, siège en mairie de
-            Montmerle-sur-Saône. Pour toute question relative à vos données :{" "}
+            Le Sou des Écoles Laïques de Montmerle-Lurcy, association loi 1901, a son siège social
+            au 1 parvis des enfants d&apos;Izieu, 01090 Montmerle-sur-Saône. Pour toute question
+            relative à vos données :{" "}
             <a href="mailto:contact@sou-montmerle.fr" className="text-sou-blue underline">
               contact@sou-montmerle.fr
             </a>
