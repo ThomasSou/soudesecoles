@@ -48,6 +48,14 @@ export async function sendMail({ to, subject, text, html, replyTo, headers }) {
       await envoyerEmailTransactionnel({ to, subject, text, html, replyTo, headers });
       return { sent: true, via: "sender" };
     } catch (error) {
+      // Cas particulier : l'appel a expiré avant la réponse de Sender, mais
+      // Sender a déjà pris le message en file (cf. senderMail.js). On compte
+      // l'e-mail comme parti par Sender et on NE bascule PAS sur le SMTP :
+      // sinon le destinataire recevrait deux fois le même message.
+      if (error?.senderProbablementEnFile) {
+        console.warn("Sender lent à répondre : message considéré en file, pas de repli SMTP.");
+        return { sent: true, via: "sender" };
+      }
       console.error("Envoi e-mail impossible (Sender) :", error?.message);
       // Sender est configuré mais a refusé l'envoi (compte gelé ou en cours de
       // validation, quota atteint, clé invalide...). Plutôt que d'abandonner,

@@ -19,12 +19,17 @@ export function isSenderConfigured() {
 // donné par Sender quand il est présent dans la réponse (utile pour
 // recouper les évènements de webhook), sinon null : le recoupement se fait
 // alors par adresse e-mail (cf. app/api/emails/sender-webhook).
-// Délai maximum pour un appel à l'API Sender. La fonction serveur (Netlify)
-// a elle-même un plafond d'exécution : si Sender ne répond pas, mieux vaut
-// échouer nettement ici — ce qui laisse jouer le repli SMTP (cf. mail.js) —
-// que de laisser la requête pendre jusqu'à ce que Netlify coupe tout et
-// renvoie une page d'erreur.
-const SENDER_TIMEOUT_MS = 8000;
+//
+// Délai maximum d'attente de la RÉPONSE de l'API Sender. Important : l'API
+// Sender met le message en file dès qu'elle a reçu le corps de la requête
+// (quelques dizaines de ms), mais elle peut mettre plusieurs secondes à
+// renvoyer sa réponse HTTP. Passé ce délai on cesse d'attendre — mais le
+// message est déjà pris en charge. C'est pourquoi, sur ce dépassement
+// (AbortError), il ne faut PAS déclencher le repli SMTP : sinon le
+// destinataire reçoit deux fois le même e-mail (une copie Sender + une
+// copie SMTP). Cf. le drapeau `senderProbablementEnFile` ci-dessous et son
+// traitement dans mail.js.
+const SENDER_TIMEOUT_MS = 4000;
 
 export async function envoyerEmailTransactionnel({ to, toName, subject, html, text, replyTo, headers }) {
   const entetes = { ...(headers || {}) };
@@ -57,7 +62,14 @@ export async function envoyerEmailTransactionnel({ to, toName, subject, html, te
     });
   } catch (error) {
     if (error?.name === "AbortError") {
-      throw new Error(`Sender n'a pas répondu en ${SENDER_TIMEOUT_MS / 1000} s.`);
+      // Pas de réponse dans le délai : le message est presque certainement
+      // déjà en file chez Sender. On le signale par un drapeau pour que
+      // mail.js compte l'e-mail comme parti (via Sender) SANS repli SMTP.
+      const enFile = new Error(
+        `Sender n'a pas répondu en ${SENDER_TIMEOUT_MS / 1000} s — message probablement mis en file.`
+      );
+      enFile.senderProbablementEnFile = true;
+      throw enFile;
     }
     throw error;
   } finally {
