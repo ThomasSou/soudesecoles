@@ -609,6 +609,16 @@ export default function EspaceAdherentPage() {
   const anneeEnCours = currentSchoolYear();
   const adhesionEnCours = findCurrentMembership(memberships);
   const isAdherent = isMembershipValid(adhesionEnCours);
+  // Historique des adhésions : on masque les lignes d'années révolues qui
+  // n'ont jamais reçu de `paid_at`. L'état réel des cotisations des années
+  // passées n'a jamais été importé en base : une telle ligne ne veut pas
+  // dire « paiement en attente », seulement « statut inconnu » — sans
+  // intérêt pour la famille et trompeur. On garde en revanche toute
+  // cotisation payée (historique légitime) et l'année en cours même
+  // impayée (cas d'un paiement en ligne encore en cours de confirmation).
+  const adhesionsAffichees = memberships.filter(
+    (m) => m.paid_at || m.school_year === anneeEnCours
+  );
   const purchasesTotal = purchases.reduce(
     (sum, p) => sum + (p.amount != null ? Number(p.amount) : 0),
     0
@@ -670,13 +680,13 @@ export default function EspaceAdherentPage() {
                 />
               </div>
             )}
-            {memberships.length > 0 && (
+            {adhesionsAffichees.length > 0 && (
               <div className="mt-5 pt-4 border-t border-slate-100">
                 <p className="text-sm font-medium text-slate-600 mb-2">
                   Historique des adhésions
                 </p>
                 <ul className="divide-y divide-slate-100">
-                  {memberships.map((m) => (
+                  {adhesionsAffichees.map((m) => (
                     <li key={m.id} className="py-2 flex justify-between text-sm">
                       <span className="text-slate-700">
                         {m.school_year}
