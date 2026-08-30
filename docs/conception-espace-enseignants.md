@@ -532,12 +532,18 @@ Dispositions prises dans le code :
   (« un RIB avait été fourni ») + la date de suppression. Un RIB réutilisable
   (`teacher_ribs`) n'est purgé qu'au dernier remboursement qui l'utilise.
 
-**À faire (I5)** : ajouter sur `/confidentialite` une mention du type —
-« Les enseignants et les prestataires peuvent déposer un relevé d'identité
-bancaire (RIB) pour être remboursés de frais engagés pour l'association. Ce
-document est stocké de façon privée, n'est accessible qu'aux membres du bureau
-habilités, et est **supprimé automatiquement dès que le remboursement
-correspondant a été effectué**. »
+**Fait (I5)** : mention ajoutée sur `/confidentialite` (bloc « Espaces
+partenaires et enseignants ») —
+« Les enseignants peuvent déposer, pour obtenir un remboursement, les factures
+de prestations engagées pour l'association ainsi que le relevé d'identité
+bancaire (RIB) du bénéficiaire du paiement — le leur, ou celui d'un prestataire
+à régler. Le RIB est stocké de façon privée, accessible aux seuls membres du
+bureau habilités, et supprimé automatiquement dès que le remboursement
+correspondant est effectué. Les prestataires n'ont pas d'accès au site. »
+
+Précision : **les prestataires n'ont pas de compte sur le site**. C'est
+l'enseignant qui dépose la facture du prestataire ET le RIB du bénéficiaire
+(le sien, ou celui du prestataire à régler).
 
 ---
 

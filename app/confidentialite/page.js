@@ -112,12 +112,12 @@ export default function ConfidentialitePage() {
             des tiers.
           </p>
           <p>
-            Les enseignants et les prestataires peuvent déposer un relevé d&apos;identité bancaire
-            (RIB) pour être remboursés de frais engagés pour l&apos;association. Ce document est
-            stocké de façon privée, n&apos;est accessible qu&apos;aux membres du bureau habilités, et
-            est <strong>supprimé automatiquement dès que le remboursement correspondant a été
-            effectué</strong>. Aucune coordonnée bancaire n&apos;est saisie ni conservée en clair :
-            seul le fichier déposé l&apos;est, puis il est effacé.
+            Les enseignants peuvent déposer, pour obtenir un remboursement, les factures de
+            prestations engagées pour l&apos;association ainsi que le relevé d&apos;identité bancaire
+            (RIB) du bénéficiaire du paiement — le leur, ou celui d&apos;un prestataire à régler. Le
+            RIB est stocké de façon privée, accessible aux seuls membres du bureau habilités, et
+            supprimé automatiquement dès que le remboursement correspondant est effectué. Les
+            prestataires n&apos;ont pas d&apos;accès au site.
           </p>
         </Section>
 
@@ -144,8 +144,9 @@ export default function ConfidentialitePage() {
             <li>Journal d&apos;envoi des campagnes e-mail (adresse, état de remise, canal) : 12 mois.</li>
             {/* TEXTE LÉGAL — à valider par Thomas */}
             <li>
-              RIB des enseignants et prestataires : supprimé dès le remboursement effectué (seule
-              subsiste la trace qu&apos;un RIB avait été fourni).
+              RIB déposé par un enseignant (le sien ou celui d&apos;un prestataire à régler) :
+              supprimé dès le remboursement effectué (seule subsiste la trace qu&apos;un RIB avait
+              été fourni).
             </li>
           </ul>
         </Section>
