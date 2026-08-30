@@ -303,9 +303,12 @@ function partenairesHtml() {
 // cf. table email_contacts). Sans identifiant (aperçu générique), on pointe
 // vers la page de contact plutôt que de risquer une désinscription à
 // l'aveugle.
-function lienDesabonnement(recipient) {
-  if (recipient?.parentId) return `${SITE_URL}/api/emails/desabonner?p=${recipient.parentId}`;
-  if (recipient?.contactId) return `${SITE_URL}/api/emails/desabonner?c=${recipient.contactId}`;
+function lienDesabonnement(recipient, campaignId) {
+  // `camp` (id de campagne) sert seulement à incrémenter un compteur de
+  // désinscriptions par campagne — jamais à identifier la personne.
+  const camp = campaignId ? `&camp=${campaignId}` : "";
+  if (recipient?.parentId) return `${SITE_URL}/api/emails/desabonner?p=${recipient.parentId}${camp}`;
+  if (recipient?.contactId) return `${SITE_URL}/api/emails/desabonner?c=${recipient.contactId}${camp}`;
   return `${SITE_URL}/contact`;
 }
 
@@ -315,9 +318,9 @@ function lienDesabonnement(recipient) {
 // en nombre. Nécessite un identifiant de destinataire (parent ou contact) :
 // sans lui (aperçu générique), on ne renvoie aucun en-tête plutôt que de
 // risquer une désinscription à l'aveugle.
-export function entetesDesinscription(recipient, { contactEmail } = {}) {
+export function entetesDesinscription(recipient, { contactEmail, campaignId } = {}) {
   if (!recipient || (!recipient.parentId && !recipient.contactId)) return {};
-  const cibles = [`<${lienDesabonnement(recipient)}>`];
+  const cibles = [`<${lienDesabonnement(recipient, campaignId)}>`];
   if (contactEmail) cibles.push(`<mailto:${contactEmail}?subject=desinscription>`);
   return {
     "List-Unsubscribe": cibles.join(", "),
@@ -326,20 +329,23 @@ export function entetesDesinscription(recipient, { contactEmail } = {}) {
 }
 
 // Lien de désinscription (obligatoire pour un envoi de masse).
-function desabonnementHtml(recipient) {
-  return `<a href="${lienDesabonnement(recipient)}" style="color:#94a3b8;text-decoration:underline;">Se désinscrire de ces e-mails</a>`;
+function desabonnementHtml(recipient, campaignId) {
+  return `<a href="${lienDesabonnement(recipient, campaignId)}" style="color:#94a3b8;text-decoration:underline;">Se désinscrire de ces e-mails</a>`;
 }
 
 // HTML complet, prêt à envoyer (table-based, styles en ligne pour la
 // compatibilité avec les clients mail), personnalisé pour un destinataire
 // donné (champs de fusion + statut d'adhésion).
-// Pixel de mesure d'ouverture. On n'y met que l'objet de l'envoi : il permet
-// de distinguer les campagnes entre elles, sans jamais identifier le lecteur.
+// Pixel de mesure d'ouverture. Keyé sur l'id de campagne quand il est connu
+// (compteur opens_count par campagne), sinon sur l'objet (compteur global de
+// /admin/statistiques). Dans les deux cas : JAMAIS d'identifiant du lecteur.
 // Rappel : beaucoup de messageries bloquent les images, le compteur est donc
 // un minimum et non un chiffre exact.
-function mesureOuvertureHtml(subject) {
-  const envoi = encodeURIComponent((subject || "Sans objet").slice(0, 120));
-  return `<img src="${SITE_URL}/api/emails/pixel?e=${envoi}" alt="" width="1" height="1" style="display:block;width:1px;height:1px;border:0;" />`;
+function mesureOuvertureHtml({ subject, campaignId } = {}) {
+  const param = campaignId
+    ? `c=${encodeURIComponent(campaignId)}`
+    : `e=${encodeURIComponent((subject || "Sans objet").slice(0, 120))}`;
+  return `<img src="${SITE_URL}/api/emails/pixel?${param}" alt="" width="1" height="1" style="display:block;width:1px;height:1px;border:0;" />`;
 }
 
 // Formate une plage horaire de créneau : "sam. 4 sept., 09:00 – 12:00".
@@ -466,7 +472,7 @@ export function planningCreneauxTexte(planning) {
   return `Créneaux bénévoles${planning.nom ? ` — ${planning.nom}` : ""}\n(Places disponibles au moment de l'envoi. Inscription à jour : ${SITE_URL}/benevoles)\n\n${corps}\n\nS'inscrire : ${SITE_URL}/benevoles`;
 }
 
-export function renderBlocksToHtml(blocks, { subject, recipient, planning } = {}) {
+export function renderBlocksToHtml(blocks, { subject, recipient, planning, campaignId } = {}) {
   const dest = { ...DEFAULT_RECIPIENT, ...(recipient || {}) };
   const body = (blocks || []).map((b) => blockToHtml(b, dest)).join("\n");
   const planningHtml = planningCreneauxHtml(planning);
@@ -507,20 +513,20 @@ export function renderBlocksToHtml(blocks, { subject, recipient, planning } = {}
                   Vous recevez cet e-mail en tant qu'adhérent ou contact du Sou des Écoles Laïques Montmerle-Lurcy.
                   Pour toute question, répondez directement à cet e-mail.
                 </p>
-                <p style="margin:0;font-size:12px;">${desabonnementHtml(dest)}</p>
+                <p style="margin:0;font-size:12px;">${desabonnementHtml(dest, campaignId)}</p>
               </td>
             </tr>
           </table>
         </td>
       </tr>
     </table>
-    ${mesureOuvertureHtml(subject)}
+    ${mesureOuvertureHtml({ subject, campaignId })}
   </body>
 </html>`;
 }
 
 // Version texte simple (fallback pour les clients mail sans HTML).
-export function renderBlocksToText(blocks, { recipient, planning } = {}) {
+export function renderBlocksToText(blocks, { recipient, planning, campaignId } = {}) {
   const dest = { ...DEFAULT_RECIPIENT, ...(recipient || {}) };
   const statut = dest.adherent
     ? "Adhésion en cours."
@@ -542,7 +548,7 @@ export function renderBlocksToText(blocks, { recipient, planning } = {}) {
     .filter(Boolean)
     .join("\n\n");
 
-  const desabo = lienDesabonnement(dest);
+  const desabo = lienDesabonnement(dest, campaignId);
 
   const planningTxt = planningCreneauxTexte(planning);
 

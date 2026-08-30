@@ -89,6 +89,9 @@ function EnvoiEmails({ token, parent }) {
   const [busyBrouillon, setBusyBrouillon] = useState(false);
   const [brouillonMsg, setBrouillonMsg] = useState("");
 
+  // Détail par destinataire d'une campagne de l'historique, replié par défaut.
+  const [detailCampagne, setDetailCampagne] = useState(null);
+
   const charger = useCallback(async () => {
     if (!token) return;
     const [res, resContacts] = await Promise.all([
@@ -465,6 +468,28 @@ function EnvoiEmails({ token, parent }) {
       setBrouillonMsg("Impossible de joindre le serveur.");
     } finally {
       setBusyBrouillon(false);
+    }
+  }
+
+  async function voirDestinataires(id) {
+    if (detailCampagne?.id === id) {
+      setDetailCampagne(null);
+      return;
+    }
+    setDetailCampagne({ id, loading: true, destinataires: [] });
+    try {
+      const res = await fetch(`/api/admin/emails/destinataires?id=${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json().catch(() => ({}));
+      setDetailCampagne({
+        id,
+        loading: false,
+        destinataires: d.destinataires || [],
+        indisponible: !!d.indisponible,
+      });
+    } catch {
+      setDetailCampagne({ id, loading: false, destinataires: [], erreur: true });
     }
   }
 
@@ -958,7 +983,8 @@ function EnvoiEmails({ token, parent }) {
         ) : (
           <div className="space-y-3">
             {campagnes.map((c) => (
-              <div key={c.id} className="border border-slate-200 rounded-xl p-4 text-sm flex items-start justify-between gap-3">
+              <div key={c.id} className="border border-slate-200 rounded-xl p-4 text-sm">
+               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold text-sou-blue">
                     {c.subject || "(sans sujet)"}
@@ -986,11 +1012,35 @@ function EnvoiEmails({ token, parent }) {
                       {c.segment.canaux.sender || 0} via Sender, {c.segment.canaux.smtp || 0} via SMTP
                     </p>
                   )}
+                  {c.status === "termine" && c.sent_count > 0 && (
+                    <p className="text-slate-400 text-xs">
+                      {typeof c.opens_count === "number" && (
+                        <>
+                          Ouvertures : {c.opens_count} (
+                          {Math.round((c.opens_count / c.sent_count) * 100)}%){" — minimum, images souvent bloquées"}
+                        </>
+                      )}
+                      {c.unsub_count ? ` · ${c.unsub_count} désinscription${c.unsub_count > 1 ? "s" : ""}` : ""}
+                    </p>
+                  )}
                   <p className="text-slate-400 text-xs mt-1">
                     {new Date(c.created_at).toLocaleString("fr-FR")}
                     {c.updated_at &&
                       c.status === "en_cours" &&
                       ` · maj ${new Date(c.updated_at).toLocaleTimeString("fr-FR")}`}
+                    {(c.status === "termine" || c.status === "en_cours") && (
+                      <>
+                        {" · "}
+                        <button
+                          onClick={() => voirDestinataires(c.id)}
+                          className="text-sou-blue hover:text-sou-gold underline"
+                        >
+                          {detailCampagne?.id === c.id
+                            ? "masquer les destinataires"
+                            : "voir les destinataires"}
+                        </button>
+                      </>
+                    )}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1.5 whitespace-nowrap">
@@ -1025,6 +1075,63 @@ function EnvoiEmails({ token, parent }) {
                     </button>
                   )}
                 </div>
+               </div>
+
+               {detailCampagne?.id === c.id && (
+                 <div className="mt-3 border-t border-slate-100 pt-3">
+                   {detailCampagne.loading ? (
+                     <p className="text-slate-400 text-xs">Chargement…</p>
+                   ) : detailCampagne.indisponible ? (
+                     <p className="text-slate-400 text-xs">
+                       Détail par destinataire indisponible pour cette campagne (migration de suivi
+                       pas encore appliquée, ou campagne antérieure).
+                     </p>
+                   ) : detailCampagne.destinataires.length === 0 ? (
+                     <p className="text-slate-400 text-xs">Aucun destinataire enregistré.</p>
+                   ) : (
+                     <div className="overflow-x-auto">
+                       <table className="w-full text-xs">
+                         <thead>
+                           <tr className="text-slate-400 text-left">
+                             <th className="py-1 pr-3 font-medium">Adresse</th>
+                             <th className="py-1 pr-3 font-medium">Statut</th>
+                             <th className="py-1 pr-3 font-medium">Canal</th>
+                             <th className="py-1 font-medium">Heure</th>
+                           </tr>
+                         </thead>
+                         <tbody>
+                           {detailCampagne.destinataires.map((d, i) => (
+                             <tr key={i} className="border-t border-slate-100">
+                               <td className="py-1 pr-3 text-slate-600">{d.email}</td>
+                               <td className="py-1 pr-3">
+                                 <span
+                                   className={
+                                     d.statut === "envoye"
+                                       ? "text-green-700"
+                                       : d.statut === "echec"
+                                       ? "text-red-600"
+                                       : "text-slate-400"
+                                   }
+                                 >
+                                   {d.statut === "envoye"
+                                     ? "envoyé"
+                                     : d.statut === "echec"
+                                     ? "échec"
+                                     : "ignoré"}
+                                 </span>
+                               </td>
+                               <td className="py-1 pr-3 text-slate-500">{d.canal || "—"}</td>
+                               <td className="py-1 text-slate-400">
+                                 {d.envoye_le ? new Date(d.envoye_le).toLocaleTimeString("fr-FR") : "—"}
+                               </td>
+                             </tr>
+                           ))}
+                         </tbody>
+                       </table>
+                     </div>
+                   )}
+                 </div>
+               )}
               </div>
             ))}
           </div>

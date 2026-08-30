@@ -54,20 +54,43 @@ export async function envoyerVague(admin, campagne) {
   for (let i = index; i < fin; i += 1) {
     const dest = tous[i];
     if (i > index) await attendre(PAUSE_ENTRE_ENVOIS_MS);
+
+    let statut = "ignore";
+    let canal = null;
     if (dest && dest.email) {
       const res = await sendMail({
         to: dest.email,
         subject,
-        text: renderBlocksToText(blocks, { recipient: dest, planning }),
-        html: renderBlocksToHtml(blocks, { subject, recipient: dest, planning }),
+        text: renderBlocksToText(blocks, { recipient: dest, planning, campaignId: campagne.id }),
+        html: renderBlocksToHtml(blocks, { subject, recipient: dest, planning, campaignId: campagne.id }),
         replyTo: CONTACT_EMAIL,
-        headers: entetesDesinscription(dest, { contactEmail: CONTACT_EMAIL }),
+        headers: entetesDesinscription(dest, { contactEmail: CONTACT_EMAIL, campaignId: campagne.id }),
       });
       if (res.sent) {
         sentCount += 1;
-        if (res.via === "sender" || res.via === "smtp") canaux[res.via] += 1;
+        statut = "envoye";
+        if (res.via === "sender" || res.via === "smtp") {
+          canaux[res.via] += 1;
+          canal = res.via;
+        }
+      } else {
+        statut = "echec";
       }
     }
+
+    // Détail par destinataire (fait technique de livraison uniquement — pas
+    // d'ouverture ni de clic par personne). Sans incidence sur l'envoi si la
+    // table n'existe pas encore (migration 0033 non appliquée).
+    if (dest && dest.email) {
+      await admin.from("email_campaign_recipients").insert({
+        campaign_id: campagne.id,
+        email: dest.email,
+        prenom: dest.firstName || null,
+        statut,
+        canal,
+      });
+    }
+
     index = i + 1;
     await admin
       .from("email_campaigns")

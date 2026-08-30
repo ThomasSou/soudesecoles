@@ -11,23 +11,48 @@ export const dynamic = "force-dynamic";
 
 function cibleDesinscription(request) {
   const params = new URL(request.url).searchParams;
-  return { parentId: params.get("p"), contactId: params.get("c") };
+  return {
+    parentId: params.get("p"),
+    contactId: params.get("c"),
+    campaignId: params.get("camp"),
+  };
 }
 
-async function desinscrire({ parentId, contactId }) {
+// Compteur de désinscriptions par campagne (agrégat, aucune donnée par
+// personne). Sans incidence si la colonne n'existe pas encore (migration
+// 0033 non appliquée).
+async function incrementerDesinscriptionCampagne(admin, campaignId) {
+  try {
+    const { data } = await admin
+      .from("email_campaigns")
+      .select("unsub_count")
+      .eq("id", campaignId)
+      .maybeSingle();
+    if (!data) return;
+    await admin
+      .from("email_campaigns")
+      .update({ unsub_count: (data.unsub_count || 0) + 1 })
+      .eq("id", campaignId);
+  } catch {
+    /* un compteur perdu est sans conséquence */
+  }
+}
+
+async function desinscrire({ parentId, contactId, campaignId }) {
   const admin = createAdminClient();
+  let ok = false;
   if (parentId) {
     const { error } = await admin.from("parents").update({ email_opt_out: true }).eq("id", parentId);
-    return !error;
-  }
-  if (contactId) {
+    ok = !error;
+  } else if (contactId) {
     const { error } = await admin
       .from("email_contacts")
       .update({ email_opt_out: true })
       .eq("id", contactId);
-    return !error;
+    ok = !error;
   }
-  return false;
+  if (ok && campaignId) await incrementerDesinscriptionCampagne(admin, campaignId);
+  return ok;
 }
 
 // Désinscription « en un clic » (RFC 8058) : quand l'e-mail porte les en-têtes
