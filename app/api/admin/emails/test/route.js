@@ -41,6 +41,8 @@ export async function POST(request) {
     html: renderBlocksToHtml(contentBlocks, { subject, recipient: dest, planning }),
     replyTo: CONTACT_EMAIL,
     headers: entetesDesinscription(dest, { contactEmail: CONTACT_EMAIL }),
+    // Même circuit que l'envoi réel d'une campagne (SMTP en tête).
+    viaSmtpDabord: true,
   });
 
   if (!res.sent) {

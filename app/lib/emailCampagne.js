@@ -79,6 +79,9 @@ export async function envoyerVague(admin, campagne) {
         html: renderBlocksToHtml(blocks, { subject, recipient: dest, planning, campaignId: campagne.id }),
         replyTo: CONTACT_EMAIL,
         headers: entetesDesinscription(dest, { contactEmail: CONTACT_EMAIL, campaignId: campagne.id }),
+        // Campagne : SMTP Infomaniak en tête (fiable sur nos volumes en
+        // vagues), Sender en secours. Cf. app/lib/mail.js.
+        viaSmtpDabord: true,
       });
       if (res.sent) {
         sentCount += 1;
