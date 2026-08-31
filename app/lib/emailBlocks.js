@@ -123,10 +123,17 @@ function escapeHtml(text) {
 
 // Remplace les champs de fusion ({{prenom}}, {{nom}}) par les données du
 // destinataire. Se fait avant l'échappement HTML, sur le texte brut.
+//
+// Quand le prénom (ou le nom) est vide — fréquent pour les destinataires
+// d'une « liste d'adresses » qui ne correspondent à aucune fiche — on retire
+// aussi l'espace qui précède le champ : « Bonjour {{prenom}}, » donne alors
+// « Bonjour, » et non « Bonjour , ».
 function fusion(text, recipient) {
+  const prenom = (recipient.firstName || "").trim();
+  const nom = (recipient.lastName || "").trim();
   return String(text || "")
-    .replace(/\{\{\s*prenom\s*\}\}/gi, recipient.firstName || "")
-    .replace(/\{\{\s*nom\s*\}\}/gi, recipient.lastName || "");
+    .replace(/ ?\{\{\s*prenom\s*\}\}/gi, prenom ? ` ${prenom}` : "")
+    .replace(/ ?\{\{\s*nom\s*\}\}/gi, nom ? ` ${nom}` : "");
 }
 
 // Petite mise en forme "à la markdown" appliquée APRÈS échappement HTML
