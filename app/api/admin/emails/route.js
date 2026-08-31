@@ -7,13 +7,15 @@ import { renderBlocksToHtml, renderBlocksToText } from "../../../lib/emailBlocks
 export const dynamic = "force-dynamic";
 
 // Canal d'envoi réellement actif en production, pour l'afficher dans le
-// back-office (savoir en un coup d'œil si une campagne partira par Sender,
-// taillé pour l'envoi en masse, ou par le SMTP classique en repli).
+// back-office. Depuis le correctif « SMTP en primaire » (cf. emailCampagne.js,
+// `viaSmtpDabord: true`), une campagne part d'abord par le SMTP Infomaniak,
+// Sender ne servant plus que de secours. On affiche donc "smtp" dès que le
+// SMTP est configuré, et "sender" seulement s'il n'y a que Sender.
 function canalEnvoi() {
-  if (process.env.SENDER_API_KEY && process.env.SENDER_FROM_EMAIL) return "sender";
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
     return "smtp";
   }
+  if (process.env.SENDER_API_KEY && process.env.SENDER_FROM_EMAIL) return "sender";
   return "aucun";
 }
 

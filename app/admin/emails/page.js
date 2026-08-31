@@ -34,8 +34,8 @@ const NIVEAUX = [
 const PAUSE_ENTRE_VAGUES_MS = 1500;
 
 const CANAUX = {
+  smtp: "SMTP Infomaniak — canal principal des campagnes (Sender en secours)",
   sender: "Sender — adapté à l'envoi en masse",
-  smtp: "SMTP Infomaniak — déconseillé pour un envoi à toute l'école (~450)",
   aucun: "aucun canal configuré — rien ne partira",
 };
 
