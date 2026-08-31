@@ -147,11 +147,35 @@ function AjouterAdresseEtInviter({ familyId, parentId, token, onDone }) {
   );
 }
 
+// Rangée de pastilles de filtre (une seule sélectionnée à la fois).
+function FiltrePills({ valeur, onChange, options }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((o) => (
+        <button
+          key={o.key}
+          onClick={() => onChange(o.key)}
+          className={`px-3 py-1.5 rounded-full text-sm ${
+            valeur === o.key
+              ? "bg-sou-blue text-white"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ListeFamilles({ token }) {
   const [familles, setFamilles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [ouvert, setOuvert] = useState(null);
-  const [filtre, setFiltre] = useState("toutes");
+  // Deux filtres indépendants, combinés en ET : présence d'un compte de
+  // connexion activé, et statut de cotisation pour l'année en cours.
+  const [filtreCompte, setFiltreCompte] = useState("tous"); // tous | avec | sans
+  const [filtreCotis, setFiltreCotis] = useState("tous"); // tous | ajour | non
   const [recherche, setRecherche] = useState("");
 
   const charger = useCallback(async () => {
@@ -172,13 +196,26 @@ function ListeFamilles({ token }) {
     return <p className="text-slate-500">Chargement des familles...</p>;
   }
 
-  // Une famille est "sans compte actif" si aucun de ses parents n'a
-  // jamais activé son compte de connexion (authActivated), qu'il y ait
-  // ou non une fiche `parents` en base (celle-ci existe indépendamment).
-  const sansCompte = familles.filter(
-    (f) => f.parents.length === 0 || f.parents.every((p) => !p.authActivated)
-  );
-  const parFiltre = filtre === "sans-compte" ? sansCompte : familles;
+  const annee = currentSchoolYear();
+
+  // Une famille "a un compte" si au moins un de ses parents a activé son
+  // compte de connexion. Elle est "à jour" si sa cotisation de l'année en
+  // cours est valide.
+  const aUnCompte = (f) => f.parents.some((p) => p.authActivated);
+  const estAJour = (f) =>
+    isMembershipValid(f.memberships.find((m) => m.school_year === annee));
+
+  const sansCompte = familles.filter((f) => !aUnCompte(f));
+  const nbAvecCompte = familles.length - sansCompte.length;
+  const nbAJour = familles.filter(estAJour).length;
+
+  const parFiltre = familles.filter((f) => {
+    if (filtreCompte === "avec" && !aUnCompte(f)) return false;
+    if (filtreCompte === "sans" && aUnCompte(f)) return false;
+    if (filtreCotis === "ajour" && !estAJour(f)) return false;
+    if (filtreCotis === "non" && estAJour(f)) return false;
+    return true;
+  });
 
   const q = recherche.trim().toLowerCase();
   const visibles = !q
@@ -192,8 +229,6 @@ function ListeFamilles({ token }) {
         );
         return dansParents || dansEnfants || nomFamille(f).toLowerCase().includes(q);
       });
-
-  const annee = currentSchoolYear();
 
   return (
     <div>
@@ -222,23 +257,25 @@ function ListeFamilles({ token }) {
         />
       </div>
 
-      <div className="flex gap-2 mb-6">
-        {[
-          { key: "toutes", label: `Toutes (${familles.length})` },
-          { key: "sans-compte", label: `Sans compte (${sansCompte.length})` },
-        ].map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFiltre(f.key)}
-            className={`px-3 py-1.5 rounded-full text-sm ${
-              filtre === f.key
-                ? "bg-sou-blue text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="flex flex-col gap-2 mb-6">
+        <FiltrePills
+          valeur={filtreCompte}
+          onChange={setFiltreCompte}
+          options={[
+            { key: "tous", label: `Toutes (${familles.length})` },
+            { key: "avec", label: `Avec compte (${nbAvecCompte})` },
+            { key: "sans", label: `Sans compte (${sansCompte.length})` },
+          ]}
+        />
+        <FiltrePills
+          valeur={filtreCotis}
+          onChange={setFiltreCotis}
+          options={[
+            { key: "tous", label: `Tous statuts` },
+            { key: "ajour", label: `À jour ${annee} (${nbAJour})` },
+            { key: "non", label: `Non cotisant (${familles.length - nbAJour})` },
+          ]}
+        />
       </div>
 
       <p className="text-sm text-slate-500 mb-3">
