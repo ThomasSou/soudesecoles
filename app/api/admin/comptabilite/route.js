@@ -81,11 +81,11 @@ export async function GET(request) {
 
   await synchroniserFacturesEnseignants(auth.admin, annee);
 
+  // select("*") plutôt qu'une liste figée : la page continue de fonctionner
+  // même si une migration ajoutant une colonne n'a pas encore été lancée.
   let requete = auth.admin
     .from("compta_lignes")
-    .select(
-      "id, sens, rubrique, evenement_id, libelle, fournisseur, montant_cents, date_operation, statut, source, teacher_invoice_id, compte, ref_bancaire, note, justificatif_path, justificatif_type, school_year, pointe_le, created_at"
-    )
+    .select("*")
     .eq("school_year", annee)
     .order("date_operation", { ascending: true, nullsFirst: true })
     .order("created_at", { ascending: true });
@@ -211,11 +211,16 @@ export async function GET(request) {
   }
 
   // Données de référence pour les filtres et le formulaire.
-  const [evenementsRes, anneesLignesRes, anneesFacturesRes] = await Promise.all([
+  const [evenementsRes, anneesLignesRes, anneesFacturesRes, parentsRes] = await Promise.all([
     auth.admin.from("benevolat_evenements").select("id, nom").order("created_at", { ascending: false }),
     auth.admin.from("compta_lignes").select("school_year"),
     auth.admin.from("teacher_invoices").select("school_year"),
+    auth.admin.from("parents").select("id, first_name, last_name").order("last_name"),
   ]);
+  const parents = (parentsRes.data || []).map((p) => ({
+    id: p.id,
+    nom: `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Sans nom",
+  }));
   const anneesSet = new Set([annee, currentSchoolYear()]);
   for (const r of [...(anneesLignesRes.data || []), ...(anneesFacturesRes.data || [])]) {
     if (r.school_year) anneesSet.add(r.school_year);
@@ -247,6 +252,7 @@ export async function GET(request) {
       ),
     },
     evenements: evenementsRes.data || [],
+    parents,
     classesRef: CLASSES_REFERENCE.map((c) => ({
       cle: c.cle,
       groupe: c.groupe,
@@ -282,6 +288,8 @@ export async function POST(request) {
     ? [...new Set(body.classes.map((c) => String(c).trim()).filter((c) => CLES_CLASSES.includes(c)))]
     : [];
   const annee = body?.annee || currentSchoolYear();
+  const payePar = body?.payePar === "benevole" ? "benevole" : "sou";
+  const payeParParentId = payePar === "benevole" ? body?.payeParParentId || null : null;
 
   // Un devis (non validé) est une dépense prévisionnelle : la ligne est
   // forcée en statut « prevu », quel que soit le statut demandé.
@@ -305,6 +313,12 @@ export async function POST(request) {
   }
   if (compte && !COMPTES.includes(compte)) {
     return NextResponse.json({ error: "Compte bancaire invalide." }, { status: 400 });
+  }
+  if (payePar === "benevole" && !payeParParentId) {
+    return NextResponse.json(
+      { error: "Choisissez le bénévole qui a avancé la dépense." },
+      { status: 400 }
+    );
   }
   if (rubrique === "evenement" && evenements.length === 0) {
     return NextResponse.json(
@@ -346,27 +360,35 @@ export async function POST(request) {
     montantsEvenements = r.montants;
   }
 
+  const nouvelleLigne = {
+    sens,
+    rubrique,
+    // Colonne conservée : porte la 1re manifestation (contrainte de
+    // cohérence). La liste complète est dans compta_ligne_evenements.
+    evenement_id: rubrique === "evenement" ? evenements[0] : null,
+    libelle,
+    fournisseur,
+    montant_cents: Math.round(montant * 100),
+    date_operation: dateOperation,
+    statut: statutEffectif,
+    source: "manuel",
+    compte,
+    pointe_le: statutEffectif === "pointe" ? new Date().toISOString() : null,
+    pointe_par: statutEffectif === "pointe" ? auth.parent.id : null,
+    note,
+    school_year: annee,
+    created_by: auth.parent.id,
+  };
+  // paye_par ajouté seulement quand ce n'est pas « le Sou » : une saisie
+  // normale reste possible même si la migration 0046 n'est pas passée.
+  if (payePar === "benevole") {
+    nouvelleLigne.paye_par = "benevole";
+    nouvelleLigne.paye_par_parent_id = payeParParentId;
+  }
+
   const { data: ligne, error } = await auth.admin
     .from("compta_lignes")
-    .insert({
-      sens,
-      rubrique,
-      // Colonne conservée : porte la 1re manifestation (contrainte de
-      // cohérence). La liste complète est dans compta_ligne_evenements.
-      evenement_id: rubrique === "evenement" ? evenements[0] : null,
-      libelle,
-      fournisseur,
-      montant_cents: Math.round(montant * 100),
-      date_operation: dateOperation,
-      statut: statutEffectif,
-      source: "manuel",
-      compte,
-      pointe_le: statutEffectif === "pointe" ? new Date().toISOString() : null,
-      pointe_par: statutEffectif === "pointe" ? auth.parent.id : null,
-      note,
-      school_year: annee,
-      created_by: auth.parent.id,
-    })
+    .insert(nouvelleLigne)
     .select("id")
     .single();
 

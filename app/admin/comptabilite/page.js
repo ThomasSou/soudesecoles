@@ -31,9 +31,11 @@ const RUBRIQUES = {
 
 const STATUTS = {
   prevu: { label: "Prévisionnel", classe: "bg-slate-100 text-slate-600" },
-  a_verifier: { label: "À vérifier", classe: "bg-amber-50 text-amber-700" },
+  a_verifier: { label: "À pointer", classe: "bg-amber-50 text-amber-700" },
   pointe: { label: "Pointé", classe: "bg-green-50 text-green-700" },
 };
+
+const PAYE_PAR = { sou: "Le Sou", benevole: "Un bénévole" };
 
 const COMPTES = { courant: "Compte courant", placement: "Compte placement" };
 
@@ -217,7 +219,7 @@ function lireFichier(file) {
 // ---------------------------------------------------------------------------
 // Formulaire d'une ligne (création ou édition d'une ligne manuelle).
 // ---------------------------------------------------------------------------
-function LigneForm({ accessToken, annees, evenements, ligne, onDone, onCancel }) {
+function LigneForm({ accessToken, annees, evenements, parents, ligne, onDone, onCancel }) {
   const edition = Boolean(ligne);
   const groupes = GROUPES;
   const anneesOptions = [
@@ -258,6 +260,8 @@ function LigneForm({ accessToken, annees, evenements, ligne, onDone, onCancel })
   const [dateOperation, setDateOperation] = useState(ligne?.date_operation || "");
   const [compte, setCompte] = useState(ligne?.compte || "");
   const [statut, setStatut] = useState(ligne?.statut || "a_verifier");
+  const [payePar, setPayePar] = useState(ligne?.paye_par || "sou");
+  const [payeParParentId, setPayeParParentId] = useState(ligne?.paye_par_parent_id || "");
   const [note, setNote] = useState(ligne?.note || "");
   const [justificatif, setJustificatif] = useState(null);
   const [justificatifType, setJustificatifType] = useState(
@@ -367,6 +371,8 @@ function LigneForm({ accessToken, annees, evenements, ligne, onDone, onCancel })
       compte: compte || null,
       statut,
       note,
+      payePar,
+      payeParParentId: payePar === "benevole" ? payeParParentId || null : null,
       justificatifDataUrl,
       justificatifType,
       annee: anneeLigne,
@@ -632,6 +638,40 @@ function LigneForm({ accessToken, annees, evenements, ligne, onDone, onCancel })
         </label>
       </div>
 
+      <div className="text-sm space-y-2">
+        <p>Payé par</p>
+        <div className="flex gap-1.5">
+          {Object.entries(PAYE_PAR).map(([k, lbl]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setPayePar(k)}
+              className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                payePar === k
+                  ? "bg-sou-blue text-white"
+                  : "bg-white border border-slate-300 text-slate-600"
+              }`}
+            >
+              {lbl}
+            </button>
+          ))}
+        </div>
+        {payePar === "benevole" && (
+          <select
+            value={payeParParentId}
+            onChange={(e) => setPayeParParentId(e.target.value)}
+            className={champ}
+          >
+            <option value="">— choisir le bénévole —</option>
+            {(parents || []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nom}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
       <label className="text-sm block">
         Note interne (facultatif)
         <textarea
@@ -704,7 +744,7 @@ function LigneForm({ accessToken, annees, evenements, ligne, onDone, onCancel })
 // ---------------------------------------------------------------------------
 // Une ligne dans la liste.
 // ---------------------------------------------------------------------------
-function LigneRow({ accessToken, ligne, evenements, annees, onChange }) {
+function LigneRow({ accessToken, ligne, evenements, annees, parents, onChange }) {
   const [edition, setEdition] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const statut = STATUTS[ligne.statut] || STATUTS.a_verifier;
@@ -792,6 +832,7 @@ function LigneRow({ accessToken, ligne, evenements, annees, onChange }) {
         accessToken={accessToken}
         annees={annees}
         evenements={evenements}
+        parents={parents}
         ligne={ligne}
         onDone={() => {
           setEdition(false);
@@ -826,6 +867,14 @@ function LigneRow({ accessToken, ligne, evenements, annees, onChange }) {
             {ligne.fournisseur && <span> · {ligne.fournisseur}</span>}
             {ligne.source === "enseignant" && (
               <span className="text-sou-blue"> · facture enseignant</span>
+            )}
+            {ligne.paye_par === "benevole" && (
+              <span className="text-amber-700">
+                {" "}
+                · avancé par{" "}
+                {(parents || []).find((p) => p.id === ligne.paye_par_parent_id)?.nom ||
+                  "un bénévole"}
+              </span>
             )}
           </p>
         </div>
@@ -1169,7 +1218,7 @@ function ComptaAdmin({ accessToken }) {
       </div>
       {(aVerifier || pointe) && (
         <p className="text-xs text-slate-500 mb-4">
-          À vérifier :{" "}
+          À pointer :{" "}
           {euros(
             (aVerifier?.depense_cents || 0) + (aVerifier?.recette_cents || 0)
           )}{" "}
@@ -1188,6 +1237,7 @@ function ComptaAdmin({ accessToken }) {
             accessToken={accessToken}
             annees={data?.annees || []}
             evenements={data?.evenements || []}
+            parents={data?.parents || []}
             onDone={() => {
               setAjout(false);
               recharger();
@@ -1220,6 +1270,7 @@ function ComptaAdmin({ accessToken }) {
               ligne={l}
               evenements={data.evenements || []}
               annees={data.annees || []}
+              parents={data.parents || []}
               onChange={recharger}
             />
           ))}

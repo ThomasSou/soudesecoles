@@ -27,7 +27,7 @@ export async function PATCH(request, { params }) {
 
   const { data: ligne, error: eLecture } = await auth.admin
     .from("compta_lignes")
-    .select("id, source, rubrique, statut, montant_cents, justificatif_path, justificatif_type")
+    .select("*")
     .eq("id", params.id)
     .maybeSingle();
   if (eLecture) return NextResponse.json({ error: eLecture.message }, { status: 500 });
@@ -142,6 +142,24 @@ export async function PATCH(request, { params }) {
     }
     if (body.annee) {
       update.school_year = String(body.annee).trim();
+    }
+    // On n'écrit paye_par que si ça change vraiment quelque chose : évite de
+    // toucher la colonne (donc de planter) tant que 0046 n'est pas passée
+    // pour les lignes « le Sou ».
+    if (body.payePar !== undefined) {
+      const pp = body.payePar === "benevole" ? "benevole" : "sou";
+      const ppId = pp === "benevole" ? body.payeParParentId || null : null;
+      if (pp === "benevole" && !ppId) {
+        return NextResponse.json(
+          { error: "Choisissez le bénévole qui a avancé la dépense." },
+          { status: 400 }
+        );
+      }
+      const actuel = ligne.paye_par || "sou";
+      if (pp !== actuel || (pp === "benevole" && ppId !== ligne.paye_par_parent_id)) {
+        update.paye_par = pp;
+        update.paye_par_parent_id = ppId;
+      }
     }
     if (body.montant !== undefined) {
       const m = Number(String(body.montant ?? "").replace(",", "."));
