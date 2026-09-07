@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../lib/adminAuth";
 import { currentSchoolYear } from "../../../lib/anneeScolaire";
-import { listerClassesAnnee } from "../../../lib/classes";
 import { televerserJustificatif, TYPES_JUSTIFICATIF } from "../../../lib/comptaFichiers";
+import { CLASSES_REFERENCE, CLES_CLASSES, libelleClasse } from "../../../lib/classesReference";
 
 export const dynamic = "force-dynamic";
 
@@ -141,6 +141,14 @@ export async function GET(request) {
     acc[l.sens === "depense" ? "depense_cents" : "recette_cents"] += l.montant_cents;
     return acc;
   };
+  // Une ligne « prévisionnelle » (statut prevu — typiquement un devis non
+  // validé) est comptée à part du réalisé, jamais mélangée.
+  const videSplit = () => ({ realise: vide(), previsionnel: vide() });
+  const ajouteSplit = (acc, l) => {
+    ajoute(l.statut === "prevu" ? acc.previsionnel : acc.realise, l);
+    return acc;
+  };
+
   const totalGlobal = lignes.reduce((a, l) => ajoute(a, l), vide());
   const parStatut = {};
   const parRubrique = {};
@@ -148,21 +156,28 @@ export async function GET(request) {
     (parStatut[l.statut] ||= vide()) && ajoute(parStatut[l.statut], l);
     (parRubrique[l.rubrique] ||= vide()) && ajoute(parRubrique[l.rubrique], l);
   }
+
   // Récap par classe : montant entier compté pour chaque classe concernée
   // (même convention que le bilan enseignants — la somme peut dépasser le
-  // total réel, c'est voulu).
+  // total réel, c'est voulu). Réalisé / prévisionnel séparés.
   const parClasse = {};
   for (const l of lignes) {
     if (l.rubrique !== "classe") continue;
     for (const c of l.classes) {
-      (parClasse[c] ||= vide()) && ajoute(parClasse[c], l);
+      ajouteSplit((parClasse[c] ||= videSplit()), l);
     }
   }
 
+  // Récap par manifestation : idem, réalisé / prévisionnel séparés.
+  const parEvenement = {};
+  for (const l of lignes) {
+    if (l.rubrique !== "evenement" || !l.evenement_id) continue;
+    ajouteSplit((parEvenement[l.evenement_id] ||= videSplit()), l);
+  }
+
   // Données de référence pour les filtres et le formulaire.
-  const [evenementsRes, classesRes, anneesLignesRes, anneesFacturesRes] = await Promise.all([
+  const [evenementsRes, anneesLignesRes, anneesFacturesRes] = await Promise.all([
     auth.admin.from("benevolat_evenements").select("id, nom").order("created_at", { ascending: false }),
-    listerClassesAnnee(auth.admin, annee),
     auth.admin.from("compta_lignes").select("school_year"),
     auth.admin.from("teacher_invoices").select("school_year"),
   ]);
@@ -171,14 +186,38 @@ export async function GET(request) {
     if (r.school_year) anneesSet.add(r.school_year);
   }
 
+  // Classes : la référence figée (avec enseignant·e), plus tout libellé déjà
+  // présent en base qui n'en fait pas partie (ex. hérité d'une facture
+  // enseignant) — pour que le filtre et les récaps restent complets.
+  const clesConnues = new Set(CLES_CLASSES);
+  const classesEnPlus = [
+    ...new Set((liensClasses || []).map((l) => l.class_label).filter((c) => !clesConnues.has(c))),
+  ].sort((a, b) => a.localeCompare(b, "fr"));
+  const evenementNom = Object.fromEntries((evenementsRes.data || []).map((e) => [e.id, e.nom]));
+
   return NextResponse.json({
     ok: true,
     annee,
     annees: [...anneesSet].sort().reverse(),
     lignes,
-    totaux: { global: totalGlobal, parStatut, parRubrique, parClasse },
+    totaux: {
+      global: totalGlobal,
+      parStatut,
+      parRubrique,
+      parClasse: Object.fromEntries(
+        Object.entries(parClasse).map(([cle, v]) => [cle, { ...v, libelle: libelleClasse(cle) }])
+      ),
+      parEvenement: Object.fromEntries(
+        Object.entries(parEvenement).map(([id, v]) => [id, { ...v, nom: evenementNom[id] || "Manifestation" }])
+      ),
+    },
     evenements: evenementsRes.data || [],
-    classes: classesRes.classes || [],
+    classesRef: CLASSES_REFERENCE.map((c) => ({
+      cle: c.cle,
+      groupe: c.groupe,
+      libelle: libelleClasse(c.cle),
+    })),
+    classesEnPlus,
   });
 }
 
@@ -199,9 +238,14 @@ export async function POST(request) {
   const note = body?.note?.trim() || null;
   const evenementId = body?.evenementId || null;
   const classes = Array.isArray(body?.classes)
-    ? [...new Set(body.classes.map((c) => String(c).trim()).filter(Boolean))]
+    ? [...new Set(body.classes.map((c) => String(c).trim()).filter((c) => CLES_CLASSES.includes(c)))]
     : [];
   const annee = body?.annee || currentSchoolYear();
+
+  // Un devis (non validé) est une dépense prévisionnelle : la ligne est
+  // forcée en statut « prevu », quel que soit le statut demandé.
+  const estDevis = body?.justificatifDataUrl && body?.justificatifType === "devis";
+  const statutEffectif = estDevis ? "prevu" : statut;
 
   if (!SENS.includes(sens)) {
     return NextResponse.json({ error: "Sens invalide (dépense ou recette)." }, { status: 400 });
@@ -225,7 +269,10 @@ export async function POST(request) {
     return NextResponse.json({ error: "Choisissez l'événement concerné." }, { status: 400 });
   }
   if (rubrique === "classe" && classes.length === 0) {
-    return NextResponse.json({ error: "Choisissez au moins une classe." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Choisissez au moins une classe dans la liste." },
+      { status: 400 }
+    );
   }
 
   const { data: ligne, error } = await auth.admin
@@ -238,11 +285,11 @@ export async function POST(request) {
       fournisseur,
       montant_cents: Math.round(montant * 100),
       date_operation: dateOperation,
-      statut,
+      statut: statutEffectif,
       source: "manuel",
       compte,
-      pointe_le: statut === "pointe" ? new Date().toISOString() : null,
-      pointe_par: statut === "pointe" ? auth.parent.id : null,
+      pointe_le: statutEffectif === "pointe" ? new Date().toISOString() : null,
+      pointe_par: statutEffectif === "pointe" ? auth.parent.id : null,
       note,
       school_year: annee,
       created_by: auth.parent.id,

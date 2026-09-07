@@ -5,6 +5,7 @@ import {
   supprimerJustificatif,
   TYPES_JUSTIFICATIF,
 } from "../../../../lib/comptaFichiers";
+import { CLES_CLASSES } from "../../../../lib/classesReference";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +93,25 @@ export async function PATCH(request, { params }) {
     update.justificatif_type = typeDemande;
   }
 
+  // Devis <-> dépense prévisionnelle. Un devis force le statut « prevu » ;
+  // le remplacer par une facture (provisoire ou définitive) sort la ligne
+  // du prévisionnel (sauf si elle est déjà pointée). On ne touche pas au
+  // statut si le bureau l'a fixé explicitement dans la même requête.
+  const typeFinal =
+    update.justificatif_type !== undefined ? update.justificatif_type : ligne.justificatif_type;
+  if (body.statut === undefined) {
+    if (typeFinal === "devis" && ligne.statut !== "prevu") {
+      update.statut = "prevu";
+      update.pointe_le = null;
+      update.pointe_par = null;
+    } else if (
+      (typeFinal === "facture_provisoire" || typeFinal === "facture_definitive") &&
+      ligne.statut === "prevu"
+    ) {
+      update.statut = "a_verifier";
+    }
+  }
+
   // Champs réservés aux lignes manuelles.
   if (manuelle) {
     if (body.libelle !== undefined) {
@@ -118,9 +138,14 @@ export async function PATCH(request, { params }) {
 
   // Remplacement des classes (lignes manuelles « classe » uniquement).
   if (manuelle && ligne.rubrique === "classe" && Array.isArray(body.classes)) {
-    const classes = [...new Set(body.classes.map((c) => String(c).trim()).filter(Boolean))];
+    const classes = [
+      ...new Set(body.classes.map((c) => String(c).trim()).filter((c) => CLES_CLASSES.includes(c))),
+    ];
     if (classes.length === 0) {
-      return NextResponse.json({ error: "Choisissez au moins une classe." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Choisissez au moins une classe dans la liste." },
+        { status: 400 }
+      );
     }
     await auth.admin.from("compta_ligne_classes").delete().eq("ligne_id", params.id);
     const { error } = await auth.admin

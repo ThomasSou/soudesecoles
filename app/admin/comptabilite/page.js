@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import AdminShell from "../admin-shell";
+import { GROUPES_CLASSES, libelleClasse } from "../../lib/classesReference";
 
 const RUBRIQUES = {
   evenement: "Événement",
@@ -11,7 +12,7 @@ const RUBRIQUES = {
 };
 
 const STATUTS = {
-  prevu: { label: "Prévu", classe: "bg-slate-100 text-slate-600" },
+  prevu: { label: "Prévisionnel", classe: "bg-slate-100 text-slate-600" },
   a_verifier: { label: "À vérifier", classe: "bg-amber-50 text-amber-700" },
   pointe: { label: "Pointé", classe: "bg-green-50 text-green-700" },
 };
@@ -59,6 +60,57 @@ function voyantJustif(ligne) {
   return { ok: false, label: "Facture manquante" };
 }
 
+// Petit tableau récapitulatif (par classe ou par manifestation), réalisé
+// d'un côté, prévisionnel de l'autre — jamais mélangés.
+function Recap({ titre, entrees }) {
+  const lignes = (entrees || [])
+    .filter(
+      (e) =>
+        e.realise.depense_cents ||
+        e.realise.recette_cents ||
+        e.previsionnel.depense_cents ||
+        e.previsionnel.recette_cents
+    )
+    .sort((a, b) => a.label.localeCompare(b.label, "fr"));
+  if (lignes.length === 0) return null;
+  return (
+    <div className="mb-4">
+      <h2 className="text-sm font-semibold text-slate-700 mb-1">{titre}</h2>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border border-slate-200 rounded-lg">
+          <thead className="bg-slate-50 text-slate-500">
+            <tr>
+              <th className="text-left px-2 py-1 font-medium">&nbsp;</th>
+              <th className="text-right px-2 py-1 font-medium">Dépenses réalisées</th>
+              <th className="text-right px-2 py-1 font-medium">Recettes réalisées</th>
+              <th className="text-right px-2 py-1 font-medium">Prévisionnel</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lignes.map((e) => {
+              const prev = e.previsionnel.depense_cents - e.previsionnel.recette_cents;
+              return (
+                <tr key={e.label} className="border-t border-slate-100">
+                  <td className="px-2 py-1">{e.label}</td>
+                  <td className="px-2 py-1 text-right text-red-700">
+                    {e.realise.depense_cents ? euros(e.realise.depense_cents) : "—"}
+                  </td>
+                  <td className="px-2 py-1 text-right text-green-700">
+                    {e.realise.recette_cents ? euros(e.realise.recette_cents) : "—"}
+                  </td>
+                  <td className="px-2 py-1 text-right text-slate-500">
+                    {prev ? euros(prev) : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // Lit le fichier choisi et le renvoie en data URL base64, pour l'envoyer
 // dans le corps JSON de la requête.
 function lireFichier(file) {
@@ -73,8 +125,13 @@ function lireFichier(file) {
 // ---------------------------------------------------------------------------
 // Formulaire d'une ligne (création ou édition d'une ligne manuelle).
 // ---------------------------------------------------------------------------
-function LigneForm({ accessToken, annee, evenements, classes, ligne, onDone, onCancel }) {
+function LigneForm({ accessToken, annee, evenements, classesRef, ligne, onDone, onCancel }) {
   const edition = Boolean(ligne);
+  const groupes = Object.keys(GROUPES_CLASSES).map((g) => ({
+    cle: g,
+    nom: GROUPES_CLASSES[g],
+    classes: (classesRef || []).filter((c) => c.groupe === g),
+  }));
   const [sens, setSens] = useState(ligne?.sens || "depense");
   const [rubrique, setRubrique] = useState(ligne?.rubrique || "evenement");
   const [evenementId, setEvenementId] = useState(ligne?.evenement_id || "");
@@ -97,6 +154,13 @@ function LigneForm({ accessToken, annee, evenements, classes, ligne, onDone, onC
 
   function toggleClasse(c) {
     setClassesSel((s) => (s.includes(c) ? s.filter((x) => x !== c) : [...s, c]));
+  }
+  function toggleGroupe(groupe) {
+    const cles = groupe.classes.map((c) => c.cle);
+    const toutes = cles.every((c) => classesSel.includes(c));
+    setClassesSel((s) =>
+      toutes ? s.filter((c) => !cles.includes(c)) : [...new Set([...s, ...cles])]
+    );
   }
 
   async function soumettre(e) {
@@ -213,30 +277,44 @@ function LigneForm({ accessToken, annee, evenements, classes, ligne, onDone, onC
       </div>
 
       {rubrique === "classe" && (
-        <div className="text-sm">
-          Classe(s) concernée(s)
-          <div className="flex flex-wrap gap-1.5 mt-1">
-            {classes.length === 0 && (
-              <span className="text-slate-400 text-xs">
-                Aucune classe connue pour cette année (les classes viennent des
-                fiches enfants).
-              </span>
-            )}
-            {classes.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => toggleClasse(c)}
-                className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                  classesSel.includes(c)
-                    ? "bg-sou-blue text-white"
-                    : "bg-white border border-slate-300 text-slate-600"
-                }`}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
+        <div className="text-sm space-y-2">
+          <p>
+            Classe(s) concernée(s){" "}
+            <span className="text-slate-400">
+              — le montant entier compte pour chacune des classes cochées
+            </span>
+          </p>
+          {groupes.map((g) => {
+            const cles = g.classes.map((c) => c.cle);
+            const toutes = cles.length > 0 && cles.every((c) => classesSel.includes(c));
+            return (
+              <div key={g.cle}>
+                <button
+                  type="button"
+                  onClick={() => toggleGroupe(g)}
+                  className="text-xs font-semibold text-sou-blue"
+                >
+                  {toutes ? "Décocher" : "Cocher"} toutes les {g.nom.toLowerCase()}s
+                </button>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {g.classes.map((c) => (
+                    <button
+                      key={c.cle}
+                      type="button"
+                      onClick={() => toggleClasse(c.cle)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        classesSel.includes(c.cle)
+                          ? "bg-sou-blue text-white"
+                          : "bg-white border border-slate-300 text-slate-600"
+                      }`}
+                    >
+                      {c.libelle}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -346,6 +424,12 @@ function LigneForm({ accessToken, annee, evenements, classes, ligne, onDone, onC
               </option>
             ))}
           </select>
+          {justificatif && justificatifType === "devis" && (
+            <span className="block text-xs text-slate-500">
+              La ligne sera enregistrée en <strong>prévisionnel</strong> tant
+              qu&apos;une facture ne remplace pas le devis.
+            </span>
+          )}
         </label>
       </div>
 
@@ -374,7 +458,7 @@ function LigneForm({ accessToken, annee, evenements, classes, ligne, onDone, onC
 // ---------------------------------------------------------------------------
 // Une ligne dans la liste.
 // ---------------------------------------------------------------------------
-function LigneRow({ accessToken, ligne, evenements, classes, annee, onChange }) {
+function LigneRow({ accessToken, ligne, evenements, classesRef, annee, onChange }) {
   const [edition, setEdition] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const statut = STATUTS[ligne.statut] || STATUTS.a_verifier;
@@ -449,7 +533,7 @@ function LigneRow({ accessToken, ligne, evenements, classes, annee, onChange }) 
         accessToken={accessToken}
         annee={annee}
         evenements={evenements}
-        classes={classes}
+        classesRef={classesRef}
         ligne={ligne}
         onDone={() => {
           setEdition(false);
@@ -471,7 +555,7 @@ function LigneRow({ accessToken, ligne, evenements, classes, annee, onChange }) 
             </span>
             {nomEvenement && <span>{nomEvenement}</span>}
             {ligne.rubrique === "classe" && ligne.classes.length > 0 && (
-              <span>{ligne.classes.join(", ")}</span>
+              <span>{ligne.classes.map((c) => libelleClasse(c)).join(", ")}</span>
             )}
             {ligne.fournisseur && <span> · {ligne.fournisseur}</span>}
             {ligne.source === "enseignant" && (
@@ -666,6 +750,17 @@ function ComptaAdmin({ accessToken }) {
   const solde = totaux.recette_cents - totaux.depense_cents;
   const aVerifier = data?.totaux?.parStatut?.a_verifier;
   const pointe = data?.totaux?.parStatut?.pointe;
+  const previsionnel = data?.totaux?.parStatut?.prevu;
+  const entreesClasses = Object.entries(data?.totaux?.parClasse || {}).map(([cle, v]) => ({
+    label: v.libelle || libelleClasse(cle),
+    realise: v.realise,
+    previsionnel: v.previsionnel,
+  }));
+  const entreesEvenements = Object.entries(data?.totaux?.parEvenement || {}).map(([id, v]) => ({
+    label: v.nom || "Manifestation",
+    realise: v.realise,
+    previsionnel: v.previsionnel,
+  }));
 
   const pilule = (actif, onClick, texte) => (
     <button
@@ -687,8 +782,9 @@ function ComptaAdmin({ accessToken }) {
         Dépenses et recettes de l&apos;association, par événement, par classe,
         en investissement ou en fonctionnement courant. Tout est en TTC. Les
         factures des enseignants apparaissent automatiquement en dépenses par
-        classe. Import des relevés Crédit Agricole et pointage automatique :
-        à venir.
+        classe. Un devis joint met la ligne en <strong>prévisionnel</strong>{" "}
+        jusqu&apos;à ce qu&apos;une facture le remplace. Import des relevés
+        Crédit Agricole et pointage automatique : à venir.
       </p>
 
       {/* Filtres */}
@@ -736,7 +832,12 @@ function ComptaAdmin({ accessToken }) {
             className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
           >
             <option value="">Toutes les classes</option>
-            {(data?.classes || []).map((c) => (
+            {(data?.classesRef || []).map((c) => (
+              <option key={c.cle} value={c.cle}>
+                {c.libelle}
+              </option>
+            ))}
+            {(data?.classesEnPlus || []).map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
@@ -764,12 +865,22 @@ function ComptaAdmin({ accessToken }) {
           <p className="text-lg font-bold text-red-700">
             {euros(totaux.depense_cents)}
           </p>
+          {previsionnel?.depense_cents ? (
+            <p className="text-[11px] text-slate-400">
+              dont prévisionnel {euros(previsionnel.depense_cents)}
+            </p>
+          ) : null}
         </div>
         <div className="border border-slate-200 rounded-xl p-3 text-center">
           <p className="text-xs text-slate-500">Recettes</p>
           <p className="text-lg font-bold text-green-700">
             {euros(totaux.recette_cents)}
           </p>
+          {previsionnel?.recette_cents ? (
+            <p className="text-[11px] text-slate-400">
+              dont prévisionnel {euros(previsionnel.recette_cents)}
+            </p>
+          ) : null}
         </div>
         <div className="border border-slate-200 rounded-xl p-3 text-center">
           <p className="text-xs text-slate-500">Solde</p>
@@ -793,6 +904,9 @@ function ComptaAdmin({ accessToken }) {
         </p>
       )}
 
+      <Recap titre="Comptes par classe" entrees={entreesClasses} />
+      <Recap titre="Comptes par manifestation" entrees={entreesEvenements} />
+
       {/* Ajout */}
       <div className="mb-4">
         {ajout ? (
@@ -800,7 +914,7 @@ function ComptaAdmin({ accessToken }) {
             accessToken={accessToken}
             annee={annee}
             evenements={data?.evenements || []}
-            classes={data?.classes || []}
+            classesRef={data?.classesRef || []}
             onDone={() => {
               setAjout(false);
               recharger();
@@ -832,7 +946,7 @@ function ComptaAdmin({ accessToken }) {
               accessToken={accessToken}
               ligne={l}
               evenements={data.evenements || []}
-              classes={data.classes || []}
+              classesRef={data.classesRef || []}
               annee={annee}
               onChange={recharger}
             />
