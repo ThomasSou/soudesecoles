@@ -293,7 +293,7 @@ function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) 
           <p>
             Classe(s) concernée(s){" "}
             <span className="text-slate-400">
-              — le montant entier compte pour chacune des classes cochées
+              — le montant est réparti à parts égales entre les classes cochées
             </span>
           </p>
           {groupes.map((g) => {

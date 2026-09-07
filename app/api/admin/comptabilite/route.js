@@ -157,15 +157,24 @@ export async function GET(request) {
     (parRubrique[l.rubrique] ||= vide()) && ajoute(parRubrique[l.rubrique], l);
   }
 
-  // Récap par classe : montant entier compté pour chaque classe concernée
-  // (même convention que le bilan enseignants — la somme peut dépasser le
-  // total réel, c'est voulu). Réalisé / prévisionnel séparés.
+  // Récap par classe : le montant de la ligne est RÉPARTI à parts égales
+  // entre les classes cochées (800 € sur 8 classes -> 100 € chacune). La
+  // somme des classes = le montant réel de la ligne (le reste en centimes
+  // est distribué aux premières classes). Réalisé / prévisionnel séparés.
+  const repartir = (total, n) => {
+    const base = Math.floor(total / n);
+    const reste = total - base * n;
+    return Array.from({ length: n }, (_, i) => base + (i < reste ? 1 : 0));
+  };
   const parClasse = {};
   for (const l of lignes) {
-    if (l.rubrique !== "classe") continue;
-    for (const c of l.classes) {
-      ajouteSplit((parClasse[c] ||= videSplit()), l);
-    }
+    if (l.rubrique !== "classe" || l.classes.length === 0) continue;
+    const parts = repartir(l.montant_cents, l.classes.length);
+    l.classes.forEach((c, i) => {
+      const bucket = (parClasse[c] ||= videSplit());
+      const cible = l.statut === "prevu" ? bucket.previsionnel : bucket.realise;
+      cible[l.sens === "depense" ? "depense_cents" : "recette_cents"] += parts[i];
+    });
   }
 
   // Récap par manifestation : idem, réalisé / prévisionnel séparés.
