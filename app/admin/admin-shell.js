@@ -17,6 +17,7 @@ const ONGLETS = [
   { href: "/admin/partenaires", label: "Partenaires", perm: "partenaires" },
   { href: "/admin/enseignants", label: "Enseignants", perm: "enseignants" },
   { href: "/admin/remboursements", label: "Remboursements", perm: "remboursements" },
+  { href: "/admin/comptabilite", label: "Comptabilité", perm: "comptabilite" },
   { href: "/admin/benevoles", label: "Bénévoles", perm: "benevoles" },
   { href: "/admin/messages", label: "Messages reçus", perm: "messages" },
   { href: "/admin/statistiques", label: "Statistiques", perm: "statistiques" },

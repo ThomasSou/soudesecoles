@@ -14,6 +14,7 @@ export const PERMISSIONS = [
   { key: "partenaires", label: "Partenaires (fiches, périodes, paiements, messages, documents)" },
   { key: "enseignants", label: "Devis et factures des enseignants" },
   { key: "remboursements", label: "Demandes de remboursement des parents" },
+  { key: "comptabilite", label: "Comptabilité (dépenses, recettes, rapprochement bancaire)" },
   { key: "benevoles", label: "Créneaux bénévoles" },
   { key: "statistiques", label: "Statistiques de fréquentation" },
   { key: "acces", label: "Gestion des accès et permissions du bureau" },

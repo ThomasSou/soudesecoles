@@ -1,0 +1,251 @@
+import { NextResponse } from "next/server";
+import { requirePermission } from "../../../lib/adminAuth";
+import { currentSchoolYear } from "../../../lib/anneeScolaire";
+import { listerClassesAnnee } from "../../../lib/classes";
+
+export const dynamic = "force-dynamic";
+
+const RUBRIQUES = ["evenement", "investissement", "courant", "classe"];
+const STATUTS = ["prevu", "a_verifier", "pointe"];
+const SENS = ["depense", "recette"];
+const COMPTES = ["courant", "placement"];
+
+// Recopie en lignes de compta les factures des enseignants de l'année qui
+// n'y sont pas encore (source = 'enseignant'). Idempotent grâce à l'index
+// unique sur teacher_invoice_id. Pas de trigger SQL : cohérent avec le reste
+// du projet (les migrations sont lancées à la main).
+async function synchroniserFacturesEnseignants(admin, annee) {
+  const { data: factures } = await admin
+    .from("teacher_invoices")
+    .select("id, label, supplier_name, amount_cents, school_year, reimbursed_at")
+    .eq("school_year", annee);
+
+  if (!factures || factures.length === 0) return;
+
+  const { data: dejaLa } = await admin
+    .from("compta_lignes")
+    .select("teacher_invoice_id")
+    .not("teacher_invoice_id", "is", null)
+    .eq("school_year", annee);
+
+  const connues = new Set((dejaLa || []).map((l) => l.teacher_invoice_id));
+  const aCreer = factures.filter((f) => !connues.has(f.id));
+  if (aCreer.length === 0) return;
+
+  const { data: lignesCreees } = await admin
+    .from("compta_lignes")
+    .insert(
+      aCreer.map((f) => ({
+        sens: "depense",
+        rubrique: "classe",
+        libelle: f.label,
+        fournisseur: f.supplier_name,
+        montant_cents: f.amount_cents,
+        date_operation: f.reimbursed_at ? f.reimbursed_at.slice(0, 10) : null,
+        statut: "a_verifier",
+        source: "enseignant",
+        teacher_invoice_id: f.id,
+        school_year: annee,
+      }))
+    )
+    .select("id, teacher_invoice_id");
+
+  if (!lignesCreees || lignesCreees.length === 0) return;
+
+  const invoiceIds = lignesCreees.map((l) => l.teacher_invoice_id);
+  const { data: liensClasses } = await admin
+    .from("teacher_invoice_classes")
+    .select("invoice_id, class_label")
+    .in("invoice_id", invoiceIds);
+
+  const ligneParFacture = Object.fromEntries(
+    lignesCreees.map((l) => [l.teacher_invoice_id, l.id])
+  );
+  const aInserer = (liensClasses || [])
+    .map((c) => ({ ligne_id: ligneParFacture[c.invoice_id], class_label: c.class_label }))
+    .filter((c) => c.ligne_id);
+
+  if (aInserer.length > 0) {
+    await admin.from("compta_ligne_classes").insert(aInserer);
+  }
+}
+
+export async function GET(request) {
+  const auth = await requirePermission(request, "comptabilite");
+  if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  const params = new URL(request.url).searchParams;
+  const annee = params.get("annee") || currentSchoolYear();
+
+  await synchroniserFacturesEnseignants(auth.admin, annee);
+
+  let requete = auth.admin
+    .from("compta_lignes")
+    .select(
+      "id, sens, rubrique, evenement_id, libelle, fournisseur, montant_cents, date_operation, statut, source, teacher_invoice_id, compte, ref_bancaire, note, school_year, pointe_le, created_at"
+    )
+    .eq("school_year", annee)
+    .order("date_operation", { ascending: true, nullsFirst: true })
+    .order("created_at", { ascending: true });
+
+  const fSens = params.get("sens");
+  const fRubrique = params.get("rubrique");
+  const fStatut = params.get("statut");
+  const fEvenement = params.get("evenementId");
+  if (fSens && SENS.includes(fSens)) requete = requete.eq("sens", fSens);
+  if (fRubrique && RUBRIQUES.includes(fRubrique)) requete = requete.eq("rubrique", fRubrique);
+  if (fStatut && STATUTS.includes(fStatut)) requete = requete.eq("statut", fStatut);
+  if (fEvenement) requete = requete.eq("evenement_id", fEvenement);
+
+  const { data: lignesBrutes, error } = await requete;
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const ids = (lignesBrutes || []).map((l) => l.id);
+  const { data: liensClasses } = ids.length
+    ? await auth.admin
+        .from("compta_ligne_classes")
+        .select("ligne_id, class_label")
+        .in("ligne_id", ids)
+    : { data: [] };
+  const classesParLigne = {};
+  for (const l of liensClasses || []) {
+    (classesParLigne[l.ligne_id] ||= []).push(l.class_label);
+  }
+
+  let lignes = (lignesBrutes || []).map((l) => ({
+    ...l,
+    classes: (classesParLigne[l.id] || []).sort((a, b) => a.localeCompare(b, "fr")),
+  }));
+
+  // Filtre « classe » : appliqué ici car il porte sur la table de liens.
+  const fClasse = params.get("classe");
+  if (fClasse) {
+    lignes = lignes.filter((l) => l.classes.includes(fClasse));
+  }
+
+  // Totaux.
+  const vide = () => ({ depense_cents: 0, recette_cents: 0 });
+  const ajoute = (acc, l) => {
+    acc[l.sens === "depense" ? "depense_cents" : "recette_cents"] += l.montant_cents;
+    return acc;
+  };
+  const totalGlobal = lignes.reduce((a, l) => ajoute(a, l), vide());
+  const parStatut = {};
+  const parRubrique = {};
+  for (const l of lignes) {
+    (parStatut[l.statut] ||= vide()) && ajoute(parStatut[l.statut], l);
+    (parRubrique[l.rubrique] ||= vide()) && ajoute(parRubrique[l.rubrique], l);
+  }
+  // Récap par classe : montant entier compté pour chaque classe concernée
+  // (même convention que le bilan enseignants — la somme peut dépasser le
+  // total réel, c'est voulu).
+  const parClasse = {};
+  for (const l of lignes) {
+    if (l.rubrique !== "classe") continue;
+    for (const c of l.classes) {
+      (parClasse[c] ||= vide()) && ajoute(parClasse[c], l);
+    }
+  }
+
+  // Données de référence pour les filtres et le formulaire.
+  const [evenementsRes, classesRes, anneesLignesRes, anneesFacturesRes] = await Promise.all([
+    auth.admin.from("benevolat_evenements").select("id, nom").order("created_at", { ascending: false }),
+    listerClassesAnnee(auth.admin, annee),
+    auth.admin.from("compta_lignes").select("school_year"),
+    auth.admin.from("teacher_invoices").select("school_year"),
+  ]);
+  const anneesSet = new Set([annee, currentSchoolYear()]);
+  for (const r of [...(anneesLignesRes.data || []), ...(anneesFacturesRes.data || [])]) {
+    if (r.school_year) anneesSet.add(r.school_year);
+  }
+
+  return NextResponse.json({
+    ok: true,
+    annee,
+    annees: [...anneesSet].sort().reverse(),
+    lignes,
+    totaux: { global: totalGlobal, parStatut, parRubrique, parClasse },
+    evenements: evenementsRes.data || [],
+    classes: classesRes.classes || [],
+  });
+}
+
+// Saisie manuelle d'une ligne.
+export async function POST(request) {
+  const auth = await requirePermission(request, "comptabilite");
+  if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  const body = await request.json().catch(() => null);
+  const sens = body?.sens;
+  const rubrique = body?.rubrique;
+  const libelle = body?.libelle?.trim();
+  const fournisseur = body?.fournisseur?.trim() || null;
+  const montant = Number(String(body?.montant ?? "").replace(",", "."));
+  const dateOperation = body?.dateOperation || null;
+  const compte = body?.compte || null;
+  const statut = body?.statut || "a_verifier";
+  const note = body?.note?.trim() || null;
+  const evenementId = body?.evenementId || null;
+  const classes = Array.isArray(body?.classes)
+    ? [...new Set(body.classes.map((c) => String(c).trim()).filter(Boolean))]
+    : [];
+  const annee = body?.annee || currentSchoolYear();
+
+  if (!SENS.includes(sens)) {
+    return NextResponse.json({ error: "Sens invalide (dépense ou recette)." }, { status: 400 });
+  }
+  if (!RUBRIQUES.includes(rubrique)) {
+    return NextResponse.json({ error: "Choisissez une rubrique." }, { status: 400 });
+  }
+  if (!libelle) {
+    return NextResponse.json({ error: "Donnez un libellé à la ligne." }, { status: 400 });
+  }
+  if (!Number.isFinite(montant) || montant <= 0) {
+    return NextResponse.json({ error: "Le montant doit être supérieur à 0." }, { status: 400 });
+  }
+  if (!STATUTS.includes(statut)) {
+    return NextResponse.json({ error: "Statut invalide." }, { status: 400 });
+  }
+  if (compte && !COMPTES.includes(compte)) {
+    return NextResponse.json({ error: "Compte bancaire invalide." }, { status: 400 });
+  }
+  if (rubrique === "evenement" && !evenementId) {
+    return NextResponse.json({ error: "Choisissez l'événement concerné." }, { status: 400 });
+  }
+  if (rubrique === "classe" && classes.length === 0) {
+    return NextResponse.json({ error: "Choisissez au moins une classe." }, { status: 400 });
+  }
+
+  const { data: ligne, error } = await auth.admin
+    .from("compta_lignes")
+    .insert({
+      sens,
+      rubrique,
+      evenement_id: rubrique === "evenement" ? evenementId : null,
+      libelle,
+      fournisseur,
+      montant_cents: Math.round(montant * 100),
+      date_operation: dateOperation,
+      statut,
+      source: "manuel",
+      compte,
+      pointe_le: statut === "pointe" ? new Date().toISOString() : null,
+      pointe_par: statut === "pointe" ? auth.parent.id : null,
+      note,
+      school_year: annee,
+      created_by: auth.parent.id,
+    })
+    .select("id")
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (rubrique === "classe" && classes.length > 0) {
+    const { error: eClasses } = await auth.admin
+      .from("compta_ligne_classes")
+      .insert(classes.map((class_label) => ({ ligne_id: ligne.id, class_label })));
+    if (eClasses) return NextResponse.json({ error: eClasses.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, id: ligne.id });
+}
