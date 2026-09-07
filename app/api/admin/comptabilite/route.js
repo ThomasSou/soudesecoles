@@ -8,7 +8,7 @@ import { repartirEgal, resoudreRepartition } from "../../../lib/comptaRepartitio
 export const dynamic = "force-dynamic";
 
 const RUBRIQUES = ["evenement", "investissement", "courant", "classe"];
-const STATUTS = ["prevu", "a_verifier", "pointe"];
+const STATUTS = ["prevu", "a_verifier", "pointe", "a_valider"];
 const SENS = ["depense", "recette"];
 const COMPTES = ["courant", "placement"];
 
@@ -72,6 +72,77 @@ async function synchroniserFacturesEnseignants(admin, annee) {
   }
 }
 
+// Rubrique de compta pour une catégorie de demande de remboursement.
+const RUBRIQUE_PAR_CATEGORIE = {
+  manifestation: "evenement",
+  investissement: "investissement",
+  fonctionnement: "courant",
+  autre: "courant",
+};
+
+// Recopie en lignes de compta les demandes de remboursement des bénévoles
+// (source = 'benevole', payé par le bénévole). Statut d'entrée : 'a_valider'
+// (le bureau valide, puis rembourse, puis pointe). Idempotent via l'index
+// unique sur reimbursement_request_id.
+async function synchroniserRemboursementsBenevoles(admin, annee) {
+  const { data: demandes } = await admin
+    .from("reimbursement_requests")
+    .select(
+      "id, parent_id, category, evenement_id, event_name, description, supplier_name, amount_cents, status, created_at"
+    )
+    .neq("status", "refused");
+
+  if (!demandes || demandes.length === 0) return;
+
+  // Périmètre : demandes rattachées à l'année scolaire demandée (déduite de
+  // la date de dépôt).
+  const delAnnee = demandes.filter((d) => currentSchoolYear(new Date(d.created_at)) === annee);
+  if (delAnnee.length === 0) return;
+
+  const { data: dejaLa } = await admin
+    .from("compta_lignes")
+    .select("reimbursement_request_id")
+    .not("reimbursement_request_id", "is", null);
+  const connues = new Set((dejaLa || []).map((l) => l.reimbursement_request_id));
+
+  const aCreer = delAnnee.filter((d) => !connues.has(d.id));
+  if (aCreer.length === 0) return;
+
+  const lignes = aCreer.map((d) => {
+    let rubrique = RUBRIQUE_PAR_CATEGORIE[d.category] || "courant";
+    // Rubrique « evenement » exige un evenement_id : sinon on retombe sur
+    // « courant ».
+    if (rubrique === "evenement" && !d.evenement_id) rubrique = "courant";
+    return {
+      sens: "depense",
+      rubrique,
+      evenement_id: rubrique === "evenement" ? d.evenement_id : null,
+      libelle: d.description?.trim() || d.supplier_name || "Frais avancés par un bénévole",
+      fournisseur: d.supplier_name || null,
+      montant_cents: d.amount_cents,
+      statut: d.status === "reimbursed" ? "a_verifier" : "a_valider",
+      source: "benevole",
+      paye_par: "benevole",
+      paye_par_parent_id: d.parent_id,
+      reimbursement_request_id: d.id,
+      school_year: annee,
+    };
+  });
+
+  const { data: creees } = await admin
+    .from("compta_lignes")
+    .insert(lignes)
+    .select("id, reimbursement_request_id, rubrique, evenement_id");
+  if (!creees || creees.length === 0) return;
+
+  const liensEvt = creees
+    .filter((l) => l.rubrique === "evenement" && l.evenement_id)
+    .map((l) => ({ ligne_id: l.id, evenement_id: l.evenement_id }));
+  if (liensEvt.length > 0) {
+    await admin.from("compta_ligne_evenements").insert(liensEvt);
+  }
+}
+
 export async function GET(request) {
   const auth = await requirePermission(request, "comptabilite");
   if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -80,6 +151,7 @@ export async function GET(request) {
   const annee = params.get("annee") || currentSchoolYear();
 
   await synchroniserFacturesEnseignants(auth.admin, annee);
+  await synchroniserRemboursementsBenevoles(auth.admin, annee);
 
   // select("*") plutôt qu'une liste figée : la page continue de fonctionner
   // même si une migration ajoutant une colonne n'a pas encore été lancée.
@@ -128,6 +200,18 @@ export async function GET(request) {
     }
   }
 
+  // Statut de la demande de remboursement liée (pour les lignes bénévoles).
+  const demandeIds = [
+    ...new Set((lignesBrutes || []).map((l) => l.reimbursement_request_id).filter(Boolean)),
+  ];
+  const { data: demandesLiees } = demandeIds.length
+    ? await auth.admin
+        .from("reimbursement_requests")
+        .select("id, status, processed_at")
+        .in("id", demandeIds)
+    : { data: [] };
+  const demandeParId = Object.fromEntries((demandesLiees || []).map((d) => [d.id, d]));
+
   let lignes = (lignesBrutes || []).map((l) => ({
     ...l,
     classes: (classesParLigne[l.id] || []).sort((a, b) => a.localeCompare(b, "fr")),
@@ -141,15 +225,24 @@ export async function GET(request) {
     repartitionEvenements: montantsEvtParLigne[l.id] ? "differenciee" : "egale",
     // Justificatif : fichier propre à la ligne (avec sa nature devis /
     // facture provisoire / définitive), ou — pour une ligne recopiée d'une
-    // facture enseignant — celui de la fiche enseignant (facture définitive).
-    a_justificatif: Boolean(l.justificatif_path || l.teacher_invoice_id),
+    // facture enseignant ou d'une demande bénévole — le fichier de celle-ci.
+    a_justificatif: Boolean(
+      l.justificatif_path || l.teacher_invoice_id || l.reimbursement_request_id
+    ),
     a_justificatif_propre: Boolean(l.justificatif_path),
     justificatif_type: l.justificatif_path
       ? l.justificatif_type || null
-      : l.teacher_invoice_id
+      : l.teacher_invoice_id || l.reimbursement_request_id
         ? "facture_definitive"
         : null,
     justificatif_path: undefined,
+    // Remboursement bénévole lié.
+    remboursement_statut: l.reimbursement_request_id
+      ? demandeParId[l.reimbursement_request_id]?.status || "pending"
+      : null,
+    remboursement_le: l.reimbursement_request_id
+      ? demandeParId[l.reimbursement_request_id]?.processed_at || null
+      : null,
   }));
 
   // Filtres portant sur les tables de liaison : appliqués ici.
@@ -193,7 +286,8 @@ export async function GET(request) {
     const parts = partsLigne(l, l.classes, l.classesMontants);
     l.classes.forEach((c, i) => {
       const bucket = (parClasse[c] ||= videSplit());
-      const cible = l.statut === "prevu" ? bucket.previsionnel : bucket.realise;
+      const prev = l.statut === "prevu" || l.statut === "a_valider";
+      const cible = prev ? bucket.previsionnel : bucket.realise;
       cible[l.sens === "depense" ? "depense_cents" : "recette_cents"] += parts[i];
     });
   }
@@ -205,7 +299,8 @@ export async function GET(request) {
     const parts = partsLigne(l, l.evenements, l.evenementsMontants);
     l.evenements.forEach((evId, i) => {
       const bucket = (parEvenement[evId] ||= videSplit());
-      const cible = l.statut === "prevu" ? bucket.previsionnel : bucket.realise;
+      const prev = l.statut === "prevu" || l.statut === "a_valider";
+      const cible = prev ? bucket.previsionnel : bucket.realise;
       cible[l.sens === "depense" ? "depense_cents" : "recette_cents"] += parts[i];
     });
   }

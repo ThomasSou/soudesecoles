@@ -7,15 +7,15 @@ export const dynamic = "force-dynamic";
 // URL signée (5 minutes) vers le justificatif d'une ligne de compta. Le
 // bucket `remboursements` est privé : c'est la seule façon d'y accéder.
 //
-// Priorité : le fichier propre à la ligne ; à défaut, pour une ligne
-// recopiée d'une facture enseignant, le fichier de cette facture.
+// Priorité : le fichier propre à la ligne ; à défaut, celui de la facture
+// enseignant ou de la demande de remboursement bénévole rattachée.
 export async function GET(request, { params }) {
   const auth = await requirePermission(request, "comptabilite");
   if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { data: ligne, error } = await auth.admin
     .from("compta_lignes")
-    .select("justificatif_path, teacher_invoice_id")
+    .select("*")
     .eq("id", params.id)
     .maybeSingle();
 
@@ -29,6 +29,14 @@ export async function GET(request, { params }) {
       .eq("id", ligne.teacher_invoice_id)
       .maybeSingle();
     path = facture?.invoice_file_path || null;
+  }
+  if (!path && ligne.reimbursement_request_id) {
+    const { data: demande } = await auth.admin
+      .from("reimbursement_requests")
+      .select("invoice_path")
+      .eq("id", ligne.reimbursement_request_id)
+      .maybeSingle();
+    path = demande?.invoice_path || null;
   }
 
   if (!path) return NextResponse.json({ error: "Aucun justificatif pour cette ligne." }, { status: 404 });

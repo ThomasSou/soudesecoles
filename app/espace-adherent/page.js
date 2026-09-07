@@ -10,7 +10,6 @@ import {
   findCurrentMembership,
   isMembershipValid,
 } from "../lib/anneeScolaire";
-import { EVENTS } from "../evenements/data";
 
 const EMPTY_CHILD = { firstName: "", lastName: "", classLevel: "", teacherName: "" };
 
@@ -243,10 +242,12 @@ function fichierEnDataUrl(file) {
 // n'apparaît que lorsque le bureau l'a lui-même indiqué dans le back-office.
 function MesRemboursements({ accessToken }) {
   const [demandes, setDemandes] = useState([]);
+  const [manifestations, setManifestations] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [category, setCategory] = useState("manifestation");
-  const [eventSlug, setEventSlug] = useState(EVENTS[0]?.slug || "");
+  const [evenementId, setEvenementId] = useState("");
   const [description, setDescription] = useState("");
+  const [supplierName, setSupplierName] = useState("");
   const [amount, setAmount] = useState("");
   const [factureFile, setFactureFile] = useState(null);
   const [ribFile, setRibFile] = useState(null);
@@ -257,7 +258,13 @@ function MesRemboursements({ accessToken }) {
   function recharger() {
     fetch("/api/remboursements", { headers: { Authorization: `Bearer ${accessToken}` } })
       .then((r) => r.json())
-      .then((data) => setDemandes(data.demandes || []))
+      .then((data) => {
+        setDemandes(data.demandes || []);
+        setManifestations(data.manifestations || []);
+        if (!evenementId && data.manifestations?.[0]) {
+          setEvenementId(data.manifestations[0].id);
+        }
+      })
       .finally(() => setChargement(false));
   }
 
@@ -280,20 +287,24 @@ function MesRemboursements({ accessToken }) {
       return;
     }
 
+    if (category === "manifestation" && !evenementId) {
+      setErreur("Choisissez la manifestation concernée.");
+      return;
+    }
+
     setEnvoi(true);
     try {
       const invoiceDataUrl = await fichierEnDataUrl(factureFile);
       const ribDataUrl = ribFile ? await fichierEnDataUrl(ribFile) : null;
-      const event = category === "manifestation" ? EVENTS.find((ev) => ev.slug === eventSlug) : null;
 
       const res = await fetch("/api/remboursements", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({
           category,
-          eventSlug: event?.slug || null,
-          eventName: event?.name || null,
+          evenementId: category === "manifestation" ? evenementId : null,
           description: description.trim() || null,
+          supplierName: supplierName.trim() || null,
           amount,
           invoiceDataUrl,
           ribDataUrl,
@@ -304,6 +315,7 @@ function MesRemboursements({ accessToken }) {
 
       setSucces("Votre demande a bien été envoyée.");
       setDescription("");
+      setSupplierName("");
       setAmount("");
       setFactureFile(null);
       setRibFile(null);
@@ -343,18 +355,31 @@ function MesRemboursements({ accessToken }) {
           <div>
             <label className="text-xs font-semibold text-slate-500">Manifestation</label>
             <select
-              value={eventSlug}
-              onChange={(e) => setEventSlug(e.target.value)}
+              value={evenementId}
+              onChange={(e) => setEvenementId(e.target.value)}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
             >
-              {EVENTS.map((ev) => (
-                <option key={ev.slug} value={ev.slug}>
-                  {ev.name}
+              {manifestations.length === 0 && <option value="">—</option>}
+              {manifestations.map((ev) => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.nom}
                 </option>
               ))}
             </select>
           </div>
         )}
+
+        <div>
+          <label className="text-xs font-semibold text-slate-500">
+            Prestataire / émetteur de la facture (facultatif)
+          </label>
+          <input
+            value={supplierName}
+            onChange={(e) => setSupplierName(e.target.value)}
+            placeholder="Ex : Boucherie Dupont, Promocash…"
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
 
         <div>
           <label className="text-xs font-semibold text-slate-500">

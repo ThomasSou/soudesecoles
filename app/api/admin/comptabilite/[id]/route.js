@@ -10,7 +10,7 @@ import { resoudreRepartition } from "../../../../lib/comptaRepartition";
 
 export const dynamic = "force-dynamic";
 
-const STATUTS = ["prevu", "a_verifier", "pointe"];
+const STATUTS = ["prevu", "a_verifier", "pointe", "a_valider"];
 const COMPTES = ["courant", "placement"];
 
 // Met à jour une ligne : statut (pointage), montant, libellé, fournisseur,
@@ -35,6 +35,42 @@ export async function PATCH(request, { params }) {
 
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
+
+  // Actions dédiées aux lignes issues d'une demande de remboursement bénévole.
+  if (body.rembourser || body.refuserRemboursement) {
+    if (!ligne.reimbursement_request_id) {
+      return NextResponse.json(
+        { error: "Cette ligne n'est pas rattachée à une demande de remboursement." },
+        { status: 400 }
+      );
+    }
+    const majDemande = {
+      status: body.refuserRemboursement ? "refused" : "reimbursed",
+      processed_at: new Date().toISOString(),
+      processed_by: auth.parent.id,
+    };
+    const { error: eDemande } = await auth.admin
+      .from("reimbursement_requests")
+      .update(majDemande)
+      .eq("id", ligne.reimbursement_request_id);
+    if (eDemande) return NextResponse.json({ error: eDemande.message }, { status: 500 });
+
+    if (body.refuserRemboursement) {
+      // Demande refusée : la dépense ne compte pas, on retire la ligne.
+      const { error: eDel } = await auth.admin
+        .from("compta_lignes")
+        .delete()
+        .eq("id", params.id);
+      if (eDel) return NextResponse.json({ error: eDel.message }, { status: 500 });
+    } else if (ligne.statut === "a_valider") {
+      // Remboursé implique validé : la ligne passe « à pointer ».
+      await auth.admin
+        .from("compta_lignes")
+        .update({ statut: "a_verifier" })
+        .eq("id", params.id);
+    }
+    return NextResponse.json({ ok: true });
+  }
 
   const update = {};
   const manuelle = ligne.source === "manuel";

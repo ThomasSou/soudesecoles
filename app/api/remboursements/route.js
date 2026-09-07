@@ -47,16 +47,30 @@ export async function POST(request) {
 
   const body = await request.json().catch(() => null);
   const category = body?.category;
-  const eventSlug = body?.eventSlug || null;
-  const eventName = body?.eventName || null;
+  const evenementId = body?.evenementId || null;
   const description = body?.description?.trim() || null;
+  const supplierName = body?.supplierName?.trim() || null;
   const amount = Number(body?.amount);
 
   if (!CATEGORIES.includes(category)) {
     return NextResponse.json({ error: "Catégorie invalide." }, { status: 400 });
   }
-  if (category === "manifestation" && !eventSlug) {
+  if (category === "manifestation" && !evenementId) {
     return NextResponse.json({ error: "Choisissez la manifestation concernée." }, { status: 400 });
+  }
+
+  // Nom de la manifestation, pour l'affichage (l'id reste la clé).
+  let eventName = null;
+  if (category === "manifestation" && evenementId) {
+    const { data: ev } = await admin
+      .from("benevolat_evenements")
+      .select("nom")
+      .eq("id", evenementId)
+      .maybeSingle();
+    if (!ev) {
+      return NextResponse.json({ error: "Manifestation inconnue." }, { status: 400 });
+    }
+    eventName = ev.nom;
   }
   if (!Number.isFinite(amount) || amount <= 0) {
     return NextResponse.json({ error: "Le montant doit être supérieur à 0." }, { status: 400 });
@@ -102,9 +116,10 @@ export async function POST(request) {
     family_id: parent.family_id,
     parent_id: parent.id,
     category,
-    event_slug: category === "manifestation" ? eventSlug : null,
+    evenement_id: category === "manifestation" ? evenementId : null,
     event_name: category === "manifestation" ? eventName : null,
     description,
+    supplier_name: supplierName,
     amount_cents: Math.round(amount * 100),
     invoice_path: invoicePath,
     rib_path: ribPath,
@@ -138,16 +153,27 @@ export async function GET(request) {
     .eq("auth_user_id", userData.user.id)
     .maybeSingle();
 
+  const { data: manifestations } = await admin
+    .from("benevolat_evenements")
+    .select("id, nom")
+    .order("created_at", { ascending: false });
+
   if (!parent?.family_id) {
-    return NextResponse.json({ ok: true, demandes: [] });
+    return NextResponse.json({ ok: true, demandes: [], manifestations: manifestations || [] });
   }
 
   const { data, error } = await admin
     .from("reimbursement_requests")
-    .select("id, category, event_name, description, amount_cents, status, admin_note, created_at, processed_at")
+    .select(
+      "id, category, event_name, description, supplier_name, amount_cents, status, admin_note, created_at, processed_at"
+    )
     .eq("family_id", parent.family_id)
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, demandes: data || [] });
+  return NextResponse.json({
+    ok: true,
+    demandes: data || [],
+    manifestations: manifestations || [],
+  });
 }

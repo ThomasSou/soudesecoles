@@ -30,12 +30,23 @@ const RUBRIQUES = {
 };
 
 const STATUTS = {
+  a_valider: { label: "À valider", classe: "bg-orange-50 text-orange-700" },
   prevu: { label: "Prévisionnel", classe: "bg-slate-100 text-slate-600" },
   a_verifier: { label: "À pointer", classe: "bg-amber-50 text-amber-700" },
   pointe: { label: "Pointé", classe: "bg-green-50 text-green-700" },
 };
 
+// Statuts que le bureau peut poser à la main via les boutons de cycle
+// (« à valider » est réservé aux demandes bénévoles, piloté à part).
+const STATUTS_CYCLE = ["prevu", "a_verifier", "pointe"];
+
 const PAYE_PAR = { sou: "Le Sou", benevole: "Un bénévole" };
+
+const REMBOURSEMENT_STATUT = {
+  pending: "Remboursement à faire",
+  reimbursed: "Remboursé",
+  refused: "Refusé",
+};
 
 const COMPTES = { courant: "Compte courant", placement: "Compte placement" };
 
@@ -614,9 +625,9 @@ function LigneForm({ accessToken, annees, evenements, parents, ligne, onDone, on
             onChange={(e) => setStatut(e.target.value)}
             className={champ}
           >
-            {Object.entries(STATUTS).map(([k, v]) => (
+            {STATUTS_CYCLE.map((k) => (
               <option key={k} value={k}>
-                {v.label}
+                {STATUTS[k].label}
               </option>
             ))}
           </select>
@@ -911,21 +922,65 @@ function LigneRow({ accessToken, ligne, evenements, annees, parents, onChange })
         </div>
       </div>
 
+      {ligne.source === "benevole" && (
+        <div className="flex flex-wrap items-center gap-1.5 mt-2 text-xs">
+          <span className="font-semibold text-orange-700">Demande bénévole</span>
+          {ligne.statut === "a_valider" && (
+            <>
+              <button
+                onClick={() => patch({ statut: "a_verifier" })}
+                disabled={envoi}
+                className="font-semibold text-white bg-sou-blue px-2.5 py-1 rounded-full disabled:opacity-40"
+              >
+                Valider
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm("Refuser cette demande ? La ligne sera retirée de la compta."))
+                    patch({ refuserRemboursement: true });
+                }}
+                disabled={envoi}
+                className="font-semibold text-red-600 px-2 disabled:opacity-40"
+              >
+                Refuser
+              </button>
+            </>
+          )}
+          {ligne.remboursement_statut === "reimbursed" ? (
+            <span className="text-green-700 font-semibold">
+              Remboursé{ligne.remboursement_le ? ` le ${formatDate(ligne.remboursement_le)}` : ""}
+            </span>
+          ) : (
+            <button
+              onClick={() => {
+                if (confirm("Marquer ce remboursement comme effectué ? Il apparaîtra sur la fiche du bénévole."))
+                  patch({ rembourser: true });
+              }}
+              disabled={envoi}
+              className="font-semibold text-sou-blue px-2 disabled:opacity-40"
+            >
+              Marquer remboursé
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-1.5 mt-2">
-        {Object.entries(STATUTS).map(([k, v]) => (
-          <button
-            key={k}
-            disabled={envoi || ligne.statut === k}
-            onClick={() => patch({ statut: k })}
-            className={`text-xs font-semibold px-2.5 py-1 rounded-full disabled:opacity-40 ${
-              ligne.statut === k
-                ? v.classe
-                : "border border-slate-300 text-slate-600"
-            }`}
-          >
-            {v.label}
-          </button>
-        ))}
+        {(ligne.source === "benevole" ? ligne.statut !== "a_valider" : true) &&
+          STATUTS_CYCLE.map((k) => (
+            <button
+              key={k}
+              disabled={envoi || ligne.statut === k}
+              onClick={() => patch({ statut: k })}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full disabled:opacity-40 ${
+                ligne.statut === k
+                  ? STATUTS[k].classe
+                  : "border border-slate-300 text-slate-600"
+              }`}
+            >
+              {STATUTS[k].label}
+            </button>
+          ))}
 
         {ligne.source === "manuel" && (
           <>
@@ -1066,6 +1121,7 @@ function ComptaAdmin({ accessToken }) {
   const aVerifier = data?.totaux?.parStatut?.a_verifier;
   const pointe = data?.totaux?.parStatut?.pointe;
   const previsionnel = data?.totaux?.parStatut?.prevu;
+  const aValider = data?.totaux?.parStatut?.a_valider;
   const entreesClasses = Object.entries(data?.totaux?.parClasse || {}).map(([cle, v]) => ({
     label: v.libelle || libelleClasse(cle),
     realise: v.realise,
@@ -1096,8 +1152,9 @@ function ComptaAdmin({ accessToken }) {
       <p className="text-slate-500 text-sm mb-6">
         Dépenses et recettes de l&apos;association, par événement, par classe,
         en investissement ou en fonctionnement courant. Tout est en TTC. Les
-        factures des enseignants apparaissent automatiquement en dépenses par
-        classe. Un devis joint met la ligne en <strong>prévisionnel</strong>{" "}
+        factures des enseignants et les demandes de remboursement des bénévoles
+        apparaissent automatiquement (ces dernières en « à valider »). Un devis
+        joint met la ligne en <strong>prévisionnel</strong>{" "}
         jusqu&apos;à ce qu&apos;une facture le remplace. Une dépense partagée se
         répartit à parts égales entre les classes / manifestations, ou avec des
         montants différenciés. Import des relevés Crédit Agricole et pointage
@@ -1216,8 +1273,17 @@ function ComptaAdmin({ accessToken }) {
           </p>
         </div>
       </div>
-      {(aVerifier || pointe) && (
+      {(aValider || aVerifier || pointe) && (
         <p className="text-xs text-slate-500 mb-4">
+          {aValider ? (
+            <>
+              À valider :{" "}
+              {euros(
+                (aValider?.depense_cents || 0) + (aValider?.recette_cents || 0)
+              )}{" "}
+              ·{" "}
+            </>
+          ) : null}
           À pointer :{" "}
           {euros(
             (aVerifier?.depense_cents || 0) + (aVerifier?.recette_cents || 0)
