@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
-import { televerserJustificatif, supprimerJustificatif } from "../../../../lib/comptaFichiers";
+import {
+  televerserJustificatif,
+  supprimerJustificatif,
+  TYPES_JUSTIFICATIF,
+} from "../../../../lib/comptaFichiers";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +25,7 @@ export async function PATCH(request, { params }) {
 
   const { data: ligne, error: eLecture } = await auth.admin
     .from("compta_lignes")
-    .select("id, source, rubrique, statut, justificatif_path")
+    .select("id, source, rubrique, statut, justificatif_path, justificatif_type")
     .eq("id", params.id)
     .maybeSingle();
   if (eLecture) return NextResponse.json({ error: eLecture.message }, { status: 500 });
@@ -64,7 +68,12 @@ export async function PATCH(request, { params }) {
   }
 
   // Justificatif : ajout / remplacement (toutes sources — le bureau peut
-  // joindre sa propre facture même sur une ligne enseignant) ou retrait.
+  // joindre sa propre facture même sur une ligne enseignant), reclassement
+  // (devis -> facture définitive…) sans re-téléverser, ou retrait.
+  const typeDemande = TYPES_JUSTIFICATIF.includes(body.justificatifType)
+    ? body.justificatifType
+    : null;
+
   if (body.justificatifDataUrl) {
     const { path, error: eFichier } = await televerserJustificatif(
       auth.admin,
@@ -74,9 +83,13 @@ export async function PATCH(request, { params }) {
     if (eFichier) return NextResponse.json({ error: eFichier }, { status: 400 });
     if (ligne.justificatif_path) await supprimerJustificatif(auth.admin, ligne.justificatif_path);
     update.justificatif_path = path;
+    update.justificatif_type = typeDemande || "facture_definitive";
   } else if (body.retirerJustificatif && ligne.justificatif_path) {
     await supprimerJustificatif(auth.admin, ligne.justificatif_path);
     update.justificatif_path = null;
+    update.justificatif_type = null;
+  } else if (typeDemande && ligne.justificatif_path) {
+    update.justificatif_type = typeDemande;
   }
 
   // Champs réservés aux lignes manuelles.

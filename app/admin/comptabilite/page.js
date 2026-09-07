@@ -38,6 +38,27 @@ function formatDate(iso) {
 // contrôlée côté serveur : 8 Mo).
 const TYPES_JUSTIF = "image/*,application/pdf";
 
+// Nature du document joint. Le voyant ne passe au vert que sur une facture
+// définitive.
+const TYPES_DOC = {
+  devis: "Devis",
+  facture_provisoire: "Facture provisoire",
+  facture_definitive: "Facture définitive",
+};
+
+// État du justificatif d'une ligne, pour le voyant et les libellés.
+function voyantJustif(ligne) {
+  if (ligne.a_justificatif_propre) {
+    const t = ligne.justificatif_type;
+    return {
+      ok: t === "facture_definitive",
+      label: TYPES_DOC[t] || "Document joint",
+    };
+  }
+  if (ligne.a_justificatif) return { ok: true, label: "Facture enseignant" };
+  return { ok: false, label: "Facture manquante" };
+}
+
 // Lit le fichier choisi et le renvoie en data URL base64, pour l'envoyer
 // dans le corps JSON de la requête.
 function lireFichier(file) {
@@ -68,6 +89,9 @@ function LigneForm({ accessToken, annee, evenements, classes, ligne, onDone, onC
   const [statut, setStatut] = useState(ligne?.statut || "a_verifier");
   const [note, setNote] = useState(ligne?.note || "");
   const [justificatif, setJustificatif] = useState(null);
+  const [justificatifType, setJustificatifType] = useState(
+    ligne?.justificatif_type || "facture_definitive"
+  );
   const [erreur, setErreur] = useState("");
   const [envoi, setEnvoi] = useState(false);
 
@@ -104,6 +128,7 @@ function LigneForm({ accessToken, annee, evenements, classes, ligne, onDone, onC
       statut,
       note,
       justificatifDataUrl,
+      justificatifType,
       annee,
     };
     const url = edition
@@ -293,20 +318,36 @@ function LigneForm({ accessToken, annee, evenements, classes, ligne, onDone, onC
         />
       </label>
 
-      <label className="text-sm block">
-        Justificatif — facture (PDF ou image, facultatif)
-        {edition && ligne?.a_justificatif_propre && (
-          <span className="block text-xs text-green-700">
-            Un justificatif est déjà joint. En choisir un nouveau le remplacera.
-          </span>
-        )}
-        <input
-          type="file"
-          accept={TYPES_JUSTIF}
-          onChange={(e) => setJustificatif(e.target.files?.[0] || null)}
-          className="mt-1 block w-full text-sm text-slate-600 file:mr-3 file:rounded-full file:border-0 file:bg-sou-blue/10 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-sou-blue"
-        />
-      </label>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <label className="text-sm block">
+          Justificatif — devis ou facture (PDF ou image, facultatif)
+          {edition && ligne?.a_justificatif_propre && (
+            <span className="block text-xs text-green-700">
+              Un document est déjà joint. En choisir un nouveau le remplacera.
+            </span>
+          )}
+          <input
+            type="file"
+            accept={TYPES_JUSTIF}
+            onChange={(e) => setJustificatif(e.target.files?.[0] || null)}
+            className="mt-1 block w-full text-sm text-slate-600 file:mr-3 file:rounded-full file:border-0 file:bg-sou-blue/10 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-sou-blue"
+          />
+        </label>
+        <label className="text-sm block">
+          Nature du document
+          <select
+            value={justificatifType}
+            onChange={(e) => setJustificatifType(e.target.value)}
+            className={champ}
+          >
+            {Object.entries(TYPES_DOC).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       {erreur && <p className="text-sm text-red-600">{erreur}</p>}
 
@@ -337,6 +378,7 @@ function LigneRow({ accessToken, ligne, evenements, classes, annee, onChange }) 
   const [edition, setEdition] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const statut = STATUTS[ligne.statut] || STATUTS.a_verifier;
+  const voyant = voyantJustif(ligne);
   const nomEvenement =
     ligne.rubrique === "evenement"
       ? evenements.find((e) => e.id === ligne.evenement_id)?.nom || "Événement"
@@ -454,7 +496,7 @@ function LigneRow({ accessToken, ligne, evenements, classes, annee, onChange }) 
             </span>
             <span
               className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                ligne.a_justificatif
+                voyant.ok
                   ? "bg-green-50 text-green-700"
                   : "bg-amber-50 text-amber-700"
               }`}
@@ -464,7 +506,7 @@ function LigneRow({ accessToken, ligne, evenements, classes, annee, onChange }) 
                   : undefined
               }
             >
-              {ligne.a_justificatif ? "Facture jointe" : "Facture manquante"}
+              {voyant.label}
             </span>
           </div>
         </div>
@@ -511,11 +553,11 @@ function LigneRow({ accessToken, ligne, evenements, classes, annee, onChange }) 
             onClick={voirJustificatif}
             className="text-xs font-semibold text-sou-blue px-2"
           >
-            Voir la facture
+            Voir le document
           </button>
         )}
         <label className="text-xs font-semibold text-sou-blue px-2 cursor-pointer">
-          {ligne.a_justificatif_propre ? "Remplacer" : "Joindre la facture"}
+          {ligne.a_justificatif_propre ? "Remplacer" : "Joindre un document"}
           <input
             type="file"
             accept={TYPES_JUSTIF}
@@ -528,13 +570,28 @@ function LigneRow({ accessToken, ligne, evenements, classes, annee, onChange }) 
           />
         </label>
         {ligne.a_justificatif_propre && (
-          <button
-            onClick={retirerJustificatif}
-            disabled={envoi}
-            className="text-xs font-semibold text-red-600 px-2 disabled:opacity-40"
-          >
-            Retirer
-          </button>
+          <>
+            <select
+              value={ligne.justificatif_type || "facture_definitive"}
+              disabled={envoi}
+              onChange={(e) => patch({ justificatifType: e.target.value })}
+              className="text-xs border border-slate-300 rounded-full px-2 py-1 text-slate-600 disabled:opacity-40"
+              title="Nature du document joint"
+            >
+              {Object.entries(TYPES_DOC).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={retirerJustificatif}
+              disabled={envoi}
+              className="text-xs font-semibold text-red-600 px-2 disabled:opacity-40"
+            >
+              Retirer
+            </button>
+          </>
         )}
       </div>
 

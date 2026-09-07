@@ -7,6 +7,10 @@ import { decoderDataUrl, BUCKET, urlSignee } from "./enseignantFichiers";
 
 export const PREFIXE_COMPTA = "comptabilite";
 
+// Nature du document joint à une ligne (cf. contrainte SQL
+// compta_lignes_justificatif_type_chk).
+export const TYPES_JUSTIFICATIF = ["devis", "facture_provisoire", "facture_definitive"];
+
 // Charge le justificatif d'une ligne et renvoie son chemin dans le bucket.
 export async function televerserJustificatif(admin, ligneId, dataUrl) {
   const fichier = decoderDataUrl(dataUrl);
