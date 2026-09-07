@@ -3,6 +3,7 @@ import { requirePermission } from "../../../lib/adminAuth";
 import { currentSchoolYear } from "../../../lib/anneeScolaire";
 import { televerserJustificatif, TYPES_JUSTIFICATIF } from "../../../lib/comptaFichiers";
 import { CLASSES_REFERENCE, CLES_CLASSES, libelleClasse } from "../../../lib/classesReference";
+import { repartirEgal, resoudreRepartition } from "../../../lib/comptaRepartition";
 
 export const dynamic = "force-dynamic";
 
@@ -103,29 +104,41 @@ export async function GET(request) {
   const ids = (lignesBrutes || []).map((l) => l.id);
   const [liensClassesRes, liensEvenementsRes] = await Promise.all([
     ids.length
-      ? auth.admin.from("compta_ligne_classes").select("ligne_id, class_label").in("ligne_id", ids)
+      ? auth.admin.from("compta_ligne_classes").select("*").in("ligne_id", ids)
       : Promise.resolve({ data: [] }),
     ids.length
-      ? auth.admin.from("compta_ligne_evenements").select("ligne_id, evenement_id").in("ligne_id", ids)
+      ? auth.admin.from("compta_ligne_evenements").select("*").in("ligne_id", ids)
       : Promise.resolve({ data: [] }),
   ]);
   const liensClasses = liensClassesRes.data;
   const classesParLigne = {};
+  const montantsClasseParLigne = {};
   for (const l of liensClasses || []) {
     (classesParLigne[l.ligne_id] ||= []).push(l.class_label);
+    if (l.montant_cents != null) {
+      (montantsClasseParLigne[l.ligne_id] ||= {})[l.class_label] = l.montant_cents;
+    }
   }
   const evenementsParLigne = {};
+  const montantsEvtParLigne = {};
   for (const l of liensEvenementsRes.data || []) {
     (evenementsParLigne[l.ligne_id] ||= []).push(l.evenement_id);
+    if (l.montant_cents != null) {
+      (montantsEvtParLigne[l.ligne_id] ||= {})[l.evenement_id] = l.montant_cents;
+    }
   }
 
   let lignes = (lignesBrutes || []).map((l) => ({
     ...l,
     classes: (classesParLigne[l.id] || []).sort((a, b) => a.localeCompare(b, "fr")),
+    classesMontants: montantsClasseParLigne[l.id] || {},
+    repartitionClasses: montantsClasseParLigne[l.id] ? "differenciee" : "egale",
     // Manifestations de la ligne : la table de liaison, avec repli sur la
     // colonne mono-événement tant que la reprise 0043 n'est pas passée.
     evenements:
       evenementsParLigne[l.id] || (l.evenement_id ? [l.evenement_id] : []),
+    evenementsMontants: montantsEvtParLigne[l.id] || {},
+    repartitionEvenements: montantsEvtParLigne[l.id] ? "differenciee" : "egale",
     // Justificatif : fichier propre à la ligne (avec sa nature devis /
     // facture provisoire / définitive), ou — pour une ligne recopiée d'une
     // facture enseignant — celui de la fiche enseignant (facture définitive).
@@ -166,19 +179,18 @@ export async function GET(request) {
     (parRubrique[l.rubrique] ||= vide()) && ajoute(parRubrique[l.rubrique], l);
   }
 
-  // Récap par classe : le montant de la ligne est RÉPARTI à parts égales
-  // entre les classes cochées (800 € sur 8 classes -> 100 € chacune). La
-  // somme des classes = le montant réel de la ligne (le reste en centimes
-  // est distribué aux premières classes). Réalisé / prévisionnel séparés.
-  const repartir = (total, n) => {
-    const base = Math.floor(total / n);
-    const reste = total - base * n;
-    return Array.from({ length: n }, (_, i) => base + (i < reste ? 1 : 0));
-  };
+  // Parts d'une ligne entre ses classes / manifestations : montants saisis
+  // si répartition différenciée, sinon division à parts égales.
+  const partsLigne = (l, cibles, montants) =>
+    montants && Object.keys(montants).length
+      ? cibles.map((c) => montants[c] || 0)
+      : repartirEgal(l.montant_cents, cibles.length);
+
+  // Récap par classe. Réalisé / prévisionnel séparés.
   const parClasse = {};
   for (const l of lignes) {
     if (l.rubrique !== "classe" || l.classes.length === 0) continue;
-    const parts = repartir(l.montant_cents, l.classes.length);
+    const parts = partsLigne(l, l.classes, l.classesMontants);
     l.classes.forEach((c, i) => {
       const bucket = (parClasse[c] ||= videSplit());
       const cible = l.statut === "prevu" ? bucket.previsionnel : bucket.realise;
@@ -186,13 +198,11 @@ export async function GET(request) {
     });
   }
 
-  // Récap par manifestation : le montant est réparti à parts égales entre
-  // les manifestations de la ligne (comme pour les classes). Réalisé /
-  // prévisionnel séparés.
+  // Récap par manifestation. Réalisé / prévisionnel séparés.
   const parEvenement = {};
   for (const l of lignes) {
     if (l.rubrique !== "evenement" || l.evenements.length === 0) continue;
-    const parts = repartir(l.montant_cents, l.evenements.length);
+    const parts = partsLigne(l, l.evenements, l.evenementsMontants);
     l.evenements.forEach((evId, i) => {
       const bucket = (parEvenement[evId] ||= videSplit());
       const cible = l.statut === "prevu" ? bucket.previsionnel : bucket.realise;
@@ -309,6 +319,33 @@ export async function POST(request) {
     );
   }
 
+  // Répartition (égale par défaut, ou différenciée avec un montant par
+  // classe / manifestation dont la somme doit égaler le total de la ligne).
+  const montantCentsTotal = Math.round(montant * 100);
+  let montantsClasses = {};
+  let montantsEvenements = {};
+  if (rubrique === "classe") {
+    const r = resoudreRepartition({
+      cles: classes,
+      mode: body?.repartitionClasses,
+      montantsBruts: body?.classesMontants,
+      totalCents: montantCentsTotal,
+      libelle: libelleClasse,
+    });
+    if (r.error) return NextResponse.json({ error: r.error }, { status: 400 });
+    montantsClasses = r.montants;
+  }
+  if (rubrique === "evenement") {
+    const r = resoudreRepartition({
+      cles: evenements,
+      mode: body?.repartitionEvenements,
+      montantsBruts: body?.evenementsMontants,
+      totalCents: montantCentsTotal,
+    });
+    if (r.error) return NextResponse.json({ error: r.error }, { status: 400 });
+    montantsEvenements = r.montants;
+  }
+
   const { data: ligne, error } = await auth.admin
     .from("compta_lignes")
     .insert({
@@ -335,17 +372,34 @@ export async function POST(request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // Le champ montant_cents n'est ajouté qu'en répartition différenciée : les
+  // lignes égales restent insérables même si la migration 0044 n'est pas
+  // encore passée.
+  const lienAvecMontant = (base, montants, cle) => {
+    const row = { ...base };
+    if (montants[cle] != null) row.montant_cents = montants[cle];
+    return row;
+  };
+
   if (rubrique === "classe" && classes.length > 0) {
     const { error: eClasses } = await auth.admin
       .from("compta_ligne_classes")
-      .insert(classes.map((class_label) => ({ ligne_id: ligne.id, class_label })));
+      .insert(
+        classes.map((class_label) =>
+          lienAvecMontant({ ligne_id: ligne.id, class_label }, montantsClasses, class_label)
+        )
+      );
     if (eClasses) return NextResponse.json({ error: eClasses.message }, { status: 500 });
   }
 
   if (rubrique === "evenement" && evenements.length > 0) {
     const { error: eEv } = await auth.admin
       .from("compta_ligne_evenements")
-      .insert(evenements.map((evenement_id) => ({ ligne_id: ligne.id, evenement_id })));
+      .insert(
+        evenements.map((evenement_id) =>
+          lienAvecMontant({ ligne_id: ligne.id, evenement_id }, montantsEvenements, evenement_id)
+        )
+      );
     if (eEv) return NextResponse.json({ error: eEv.message }, { status: 500 });
   }
 

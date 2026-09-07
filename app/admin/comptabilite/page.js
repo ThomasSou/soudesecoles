@@ -7,6 +7,7 @@ import {
   GROUPES_CLASSES,
   libelleClasse,
 } from "../../lib/classesReference";
+import { repartirEgal } from "../../lib/comptaRepartition";
 
 // Groupes de classes pour le sélecteur, construits directement depuis la
 // référence (jamais dépendants de la réponse de l'API — le sélecteur ne
@@ -127,6 +128,80 @@ function Recap({ titre, entrees }) {
   );
 }
 
+const centsVersTexte = (m) =>
+  Object.fromEntries(Object.entries(m || {}).map(([k, v]) => [k, (v / 100).toFixed(2)]));
+
+const texteVersCents = (v) =>
+  Math.round((Number(String(v ?? "").replace(",", ".")) || 0) * 100);
+
+// Éditeur de répartition d'un montant entre plusieurs classes / manifestations.
+// items : [{ key, label }]. Masqué s'il y a moins de 2 éléments.
+function RepartitionEditor({ mode, setMode, items, montants, setMontants, totalCents }) {
+  if (items.length < 2) return null;
+  const sommeCents = items.reduce((s, it) => s + texteVersCents(montants[it.key]), 0);
+  const ok = mode !== "differenciee" || sommeCents === totalCents;
+  const fmt = (c) =>
+    (c / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  return (
+    <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-2">
+      <div className="flex flex-wrap gap-1.5">
+        {[
+          ["egale", "Répartition égale"],
+          ["differenciee", "Montants différenciés"],
+        ].map(([k, lbl]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => {
+              if (k === "differenciee") {
+                const parts = repartirEgal(totalCents, items.length);
+                const nv = { ...montants };
+                items.forEach((it, i) => {
+                  if (nv[it.key] == null || nv[it.key] === "") {
+                    nv[it.key] = (parts[i] / 100).toFixed(2);
+                  }
+                });
+                setMontants(nv);
+              }
+              setMode(k);
+            }}
+            className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+              mode === k
+                ? "bg-sou-blue text-white"
+                : "bg-white border border-slate-300 text-slate-600"
+            }`}
+          >
+            {lbl}
+          </button>
+        ))}
+      </div>
+
+      {mode === "differenciee" && (
+        <div className="space-y-1">
+          {items.map((it) => (
+            <div key={it.key} className="flex items-center gap-2 text-xs">
+              <span className="flex-1 min-w-0 truncate">{it.label}</span>
+              <input
+                value={montants[it.key] ?? ""}
+                inputMode="decimal"
+                onChange={(e) => setMontants({ ...montants, [it.key]: e.target.value })}
+                className="w-24 border border-slate-200 rounded-lg px-2 py-1 text-right"
+                placeholder="0,00"
+              />
+              <span className="text-slate-400">€</span>
+            </div>
+          ))}
+          <p className={`text-xs font-semibold ${ok ? "text-green-700" : "text-red-600"}`}>
+            Total réparti : {fmt(sommeCents)} € / montant de la ligne : {fmt(totalCents)} €
+            {ok ? " ✓" : " — à ajuster"}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Lit le fichier choisi et le renvoie en data URL base64, pour l'envoyer
 // dans le corps JSON de la requête.
 function lireFichier(file) {
@@ -152,6 +227,18 @@ function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) 
   const [evenementsLocaux, setEvenementsLocaux] = useState([]);
   const [nouvelleManif, setNouvelleManif] = useState("");
   const [classesSel, setClassesSel] = useState(ligne?.classes || []);
+  const [repartitionClasses, setRepartitionClasses] = useState(
+    ligne?.repartitionClasses || "egale"
+  );
+  const [classesMontants, setClassesMontants] = useState(
+    centsVersTexte(ligne?.classesMontants)
+  );
+  const [repartitionEvenements, setRepartitionEvenements] = useState(
+    ligne?.repartitionEvenements || "egale"
+  );
+  const [evenementsMontants, setEvenementsMontants] = useState(
+    centsVersTexte(ligne?.evenementsMontants)
+  );
   const [libelle, setLibelle] = useState(ligne?.libelle || "");
   const [fournisseur, setFournisseur] = useState(ligne?.fournisseur || "");
   const [montant, setMontant] = useState(
@@ -212,9 +299,28 @@ function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) 
     );
   }
 
+  const totalLigneCents = texteVersCents(montant);
+  const sommeRepartie = (sel, montants) =>
+    sel.reduce((s, k) => s + texteVersCents(montants[k]), 0);
+  const classesDiffOk =
+    rubrique !== "classe" ||
+    repartitionClasses !== "differenciee" ||
+    sommeRepartie(classesSel, classesMontants) === totalLigneCents;
+  const evenementsDiffOk =
+    rubrique !== "evenement" ||
+    repartitionEvenements !== "differenciee" ||
+    sommeRepartie(evenementsSel, evenementsMontants) === totalLigneCents;
+
   async function soumettre(e) {
     e.preventDefault();
     setErreur("");
+
+    if (!classesDiffOk || !evenementsDiffOk) {
+      setErreur(
+        "La somme des montants répartis ne correspond pas au montant de la ligne."
+      );
+      return;
+    }
     setEnvoi(true);
 
     let justificatifDataUrl = null;
@@ -233,6 +339,16 @@ function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) 
       rubrique,
       evenements: rubrique === "evenement" ? evenementsSel : [],
       classes: rubrique === "classe" ? classesSel : [],
+      repartitionClasses: rubrique === "classe" ? repartitionClasses : undefined,
+      classesMontants:
+        rubrique === "classe" && repartitionClasses === "differenciee"
+          ? classesMontants
+          : undefined,
+      repartitionEvenements: rubrique === "evenement" ? repartitionEvenements : undefined,
+      evenementsMontants:
+        rubrique === "evenement" && repartitionEvenements === "differenciee"
+          ? evenementsMontants
+          : undefined,
       libelle,
       fournisseur,
       montant: String(montant).replace(",", "."),
@@ -312,7 +428,7 @@ function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) 
           <p>
             Manifestation(s) concernée(s){" "}
             <span className="text-slate-400">
-              — le montant est réparti à parts égales entre les manifestations cochées
+              — réparti à parts égales, sauf montants différenciés
             </span>
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -336,6 +452,17 @@ function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) 
               </button>
             ))}
           </div>
+          <RepartitionEditor
+            mode={repartitionEvenements}
+            setMode={setRepartitionEvenements}
+            items={evenementsSel.map((id) => ({
+              key: id,
+              label: tousEvenements.find((e) => e.id === id)?.nom || "Manifestation",
+            }))}
+            montants={evenementsMontants}
+            setMontants={setEvenementsMontants}
+            totalCents={totalLigneCents}
+          />
           <div className="flex gap-2">
             <input
               value={nouvelleManif}
@@ -400,6 +527,14 @@ function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) 
               </div>
             );
           })}
+          <RepartitionEditor
+            mode={repartitionClasses}
+            setMode={setRepartitionClasses}
+            items={classesSel.map((c) => ({ key: c, label: libelleClasse(c) }))}
+            montants={classesMontants}
+            setMontants={setClassesMontants}
+            totalCents={totalLigneCents}
+          />
         </div>
       )}
 
@@ -523,7 +658,7 @@ function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) 
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={envoi}
+          disabled={envoi || !classesDiffOk || !evenementsDiffOk}
           className="bg-sou-blue text-white text-sm font-semibold px-4 py-2 rounded-full disabled:opacity-50"
         >
           {edition ? "Enregistrer" : "Ajouter la ligne"}
@@ -554,12 +689,17 @@ function LigneRow({ accessToken, ligne, evenements, annee, onChange }) {
       : ligne.evenement_id
         ? [ligne.evenement_id]
         : [];
+  const evtDiff = ligne.repartitionEvenements === "differenciee";
   const nomEvenement =
     ligne.rubrique === "evenement"
       ? idsEvenement
-          .map((id) => evenements.find((e) => e.id === id)?.nom || "Manifestation")
+          .map((id) => {
+            const n = evenements.find((e) => e.id === id)?.nom || "Manifestation";
+            return evtDiff ? `${n} (${euros(ligne.evenementsMontants?.[id] || 0)})` : n;
+          })
           .join(", ")
       : null;
+  const classeDiff = ligne.repartitionClasses === "differenciee";
 
   async function patch(corps) {
     setEnvoi(true);
@@ -647,7 +787,15 @@ function LigneRow({ accessToken, ligne, evenements, annee, onChange }) {
             </span>
             {nomEvenement && <span>{nomEvenement}</span>}
             {ligne.rubrique === "classe" && ligne.classes.length > 0 && (
-              <span>{ligne.classes.map((c) => libelleClasse(c)).join(", ")}</span>
+              <span>
+                {ligne.classes
+                  .map((c) =>
+                    classeDiff
+                      ? `${libelleClasse(c)} (${euros(ligne.classesMontants?.[c] || 0)})`
+                      : libelleClasse(c)
+                  )
+                  .join(", ")}
+              </span>
             )}
             {ligne.fournisseur && <span> · {ligne.fournisseur}</span>}
             {ligne.source === "enseignant" && (
@@ -875,8 +1023,10 @@ function ComptaAdmin({ accessToken }) {
         en investissement ou en fonctionnement courant. Tout est en TTC. Les
         factures des enseignants apparaissent automatiquement en dépenses par
         classe. Un devis joint met la ligne en <strong>prévisionnel</strong>{" "}
-        jusqu&apos;à ce qu&apos;une facture le remplace. Import des relevés
-        Crédit Agricole et pointage automatique : à venir.
+        jusqu&apos;à ce qu&apos;une facture le remplace. Une dépense partagée se
+        répartit à parts égales entre les classes / manifestations, ou avec des
+        montants différenciés. Import des relevés Crédit Agricole et pointage
+        automatique : à venir.
       </p>
 
       {data?.error && (

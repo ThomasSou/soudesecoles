@@ -5,7 +5,8 @@ import {
   supprimerJustificatif,
   TYPES_JUSTIFICATIF,
 } from "../../../../lib/comptaFichiers";
-import { CLES_CLASSES } from "../../../../lib/classesReference";
+import { CLES_CLASSES, libelleClasse } from "../../../../lib/classesReference";
+import { resoudreRepartition } from "../../../../lib/comptaRepartition";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export async function PATCH(request, { params }) {
 
   const { data: ligne, error: eLecture } = await auth.admin
     .from("compta_lignes")
-    .select("id, source, rubrique, statut, justificatif_path, justificatif_type")
+    .select("id, source, rubrique, statut, montant_cents, justificatif_path, justificatif_type")
     .eq("id", params.id)
     .maybeSingle();
   if (eLecture) return NextResponse.json({ error: eLecture.message }, { status: 500 });
@@ -148,35 +149,75 @@ export async function PATCH(request, { params }) {
     }
   }
 
+  // Classes d'une ligne « classe » manuelle à remplacer (le cas échéant).
+  const classesMaj =
+    manuelle && ligne.rubrique === "classe" && Array.isArray(body.classes)
+      ? [...new Set(body.classes.map((c) => String(c).trim()).filter((c) => CLES_CLASSES.includes(c)))]
+      : null;
+  if (classesMaj && classesMaj.length === 0) {
+    return NextResponse.json(
+      { error: "Choisissez au moins une classe dans la liste." },
+      { status: 400 }
+    );
+  }
+
+  // Répartition (égale ou différenciée) — validée AVANT d'écrire quoi que
+  // ce soit, pour ne pas laisser la ligne à moitié modifiée.
+  const totalCents =
+    update.montant_cents !== undefined ? update.montant_cents : ligne.montant_cents;
+  let montantsClasses = null;
+  let montantsEvenements = null;
+  if (classesMaj) {
+    const r = resoudreRepartition({
+      cles: classesMaj,
+      mode: body.repartitionClasses,
+      montantsBruts: body.classesMontants,
+      totalCents,
+      libelle: libelleClasse,
+    });
+    if (r.error) return NextResponse.json({ error: r.error }, { status: 400 });
+    montantsClasses = r.montants;
+  }
+  if (evenementsMaj) {
+    const r = resoudreRepartition({
+      cles: evenementsMaj,
+      mode: body.repartitionEvenements,
+      montantsBruts: body.evenementsMontants,
+      totalCents,
+    });
+    if (r.error) return NextResponse.json({ error: r.error }, { status: 400 });
+    montantsEvenements = r.montants;
+  }
+
   if (Object.keys(update).length > 0) {
     const { error } = await auth.admin.from("compta_lignes").update(update).eq("id", params.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Remplacement des classes (lignes manuelles « classe » uniquement).
-  if (manuelle && ligne.rubrique === "classe" && Array.isArray(body.classes)) {
-    const classes = [
-      ...new Set(body.classes.map((c) => String(c).trim()).filter((c) => CLES_CLASSES.includes(c))),
-    ];
-    if (classes.length === 0) {
-      return NextResponse.json(
-        { error: "Choisissez au moins une classe dans la liste." },
-        { status: 400 }
-      );
-    }
+  // montant_cents ajouté seulement en répartition différenciée (compat 0044).
+  const lienAvecMontant = (base, montants, cle) => {
+    const row = { ...base };
+    if (montants && montants[cle] != null) row.montant_cents = montants[cle];
+    return row;
+  };
+
+  if (classesMaj) {
     await auth.admin.from("compta_ligne_classes").delete().eq("ligne_id", params.id);
-    const { error } = await auth.admin
-      .from("compta_ligne_classes")
-      .insert(classes.map((class_label) => ({ ligne_id: params.id, class_label })));
+    const { error } = await auth.admin.from("compta_ligne_classes").insert(
+      classesMaj.map((class_label) =>
+        lienAvecMontant({ ligne_id: params.id, class_label }, montantsClasses, class_label)
+      )
+    );
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Remplacement des manifestations (lignes manuelles « événement »).
   if (evenementsMaj) {
     await auth.admin.from("compta_ligne_evenements").delete().eq("ligne_id", params.id);
-    const { error } = await auth.admin
-      .from("compta_ligne_evenements")
-      .insert(evenementsMaj.map((evenement_id) => ({ ligne_id: params.id, evenement_id })));
+    const { error } = await auth.admin.from("compta_ligne_evenements").insert(
+      evenementsMaj.map((evenement_id) =>
+        lienAvecMontant({ ligne_id: params.id, evenement_id }, montantsEvenements, evenement_id)
+      )
+    );
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
