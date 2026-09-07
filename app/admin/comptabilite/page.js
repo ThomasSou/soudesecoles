@@ -1220,6 +1220,9 @@ function ComptaAdmin({ accessToken }) {
     realise: v.realise,
     previsionnel: v.previsionnel,
   }));
+  const aRembourser = Object.values(data?.totaux?.parBenevole || {})
+    .filter((v) => v.montant_cents > 0)
+    .sort((a, b) => b.montant_cents - a.montant_cents);
 
   const pilule = (actif, onClick, texte) => (
     <button
@@ -1383,6 +1386,28 @@ function ComptaAdmin({ accessToken }) {
 
       <Recap titre="Comptes par classe" entrees={entreesClasses} />
       <Recap titre="Comptes par manifestation" entrees={entreesEvenements} />
+
+      {aRembourser.length > 0 && (
+        <div className="mb-4">
+          <h2 className="text-sm font-semibold text-slate-700 mb-1">
+            À rembourser aux bénévoles
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border border-slate-200 rounded-lg">
+              <tbody>
+                {aRembourser.map((v) => (
+                  <tr key={v.nom} className="border-t border-slate-100 first:border-t-0">
+                    <td className="px-2 py-1">{v.nom}</td>
+                    <td className="px-2 py-1 text-right font-semibold text-red-700">
+                      {euros(v.montant_cents)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Ajout */}
       <div className="mb-4">

@@ -171,9 +171,57 @@ export async function GET(request) {
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Dépenses saisies par le bureau et attribuées à un membre de la famille
+  // (« payé par un bénévole »). Elles n'ont pas de demande côté famille mais
+  // doivent apparaître dans l'historique et compter dans le total dû.
+  const { data: parentsFamille } = await admin
+    .from("parents")
+    .select("id")
+    .eq("family_id", parent.family_id);
+  const parentIds = (parentsFamille || []).map((p) => p.id);
+
+  const { data: avancesBureau } = parentIds.length
+    ? await admin
+        .from("compta_lignes")
+        .select("id, libelle, fournisseur, montant_cents, rembourse_le, created_at, rubrique")
+        .eq("source", "manuel")
+        .eq("paye_par", "benevole")
+        .in("paye_par_parent_id", parentIds)
+        .order("created_at", { ascending: false })
+    : { data: [] };
+
+  const CAT_PAR_RUBRIQUE = {
+    evenement: "manifestation",
+    investissement: "investissement",
+    courant: "fonctionnement",
+    classe: "autre",
+  };
+  const avances = (avancesBureau || []).map((l) => ({
+    id: `compta-${l.id}`,
+    category: CAT_PAR_RUBRIQUE[l.rubrique] || "autre",
+    event_name: null,
+    description: l.libelle,
+    supplier_name: l.fournisseur,
+    amount_cents: l.montant_cents,
+    status: l.rembourse_le ? "reimbursed" : "pending",
+    admin_note: null,
+    created_at: l.created_at,
+    processed_at: l.rembourse_le,
+    origine: "bureau",
+  }));
+
+  const toutes = [...(data || []), ...avances].sort(
+    (a, b) => new Date(b.created_at) - new Date(a.created_at)
+  );
+  const totalARembourserCents = toutes
+    .filter((d) => d.status === "pending")
+    .reduce((s, d) => s + (d.amount_cents || 0), 0);
+
   return NextResponse.json({
     ok: true,
-    demandes: data || [],
+    demandes: toutes,
+    totalARembourserCents,
     manifestations: manifestations || [],
   });
 }

@@ -311,6 +311,14 @@ export async function GET(request) {
     });
   }
 
+  // À rembourser aux bénévoles : total non remboursé par personne.
+  const parBenevole = {};
+  for (const l of lignes) {
+    if (l.paye_par !== "benevole" || l.rembourse || !l.paye_par_parent_id) continue;
+    parBenevole[l.paye_par_parent_id] =
+      (parBenevole[l.paye_par_parent_id] || 0) + l.montant_cents;
+  }
+
   // Données de référence pour les filtres et le formulaire.
   const [evenementsRes, anneesLignesRes, anneesFacturesRes, parentsRes] = await Promise.all([
     auth.admin.from("benevolat_evenements").select("id, nom").order("created_at", { ascending: false }),
@@ -350,6 +358,12 @@ export async function GET(request) {
       ),
       parEvenement: Object.fromEntries(
         Object.entries(parEvenement).map(([id, v]) => [id, { ...v, nom: evenementNom[id] || "Manifestation" }])
+      ),
+      parBenevole: Object.fromEntries(
+        Object.entries(parBenevole).map(([id, cents]) => [
+          id,
+          { nom: parents.find((p) => p.id === id)?.nom || "Bénévole", montant_cents: cents },
+        ])
       ),
     },
     evenements: evenementsRes.data || [],

@@ -242,6 +242,7 @@ function fichierEnDataUrl(file) {
 // n'apparaît que lorsque le bureau l'a lui-même indiqué dans le back-office.
 function MesRemboursements({ accessToken }) {
   const [demandes, setDemandes] = useState([]);
+  const [totalDu, setTotalDu] = useState(0);
   const [manifestations, setManifestations] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [category, setCategory] = useState("manifestation");
@@ -260,6 +261,7 @@ function MesRemboursements({ accessToken }) {
       .then((r) => r.json())
       .then((data) => {
         setDemandes(data.demandes || []);
+        setTotalDu(data.totalARembourserCents || 0);
         setManifestations(data.manifestations || []);
         if (!evenementId && data.manifestations?.[0]) {
           setEvenementId(data.manifestations[0].id);
@@ -444,7 +446,14 @@ function MesRemboursements({ accessToken }) {
       </form>
 
       <div className="pt-4 border-t border-slate-100">
-        <p className="text-sm font-medium text-slate-600 mb-2">Historique</p>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-medium text-slate-600">Historique</p>
+          {totalDu > 0 && (
+            <p className="text-sm font-semibold text-sou-blue">
+              Total à vous rembourser : {(totalDu / 100).toFixed(2)} €
+            </p>
+          )}
+        </div>
         {chargement ? (
           <p className="text-slate-500 text-sm">Chargement...</p>
         ) : demandes.length === 0 ? (
@@ -461,8 +470,18 @@ function MesRemboursements({ accessToken }) {
                 <li key={d.id} className="py-3 text-sm">
                   <div className="flex justify-between gap-4">
                     <div>
-                      <p className="text-slate-700">{libelle}</p>
-                      {d.description && <p className="text-slate-400 text-xs">{d.description}</p>}
+                      <p className="text-slate-700">
+                        {libelle}
+                        {d.origine === "bureau" && (
+                          <span className="text-slate-400 text-xs"> · ajouté par le bureau</span>
+                        )}
+                      </p>
+                      {d.supplier_name && (
+                        <p className="text-slate-400 text-xs">Prestataire : {d.supplier_name}</p>
+                      )}
+                      {d.description && d.description !== libelle && (
+                        <p className="text-slate-400 text-xs">{d.description}</p>
+                      )}
                       <p className="text-slate-400 text-xs mt-0.5">{formatPurchaseDate(d.created_at)}</p>
                       {d.status === "refused" && d.admin_note && (
                         <p className="text-red-600 text-xs mt-1">Motif : {d.admin_note}</p>
