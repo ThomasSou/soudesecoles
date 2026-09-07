@@ -8,6 +8,7 @@ import {
   libelleClasse,
 } from "../../lib/classesReference";
 import { repartirEgal } from "../../lib/comptaRepartition";
+import { currentSchoolYear } from "../../lib/anneeScolaire";
 
 // Groupes de classes pour le sélecteur, construits directement depuis la
 // référence (jamais dépendants de la réponse de l'API — le sélecteur ne
@@ -216,9 +217,19 @@ function lireFichier(file) {
 // ---------------------------------------------------------------------------
 // Formulaire d'une ligne (création ou édition d'une ligne manuelle).
 // ---------------------------------------------------------------------------
-function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) {
+function LigneForm({ accessToken, annees, evenements, ligne, onDone, onCancel }) {
   const edition = Boolean(ligne);
   const groupes = GROUPES;
+  const anneesOptions = [
+    ...new Set([
+      currentSchoolYear(),
+      ...(annees || []),
+      ...(ligne?.school_year ? [ligne.school_year] : []),
+    ]),
+  ].sort().reverse();
+  const [anneeLigne, setAnneeLigne] = useState(
+    ligne?.school_year || currentSchoolYear()
+  );
   const [sens, setSens] = useState(ligne?.sens || "depense");
   const [rubrique, setRubrique] = useState(ligne?.rubrique || "evenement");
   const [evenementsSel, setEvenementsSel] = useState(
@@ -358,7 +369,7 @@ function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) 
       note,
       justificatifDataUrl,
       justificatifType,
-      annee,
+      annee: anneeLigne,
     };
     const url = edition
       ? `/api/admin/comptabilite/${ligne.id}`
@@ -604,6 +615,21 @@ function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) 
             ))}
           </select>
         </label>
+        <label className="text-sm">
+          Année scolaire{" "}
+          <span className="text-slate-400">(pré-remplie sur l&apos;année en cours)</span>
+          <select
+            value={anneeLigne}
+            onChange={(e) => setAnneeLigne(e.target.value)}
+            className={champ}
+          >
+            {anneesOptions.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <label className="text-sm block">
@@ -678,7 +704,7 @@ function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) 
 // ---------------------------------------------------------------------------
 // Une ligne dans la liste.
 // ---------------------------------------------------------------------------
-function LigneRow({ accessToken, ligne, evenements, annee, onChange }) {
+function LigneRow({ accessToken, ligne, evenements, annees, onChange }) {
   const [edition, setEdition] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const statut = STATUTS[ligne.statut] || STATUTS.a_verifier;
@@ -764,7 +790,7 @@ function LigneRow({ accessToken, ligne, evenements, annee, onChange }) {
     return (
       <LigneForm
         accessToken={accessToken}
-        annee={annee}
+        annees={annees}
         evenements={evenements}
         ligne={ligne}
         onDone={() => {
@@ -1160,7 +1186,7 @@ function ComptaAdmin({ accessToken }) {
         {ajout ? (
           <LigneForm
             accessToken={accessToken}
-            annee={annee}
+            annees={data?.annees || []}
             evenements={data?.evenements || []}
             onDone={() => {
               setAjout(false);
@@ -1193,7 +1219,7 @@ function ComptaAdmin({ accessToken }) {
               accessToken={accessToken}
               ligne={l}
               evenements={data.evenements || []}
-              annee={annee}
+              annees={data.annees || []}
               onChange={recharger}
             />
           ))}

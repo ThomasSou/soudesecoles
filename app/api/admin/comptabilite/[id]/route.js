@@ -140,6 +140,9 @@ export async function PATCH(request, { params }) {
     if (body.fournisseur !== undefined) {
       update.fournisseur = body.fournisseur?.trim() || null;
     }
+    if (body.annee) {
+      update.school_year = String(body.annee).trim();
+    }
     if (body.montant !== undefined) {
       const m = Number(String(body.montant ?? "").replace(",", "."));
       if (!Number.isFinite(m) || m <= 0) {
