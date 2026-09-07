@@ -2,7 +2,23 @@
 
 import { useCallback, useEffect, useState } from "react";
 import AdminShell from "../admin-shell";
-import { GROUPES_CLASSES, libelleClasse } from "../../lib/classesReference";
+import {
+  CLASSES_REFERENCE,
+  GROUPES_CLASSES,
+  libelleClasse,
+} from "../../lib/classesReference";
+
+// Groupes de classes pour le sélecteur, construits directement depuis la
+// référence (jamais dépendants de la réponse de l'API — le sélecteur ne
+// peut donc pas se retrouver vide).
+const GROUPES = Object.keys(GROUPES_CLASSES).map((g) => ({
+  cle: g,
+  nom: GROUPES_CLASSES[g],
+  classes: CLASSES_REFERENCE.filter((c) => c.groupe === g).map((c) => ({
+    cle: c.cle,
+    libelle: libelleClasse(c.cle),
+  })),
+}));
 
 const RUBRIQUES = {
   evenement: "Événement",
@@ -125,13 +141,9 @@ function lireFichier(file) {
 // ---------------------------------------------------------------------------
 // Formulaire d'une ligne (création ou édition d'une ligne manuelle).
 // ---------------------------------------------------------------------------
-function LigneForm({ accessToken, annee, evenements, classesRef, ligne, onDone, onCancel }) {
+function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) {
   const edition = Boolean(ligne);
-  const groupes = Object.keys(GROUPES_CLASSES).map((g) => ({
-    cle: g,
-    nom: GROUPES_CLASSES[g],
-    classes: (classesRef || []).filter((c) => c.groupe === g),
-  }));
+  const groupes = GROUPES;
   const [sens, setSens] = useState(ligne?.sens || "depense");
   const [rubrique, setRubrique] = useState(ligne?.rubrique || "evenement");
   const [evenementId, setEvenementId] = useState(ligne?.evenement_id || "");
@@ -458,7 +470,7 @@ function LigneForm({ accessToken, annee, evenements, classesRef, ligne, onDone, 
 // ---------------------------------------------------------------------------
 // Une ligne dans la liste.
 // ---------------------------------------------------------------------------
-function LigneRow({ accessToken, ligne, evenements, classesRef, annee, onChange }) {
+function LigneRow({ accessToken, ligne, evenements, annee, onChange }) {
   const [edition, setEdition] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const statut = STATUTS[ligne.statut] || STATUTS.a_verifier;
@@ -533,7 +545,6 @@ function LigneRow({ accessToken, ligne, evenements, classesRef, annee, onChange 
         accessToken={accessToken}
         annee={annee}
         evenements={evenements}
-        classesRef={classesRef}
         ligne={ligne}
         onDone={() => {
           setEdition(false);
@@ -832,9 +843,9 @@ function ComptaAdmin({ accessToken }) {
             className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm"
           >
             <option value="">Toutes les classes</option>
-            {(data?.classesRef || []).map((c) => (
+            {CLASSES_REFERENCE.map((c) => (
               <option key={c.cle} value={c.cle}>
-                {c.libelle}
+                {libelleClasse(c.cle)}
               </option>
             ))}
             {(data?.classesEnPlus || []).map((c) => (
@@ -914,7 +925,6 @@ function ComptaAdmin({ accessToken }) {
             accessToken={accessToken}
             annee={annee}
             evenements={data?.evenements || []}
-            classesRef={data?.classesRef || []}
             onDone={() => {
               setAjout(false);
               recharger();
@@ -946,7 +956,6 @@ function ComptaAdmin({ accessToken }) {
               accessToken={accessToken}
               ligne={l}
               evenements={data.evenements || []}
-              classesRef={data.classesRef || []}
               annee={annee}
               onChange={recharger}
             />
