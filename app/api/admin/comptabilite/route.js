@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../lib/adminAuth";
 import { currentSchoolYear } from "../../../lib/anneeScolaire";
 import { listerClassesAnnee } from "../../../lib/classes";
+import { televerserJustificatif } from "../../../lib/comptaFichiers";
 
 export const dynamic = "force-dynamic";
 
@@ -82,7 +83,7 @@ export async function GET(request) {
   let requete = auth.admin
     .from("compta_lignes")
     .select(
-      "id, sens, rubrique, evenement_id, libelle, fournisseur, montant_cents, date_operation, statut, source, teacher_invoice_id, compte, ref_bancaire, note, school_year, pointe_le, created_at"
+      "id, sens, rubrique, evenement_id, libelle, fournisseur, montant_cents, date_operation, statut, source, teacher_invoice_id, compte, ref_bancaire, note, justificatif_path, school_year, pointe_le, created_at"
     )
     .eq("school_year", annee)
     .order("date_operation", { ascending: true, nullsFirst: true })
@@ -115,6 +116,11 @@ export async function GET(request) {
   let lignes = (lignesBrutes || []).map((l) => ({
     ...l,
     classes: (classesParLigne[l.id] || []).sort((a, b) => a.localeCompare(b, "fr")),
+    // Justificatif : fichier propre à la ligne, ou — pour une ligne recopiée
+    // d'une facture enseignant — celui de la fiche enseignant.
+    a_justificatif: Boolean(l.justificatif_path || l.teacher_invoice_id),
+    a_justificatif_propre: Boolean(l.justificatif_path),
+    justificatif_path: undefined,
   }));
 
   // Filtre « classe » : appliqué ici car il porte sur la table de liens.
@@ -245,6 +251,17 @@ export async function POST(request) {
       .from("compta_ligne_classes")
       .insert(classes.map((class_label) => ({ ligne_id: ligne.id, class_label })));
     if (eClasses) return NextResponse.json({ error: eClasses.message }, { status: 500 });
+  }
+
+  // Justificatif (facture PDF ou image) joint à la création.
+  if (body?.justificatifDataUrl) {
+    const { path, error: eFichier } = await televerserJustificatif(
+      auth.admin,
+      ligne.id,
+      body.justificatifDataUrl
+    );
+    if (eFichier) return NextResponse.json({ error: eFichier }, { status: 400 });
+    await auth.admin.from("compta_lignes").update({ justificatif_path: path }).eq("id", ligne.id);
   }
 
   return NextResponse.json({ ok: true, id: ligne.id });

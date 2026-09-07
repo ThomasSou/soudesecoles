@@ -34,6 +34,21 @@ function formatDate(iso) {
   });
 }
 
+// Justificatif accepté : image ou PDF (même limite que l'espace enseignant,
+// contrôlée côté serveur : 8 Mo).
+const TYPES_JUSTIF = "image/*,application/pdf";
+
+// Lit le fichier choisi et le renvoie en data URL base64, pour l'envoyer
+// dans le corps JSON de la requête.
+function lireFichier(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error || new Error("lecture impossible"));
+    r.readAsDataURL(file);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Formulaire d'une ligne (création ou édition d'une ligne manuelle).
 // ---------------------------------------------------------------------------
@@ -52,6 +67,7 @@ function LigneForm({ accessToken, annee, evenements, classes, ligne, onDone, onC
   const [compte, setCompte] = useState(ligne?.compte || "");
   const [statut, setStatut] = useState(ligne?.statut || "a_verifier");
   const [note, setNote] = useState(ligne?.note || "");
+  const [justificatif, setJustificatif] = useState(null);
   const [erreur, setErreur] = useState("");
   const [envoi, setEnvoi] = useState(false);
 
@@ -63,6 +79,18 @@ function LigneForm({ accessToken, annee, evenements, classes, ligne, onDone, onC
     e.preventDefault();
     setErreur("");
     setEnvoi(true);
+
+    let justificatifDataUrl = null;
+    if (justificatif) {
+      try {
+        justificatifDataUrl = await lireFichier(justificatif);
+      } catch {
+        setErreur("Lecture du fichier impossible.");
+        setEnvoi(false);
+        return;
+      }
+    }
+
     const corps = {
       sens,
       rubrique,
@@ -75,6 +103,7 @@ function LigneForm({ accessToken, annee, evenements, classes, ligne, onDone, onC
       compte: compte || null,
       statut,
       note,
+      justificatifDataUrl,
       annee,
     };
     const url = edition
@@ -264,6 +293,21 @@ function LigneForm({ accessToken, annee, evenements, classes, ligne, onDone, onC
         />
       </label>
 
+      <label className="text-sm block">
+        Justificatif — facture (PDF ou image, facultatif)
+        {edition && ligne?.a_justificatif_propre && (
+          <span className="block text-xs text-green-700">
+            Un justificatif est déjà joint. En choisir un nouveau le remplacera.
+          </span>
+        )}
+        <input
+          type="file"
+          accept={TYPES_JUSTIF}
+          onChange={(e) => setJustificatif(e.target.files?.[0] || null)}
+          className="mt-1 block w-full text-sm text-slate-600 file:mr-3 file:rounded-full file:border-0 file:bg-sou-blue/10 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-sou-blue"
+        />
+      </label>
+
       {erreur && <p className="text-sm text-red-600">{erreur}</p>}
 
       <div className="flex gap-2">
@@ -314,6 +358,32 @@ function LigneRow({ accessToken, ligne, evenements, classes, annee, onChange }) 
       const d = await res.json().catch(() => ({}));
       alert(d.error || "Modification impossible.");
     }
+  }
+
+  async function joindreJustificatif(file) {
+    if (!file) return;
+    let dataUrl;
+    try {
+      dataUrl = await lireFichier(file);
+    } catch {
+      alert("Lecture du fichier impossible.");
+      return;
+    }
+    patch({ justificatifDataUrl: dataUrl });
+  }
+
+  async function retirerJustificatif() {
+    if (!confirm("Retirer le justificatif joint à cette ligne ?")) return;
+    patch({ retirerJustificatif: true });
+  }
+
+  async function voirJustificatif() {
+    const res = await fetch(`/api/admin/comptabilite/${ligne.id}/fichier`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const d = await res.json().catch(() => ({}));
+    if (res.ok && d.url) window.open(d.url, "_blank", "noopener");
+    else alert(d.error || "Justificatif indisponible.");
   }
 
   async function supprimer() {
@@ -376,11 +446,27 @@ function LigneRow({ accessToken, ligne, evenements, classes, annee, onChange }) 
             {ligne.sens === "recette" ? "+" : "−"} {euros(ligne.montant_cents)}
           </p>
           <p className="text-xs text-slate-400">{formatDate(ligne.date_operation)}</p>
-          <span
-            className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statut.classe}`}
-          >
-            {statut.label}
-          </span>
+          <div className="flex flex-col items-end gap-1 mt-0.5">
+            <span
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statut.classe}`}
+            >
+              {statut.label}
+            </span>
+            <span
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                ligne.a_justificatif
+                  ? "bg-green-50 text-green-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+              title={
+                ligne.a_justificatif && !ligne.a_justificatif_propre
+                  ? "Justificatif repris de la facture enseignant"
+                  : undefined
+              }
+            >
+              {ligne.a_justificatif ? "Facture jointe" : "Facture manquante"}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -416,6 +502,39 @@ function LigneRow({ accessToken, ligne, evenements, classes, annee, onChange }) 
               Supprimer
             </button>
           </>
+        )}
+
+        <span className="mx-1 text-slate-300">|</span>
+
+        {ligne.a_justificatif && (
+          <button
+            onClick={voirJustificatif}
+            className="text-xs font-semibold text-sou-blue px-2"
+          >
+            Voir la facture
+          </button>
+        )}
+        <label className="text-xs font-semibold text-sou-blue px-2 cursor-pointer">
+          {ligne.a_justificatif_propre ? "Remplacer" : "Joindre la facture"}
+          <input
+            type="file"
+            accept={TYPES_JUSTIF}
+            disabled={envoi}
+            className="hidden"
+            onChange={(e) => {
+              joindreJustificatif(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        {ligne.a_justificatif_propre && (
+          <button
+            onClick={retirerJustificatif}
+            disabled={envoi}
+            className="text-xs font-semibold text-red-600 px-2 disabled:opacity-40"
+          >
+            Retirer
+          </button>
         )}
       </div>
 

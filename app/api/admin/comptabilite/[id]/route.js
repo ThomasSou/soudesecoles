@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
+import { televerserJustificatif, supprimerJustificatif } from "../../../../lib/comptaFichiers";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export async function PATCH(request, { params }) {
 
   const { data: ligne, error: eLecture } = await auth.admin
     .from("compta_lignes")
-    .select("id, source, rubrique, statut")
+    .select("id, source, rubrique, statut, justificatif_path")
     .eq("id", params.id)
     .maybeSingle();
   if (eLecture) return NextResponse.json({ error: eLecture.message }, { status: 500 });
@@ -60,6 +61,22 @@ export async function PATCH(request, { params }) {
   }
   if (body.note !== undefined) {
     update.note = body.note?.trim() || null;
+  }
+
+  // Justificatif : ajout / remplacement (toutes sources — le bureau peut
+  // joindre sa propre facture même sur une ligne enseignant) ou retrait.
+  if (body.justificatifDataUrl) {
+    const { path, error: eFichier } = await televerserJustificatif(
+      auth.admin,
+      params.id,
+      body.justificatifDataUrl
+    );
+    if (eFichier) return NextResponse.json({ error: eFichier }, { status: 400 });
+    if (ligne.justificatif_path) await supprimerJustificatif(auth.admin, ligne.justificatif_path);
+    update.justificatif_path = path;
+  } else if (body.retirerJustificatif && ligne.justificatif_path) {
+    await supprimerJustificatif(auth.admin, ligne.justificatif_path);
+    update.justificatif_path = null;
   }
 
   // Champs réservés aux lignes manuelles.
