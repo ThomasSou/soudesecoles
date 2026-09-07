@@ -236,13 +236,19 @@ export async function GET(request) {
         ? "facture_definitive"
         : null,
     justificatif_path: undefined,
-    // Remboursement bénévole lié.
-    remboursement_statut: l.reimbursement_request_id
-      ? demandeParId[l.reimbursement_request_id]?.status || "pending"
-      : null,
-    remboursement_le: l.reimbursement_request_id
-      ? demandeParId[l.reimbursement_request_id]?.processed_at || null
-      : null,
+    // Suivi du remboursement — pour toute ligne avancée par un bénévole
+    // (saisie bureau OU demande côté famille). rembourse_le sur la ligne
+    // fait foi ; à défaut, le statut de la demande liée.
+    rembourse: Boolean(
+      l.rembourse_le ||
+        (l.reimbursement_request_id &&
+          demandeParId[l.reimbursement_request_id]?.status === "reimbursed")
+    ),
+    rembourse_le:
+      l.rembourse_le ||
+      (l.reimbursement_request_id
+        ? demandeParId[l.reimbursement_request_id]?.processed_at || null
+        : null),
   }));
 
   // Filtres portant sur les tables de liaison : appliqués ici.

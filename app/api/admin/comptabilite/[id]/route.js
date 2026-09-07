@@ -36,38 +36,61 @@ export async function PATCH(request, { params }) {
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
 
-  // Actions dédiées aux lignes issues d'une demande de remboursement bénévole.
-  if (body.rembourser || body.refuserRemboursement) {
+  // --- Refuser une demande de remboursement (source 'benevole' seulement) ---
+  if (body.refuserRemboursement) {
     if (!ligne.reimbursement_request_id) {
       return NextResponse.json(
         { error: "Cette ligne n'est pas rattachée à une demande de remboursement." },
         { status: 400 }
       );
     }
-    const majDemande = {
-      status: body.refuserRemboursement ? "refused" : "reimbursed",
-      processed_at: new Date().toISOString(),
-      processed_by: auth.parent.id,
-    };
     const { error: eDemande } = await auth.admin
       .from("reimbursement_requests")
-      .update(majDemande)
+      .update({
+        status: "refused",
+        processed_at: new Date().toISOString(),
+        processed_by: auth.parent.id,
+      })
       .eq("id", ligne.reimbursement_request_id);
     if (eDemande) return NextResponse.json({ error: eDemande.message }, { status: 500 });
+    // Demande refusée : la dépense ne compte pas, on retire la ligne.
+    const { error: eDel } = await auth.admin.from("compta_lignes").delete().eq("id", params.id);
+    if (eDel) return NextResponse.json({ error: eDel.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
 
-    if (body.refuserRemboursement) {
-      // Demande refusée : la dépense ne compte pas, on retire la ligne.
-      const { error: eDel } = await auth.admin
-        .from("compta_lignes")
-        .delete()
-        .eq("id", params.id);
-      if (eDel) return NextResponse.json({ error: eDel.message }, { status: 500 });
-    } else if (ligne.statut === "a_valider") {
-      // Remboursé implique validé : la ligne passe « à pointer ».
+  // --- Marquer remboursé / annuler — pour toute ligne avancée par un
+  //     bénévole (saisie bureau OU demande côté famille) ---
+  if (body.rembourser || body.annulerRemboursement) {
+    if (ligne.paye_par !== "benevole") {
+      return NextResponse.json(
+        { error: "Cette dépense n'a pas été avancée par un bénévole." },
+        { status: 400 }
+      );
+    }
+    const rembourse = Boolean(body.rembourser);
+    const majLigne = {
+      rembourse_le: rembourse ? new Date().toISOString() : null,
+      rembourse_par: rembourse ? auth.parent.id : null,
+    };
+    // « Remboursé » implique « validé » : on sort la ligne de « à valider ».
+    if (rembourse && ligne.statut === "a_valider") majLigne.statut = "a_verifier";
+    const { error: eLigne } = await auth.admin
+      .from("compta_lignes")
+      .update(majLigne)
+      .eq("id", params.id);
+    if (eLigne) return NextResponse.json({ error: eLigne.message }, { status: 500 });
+
+    // Reflet sur la fiche du bénévole quand il y a une demande liée.
+    if (ligne.reimbursement_request_id) {
       await auth.admin
-        .from("compta_lignes")
-        .update({ statut: "a_verifier" })
-        .eq("id", params.id);
+        .from("reimbursement_requests")
+        .update({
+          status: rembourse ? "reimbursed" : "pending",
+          processed_at: rembourse ? new Date().toISOString() : null,
+          processed_by: rembourse ? auth.parent.id : null,
+        })
+        .eq("id", ligne.reimbursement_request_id);
     }
     return NextResponse.json({ ok: true });
   }

@@ -87,8 +87,70 @@ function voyantJustif(ligne) {
       label: TYPES_DOC[t] || "Document joint",
     };
   }
-  if (ligne.a_justificatif) return { ok: true, label: "Facture enseignant" };
+  if (ligne.a_justificatif) {
+    const label =
+      ligne.source === "benevole"
+        ? "Facture bénévole"
+        : ligne.source === "enseignant"
+          ? "Facture enseignant"
+          : "Facture jointe";
+    return { ok: true, label };
+  }
   return { ok: false, label: "Facture manquante" };
+}
+
+// Sélecteur de parent avec recherche (tape les premières lettres du nom ou
+// prénom) — la liste complète est trop longue pour un simple menu déroulant.
+function SelecteurParent({ parents, valeur, onChange, champ }) {
+  const [q, setQ] = useState("");
+  const choisi = (parents || []).find((p) => p.id === valeur);
+  if (choisi) {
+    return (
+      <div className="flex items-center gap-2 text-sm">
+        <span className="font-medium">{choisi.nom}</span>
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          className="text-xs font-semibold text-sou-blue"
+        >
+          changer
+        </button>
+      </div>
+    );
+  }
+  const res = (parents || [])
+    .filter((p) => p.nom.toLowerCase().includes(q.trim().toLowerCase()))
+    .slice(0, 8);
+  return (
+    <div>
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Tapez le nom ou le prénom…"
+        className={champ}
+      />
+      {q.trim() && (
+        <div className="flex flex-wrap gap-1.5 mt-1">
+          {res.length === 0 && (
+            <span className="text-xs text-slate-400">Aucun résultat.</span>
+          )}
+          {res.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => {
+                onChange(p.id);
+                setQ("");
+              }}
+              className="px-2.5 py-1 rounded-full text-xs font-semibold bg-white border border-slate-300 text-slate-600"
+            >
+              {p.nom}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Petit tableau récapitulatif (par classe ou par manifestation), réalisé
@@ -668,18 +730,12 @@ function LigneForm({ accessToken, annees, evenements, parents, ligne, onDone, on
           ))}
         </div>
         {payePar === "benevole" && (
-          <select
-            value={payeParParentId}
-            onChange={(e) => setPayeParParentId(e.target.value)}
-            className={champ}
-          >
-            <option value="">— choisir le bénévole —</option>
-            {(parents || []).map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nom}
-              </option>
-            ))}
-          </select>
+          <SelecteurParent
+            parents={parents}
+            valeur={payeParParentId}
+            onChange={setPayeParParentId}
+            champ={champ}
+          />
         )}
       </div>
 
@@ -912,20 +968,33 @@ function LigneRow({ accessToken, ligne, evenements, annees, parents, onChange })
               }`}
               title={
                 ligne.a_justificatif && !ligne.a_justificatif_propre
-                  ? "Justificatif repris de la facture enseignant"
+                  ? "Justificatif repris de la facture / demande liée"
                   : undefined
               }
             >
               {voyant.label}
             </span>
+            {ligne.paye_par === "benevole" && (
+              <span
+                className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  ligne.rembourse
+                    ? "bg-green-50 text-green-700"
+                    : "bg-red-50 text-red-700"
+                }`}
+              >
+                {ligne.rembourse ? "Remboursé" : "À rembourser"}
+              </span>
+            )}
           </div>
         </div>
       </div>
 
-      {ligne.source === "benevole" && (
+      {ligne.paye_par === "benevole" && (
         <div className="flex flex-wrap items-center gap-1.5 mt-2 text-xs">
-          <span className="font-semibold text-orange-700">Demande bénévole</span>
-          {ligne.statut === "a_valider" && (
+          {ligne.source === "benevole" && (
+            <span className="font-semibold text-slate-500">Demande bénévole</span>
+          )}
+          {ligne.source === "benevole" && ligne.statut === "a_valider" && (
             <>
               <button
                 onClick={() => patch({ statut: "a_verifier" })}
@@ -946,18 +1015,37 @@ function LigneRow({ accessToken, ligne, evenements, annees, parents, onChange })
               </button>
             </>
           )}
-          {ligne.remboursement_statut === "reimbursed" ? (
-            <span className="text-green-700 font-semibold">
-              Remboursé{ligne.remboursement_le ? ` le ${formatDate(ligne.remboursement_le)}` : ""}
-            </span>
+          {ligne.rembourse ? (
+            <>
+              <span className="text-green-700 font-semibold">
+                Remboursé{ligne.rembourse_le ? ` le ${formatDate(ligne.rembourse_le)}` : ""}
+              </span>
+              <button
+                onClick={() => {
+                  if (confirm("Annuler le remboursement ?"))
+                    patch({ annulerRemboursement: true });
+                }}
+                disabled={envoi}
+                className="text-slate-400 px-1 disabled:opacity-40"
+              >
+                annuler
+              </button>
+            </>
           ) : (
             <button
               onClick={() => {
-                if (confirm("Marquer ce remboursement comme effectué ? Il apparaîtra sur la fiche du bénévole."))
+                if (
+                  confirm(
+                    "Marquer ce remboursement comme effectué ?" +
+                      (ligne.source === "benevole"
+                        ? " Il apparaîtra sur la fiche du bénévole."
+                        : "")
+                  )
+                )
                   patch({ rembourser: true });
               }}
               disabled={envoi}
-              className="font-semibold text-sou-blue px-2 disabled:opacity-40"
+              className="font-semibold text-white bg-sou-blue px-2.5 py-1 rounded-full disabled:opacity-40"
             >
               Marquer remboursé
             </button>
