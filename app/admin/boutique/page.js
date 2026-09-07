@@ -379,6 +379,11 @@ function BoutiqueAdmin({ accessToken }) {
 
   const boutiqueActive = boutiques.find((b) => b.id === boutiqueFiltre);
 
+  const commandesPayees = commandes.filter((c) => c.status === "paid");
+  const totalPayeCents = commandesPayees.reduce((s, c) => s + (c.total_cents || 0), 0);
+  const commandesEnAttente = commandes.filter((c) => c.status === "pending");
+  const totalAttenteCents = commandesEnAttente.reduce((s, c) => s + (c.total_cents || 0), 0);
+
   return (
     <div className="space-y-6">
       <div className="flex gap-2 text-sm font-semibold">
@@ -532,6 +537,28 @@ function BoutiqueAdmin({ accessToken }) {
 
       {onglet === "commandes" && (
         <div className="space-y-2">
+          <div className="flex flex-wrap gap-3">
+            <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2">
+              <p className="text-xs text-green-700">Total encaissé (commandes payées)</p>
+              <p className="text-lg font-bold text-green-800">
+                {euros(totalPayeCents)}{" "}
+                <span className="text-sm font-normal text-green-700">
+                  · {commandesPayees.length} commande{commandesPayees.length > 1 ? "s" : ""}
+                </span>
+              </p>
+            </div>
+            {commandesEnAttente.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">
+                <p className="text-xs text-amber-700">En attente de paiement</p>
+                <p className="text-lg font-bold text-amber-800">
+                  {euros(totalAttenteCents)}{" "}
+                  <span className="text-sm font-normal text-amber-700">
+                    · {commandesEnAttente.length}
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
           {commandes.map((c) => (
             <div key={c.id} className="bg-white border border-slate-200 rounded-xl p-4">
               <div className="flex justify-between items-start">
