@@ -112,6 +112,23 @@ export async function PATCH(request, { params }) {
     }
   }
 
+  // Manifestations d'une ligne « événement » manuelle : la colonne
+  // evenement_id porte la 1re de la liste (contrainte de cohérence), la
+  // liste complète est remplacée plus bas dans compta_ligne_evenements.
+  const evenementsMaj =
+    manuelle && ligne.rubrique === "evenement" && Array.isArray(body.evenements)
+      ? [...new Set(body.evenements.map((e) => String(e).trim()).filter(Boolean))]
+      : null;
+  if (evenementsMaj) {
+    if (evenementsMaj.length === 0) {
+      return NextResponse.json(
+        { error: "Choisissez au moins une manifestation." },
+        { status: 400 }
+      );
+    }
+    update.evenement_id = evenementsMaj[0];
+  }
+
   // Champs réservés aux lignes manuelles.
   if (manuelle) {
     if (body.libelle !== undefined) {
@@ -151,6 +168,15 @@ export async function PATCH(request, { params }) {
     const { error } = await auth.admin
       .from("compta_ligne_classes")
       .insert(classes.map((class_label) => ({ ligne_id: params.id, class_label })));
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Remplacement des manifestations (lignes manuelles « événement »).
+  if (evenementsMaj) {
+    await auth.admin.from("compta_ligne_evenements").delete().eq("ligne_id", params.id);
+    const { error } = await auth.admin
+      .from("compta_ligne_evenements")
+      .insert(evenementsMaj.map((evenement_id) => ({ ligne_id: params.id, evenement_id })));
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

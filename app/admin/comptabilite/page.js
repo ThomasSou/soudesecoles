@@ -146,7 +146,11 @@ function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) 
   const groupes = GROUPES;
   const [sens, setSens] = useState(ligne?.sens || "depense");
   const [rubrique, setRubrique] = useState(ligne?.rubrique || "evenement");
-  const [evenementId, setEvenementId] = useState(ligne?.evenement_id || "");
+  const [evenementsSel, setEvenementsSel] = useState(
+    ligne?.evenements || (ligne?.evenement_id ? [ligne.evenement_id] : [])
+  );
+  const [evenementsLocaux, setEvenementsLocaux] = useState([]);
+  const [nouvelleManif, setNouvelleManif] = useState("");
   const [classesSel, setClassesSel] = useState(ligne?.classes || []);
   const [libelle, setLibelle] = useState(ligne?.libelle || "");
   const [fournisseur, setFournisseur] = useState(ligne?.fournisseur || "");
@@ -163,6 +167,39 @@ function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) 
   );
   const [erreur, setErreur] = useState("");
   const [envoi, setEnvoi] = useState(false);
+
+  const tousEvenements = [
+    ...evenements,
+    ...evenementsLocaux.filter((e) => !evenements.some((x) => x.id === e.id)),
+  ];
+
+  function toggleEvenement(id) {
+    setEvenementsSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  }
+
+  async function creerManifestation() {
+    const nom = nouvelleManif.trim();
+    if (!nom) return;
+    setEnvoi(true);
+    setErreur("");
+    const res = await fetch("/api/admin/comptabilite/manifestations", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ nom }),
+    });
+    const d = await res.json().catch(() => ({}));
+    setEnvoi(false);
+    if (!res.ok || !d.evenement) {
+      setErreur(d.error || "Création de la manifestation impossible.");
+      return;
+    }
+    setEvenementsLocaux((l) => [...l, d.evenement]);
+    setEvenementsSel((s) => [...s, d.evenement.id]);
+    setNouvelleManif("");
+  }
 
   function toggleClasse(c) {
     setClassesSel((s) => (s.includes(c) ? s.filter((x) => x !== c) : [...s, c]));
@@ -194,7 +231,7 @@ function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) 
     const corps = {
       sens,
       rubrique,
-      evenementId: rubrique === "evenement" ? evenementId : null,
+      evenements: rubrique === "evenement" ? evenementsSel : [],
       classes: rubrique === "classe" ? classesSel : [],
       libelle,
       fournisseur,
@@ -268,25 +305,61 @@ function LigneForm({ accessToken, annee, evenements, ligne, onDone, onCancel }) 
             ))}
           </select>
         </label>
-
-        {rubrique === "evenement" && (
-          <label className="text-sm">
-            Événement
-            <select
-              value={evenementId}
-              onChange={(e) => setEvenementId(e.target.value)}
-              className={champ}
-            >
-              <option value="">— choisir —</option>
-              {evenements.map((ev) => (
-                <option key={ev.id} value={ev.id}>
-                  {ev.nom}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
       </div>
+
+      {rubrique === "evenement" && (
+        <div className="text-sm space-y-2">
+          <p>
+            Manifestation(s) concernée(s){" "}
+            <span className="text-slate-400">
+              — le montant est réparti à parts égales entre les manifestations cochées
+            </span>
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {tousEvenements.length === 0 && (
+              <span className="text-slate-400 text-xs">
+                Aucune manifestation. Ajoutez-en une ci-dessous.
+              </span>
+            )}
+            {tousEvenements.map((ev) => (
+              <button
+                key={ev.id}
+                type="button"
+                onClick={() => toggleEvenement(ev.id)}
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                  evenementsSel.includes(ev.id)
+                    ? "bg-sou-blue text-white"
+                    : "bg-white border border-slate-300 text-slate-600"
+                }`}
+              >
+                {ev.nom}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={nouvelleManif}
+              onChange={(e) => setNouvelleManif(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  creerManifestation();
+                }
+              }}
+              className={champ}
+              placeholder="Nouvelle manifestation (ex. Vide-greniers 2026)"
+            />
+            <button
+              type="button"
+              onClick={creerManifestation}
+              disabled={envoi || !nouvelleManif.trim()}
+              className="shrink-0 text-xs font-semibold text-sou-blue px-3 border border-sou-blue/40 rounded-lg disabled:opacity-40"
+            >
+              Ajouter
+            </button>
+          </div>
+        </div>
+      )}
 
       {rubrique === "classe" && (
         <div className="text-sm space-y-2">
@@ -475,9 +548,17 @@ function LigneRow({ accessToken, ligne, evenements, annee, onChange }) {
   const [envoi, setEnvoi] = useState(false);
   const statut = STATUTS[ligne.statut] || STATUTS.a_verifier;
   const voyant = voyantJustif(ligne);
+  const idsEvenement =
+    ligne.evenements && ligne.evenements.length
+      ? ligne.evenements
+      : ligne.evenement_id
+        ? [ligne.evenement_id]
+        : [];
   const nomEvenement =
     ligne.rubrique === "evenement"
-      ? evenements.find((e) => e.id === ligne.evenement_id)?.nom || "Événement"
+      ? idsEvenement
+          .map((id) => evenements.find((e) => e.id === id)?.nom || "Manifestation")
+          .join(", ")
       : null;
 
   async function patch(corps) {
@@ -797,6 +878,12 @@ function ComptaAdmin({ accessToken }) {
         jusqu&apos;à ce qu&apos;une facture le remplace. Import des relevés
         Crédit Agricole et pointage automatique : à venir.
       </p>
+
+      {data?.error && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+          {data.error}
+        </p>
+      )}
 
       {/* Filtres */}
       <div className="space-y-2 mb-4">

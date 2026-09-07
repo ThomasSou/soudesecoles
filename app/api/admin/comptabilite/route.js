@@ -96,26 +96,36 @@ export async function GET(request) {
   if (fSens && SENS.includes(fSens)) requete = requete.eq("sens", fSens);
   if (fRubrique && RUBRIQUES.includes(fRubrique)) requete = requete.eq("rubrique", fRubrique);
   if (fStatut && STATUTS.includes(fStatut)) requete = requete.eq("statut", fStatut);
-  if (fEvenement) requete = requete.eq("evenement_id", fEvenement);
 
   const { data: lignesBrutes, error } = await requete;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const ids = (lignesBrutes || []).map((l) => l.id);
-  const { data: liensClasses } = ids.length
-    ? await auth.admin
-        .from("compta_ligne_classes")
-        .select("ligne_id, class_label")
-        .in("ligne_id", ids)
-    : { data: [] };
+  const [liensClassesRes, liensEvenementsRes] = await Promise.all([
+    ids.length
+      ? auth.admin.from("compta_ligne_classes").select("ligne_id, class_label").in("ligne_id", ids)
+      : Promise.resolve({ data: [] }),
+    ids.length
+      ? auth.admin.from("compta_ligne_evenements").select("ligne_id, evenement_id").in("ligne_id", ids)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const liensClasses = liensClassesRes.data;
   const classesParLigne = {};
   for (const l of liensClasses || []) {
     (classesParLigne[l.ligne_id] ||= []).push(l.class_label);
+  }
+  const evenementsParLigne = {};
+  for (const l of liensEvenementsRes.data || []) {
+    (evenementsParLigne[l.ligne_id] ||= []).push(l.evenement_id);
   }
 
   let lignes = (lignesBrutes || []).map((l) => ({
     ...l,
     classes: (classesParLigne[l.id] || []).sort((a, b) => a.localeCompare(b, "fr")),
+    // Manifestations de la ligne : la table de liaison, avec repli sur la
+    // colonne mono-événement tant que la reprise 0043 n'est pas passée.
+    evenements:
+      evenementsParLigne[l.id] || (l.evenement_id ? [l.evenement_id] : []),
     // Justificatif : fichier propre à la ligne (avec sa nature devis /
     // facture provisoire / définitive), ou — pour une ligne recopiée d'une
     // facture enseignant — celui de la fiche enseignant (facture définitive).
@@ -129,10 +139,13 @@ export async function GET(request) {
     justificatif_path: undefined,
   }));
 
-  // Filtre « classe » : appliqué ici car il porte sur la table de liens.
+  // Filtres portant sur les tables de liaison : appliqués ici.
   const fClasse = params.get("classe");
   if (fClasse) {
     lignes = lignes.filter((l) => l.classes.includes(fClasse));
+  }
+  if (fEvenement) {
+    lignes = lignes.filter((l) => l.evenements.includes(fEvenement));
   }
 
   // Totaux.
@@ -144,10 +157,6 @@ export async function GET(request) {
   // Une ligne « prévisionnelle » (statut prevu — typiquement un devis non
   // validé) est comptée à part du réalisé, jamais mélangée.
   const videSplit = () => ({ realise: vide(), previsionnel: vide() });
-  const ajouteSplit = (acc, l) => {
-    ajoute(l.statut === "prevu" ? acc.previsionnel : acc.realise, l);
-    return acc;
-  };
 
   const totalGlobal = lignes.reduce((a, l) => ajoute(a, l), vide());
   const parStatut = {};
@@ -177,11 +186,18 @@ export async function GET(request) {
     });
   }
 
-  // Récap par manifestation : idem, réalisé / prévisionnel séparés.
+  // Récap par manifestation : le montant est réparti à parts égales entre
+  // les manifestations de la ligne (comme pour les classes). Réalisé /
+  // prévisionnel séparés.
   const parEvenement = {};
   for (const l of lignes) {
-    if (l.rubrique !== "evenement" || !l.evenement_id) continue;
-    ajouteSplit((parEvenement[l.evenement_id] ||= videSplit()), l);
+    if (l.rubrique !== "evenement" || l.evenements.length === 0) continue;
+    const parts = repartir(l.montant_cents, l.evenements.length);
+    l.evenements.forEach((evId, i) => {
+      const bucket = (parEvenement[evId] ||= videSplit());
+      const cible = l.statut === "prevu" ? bucket.previsionnel : bucket.realise;
+      cible[l.sens === "depense" ? "depense_cents" : "recette_cents"] += parts[i];
+    });
   }
 
   // Données de référence pour les filtres et le formulaire.
@@ -245,7 +261,13 @@ export async function POST(request) {
   const compte = body?.compte || null;
   const statut = body?.statut || "a_verifier";
   const note = body?.note?.trim() || null;
-  const evenementId = body?.evenementId || null;
+  // Manifestations : liste (répartition à parts égales). Compat : accepte
+  // encore `evenementId` seul.
+  const evenements = Array.isArray(body?.evenements)
+    ? [...new Set(body.evenements.map((e) => String(e).trim()).filter(Boolean))]
+    : body?.evenementId
+      ? [String(body.evenementId).trim()]
+      : [];
   const classes = Array.isArray(body?.classes)
     ? [...new Set(body.classes.map((c) => String(c).trim()).filter((c) => CLES_CLASSES.includes(c)))]
     : [];
@@ -274,8 +296,11 @@ export async function POST(request) {
   if (compte && !COMPTES.includes(compte)) {
     return NextResponse.json({ error: "Compte bancaire invalide." }, { status: 400 });
   }
-  if (rubrique === "evenement" && !evenementId) {
-    return NextResponse.json({ error: "Choisissez l'événement concerné." }, { status: 400 });
+  if (rubrique === "evenement" && evenements.length === 0) {
+    return NextResponse.json(
+      { error: "Choisissez au moins une manifestation." },
+      { status: 400 }
+    );
   }
   if (rubrique === "classe" && classes.length === 0) {
     return NextResponse.json(
@@ -289,7 +314,9 @@ export async function POST(request) {
     .insert({
       sens,
       rubrique,
-      evenement_id: rubrique === "evenement" ? evenementId : null,
+      // Colonne conservée : porte la 1re manifestation (contrainte de
+      // cohérence). La liste complète est dans compta_ligne_evenements.
+      evenement_id: rubrique === "evenement" ? evenements[0] : null,
       libelle,
       fournisseur,
       montant_cents: Math.round(montant * 100),
@@ -313,6 +340,13 @@ export async function POST(request) {
       .from("compta_ligne_classes")
       .insert(classes.map((class_label) => ({ ligne_id: ligne.id, class_label })));
     if (eClasses) return NextResponse.json({ error: eClasses.message }, { status: 500 });
+  }
+
+  if (rubrique === "evenement" && evenements.length > 0) {
+    const { error: eEv } = await auth.admin
+      .from("compta_ligne_evenements")
+      .insert(evenements.map((evenement_id) => ({ ligne_id: ligne.id, evenement_id })));
+    if (eEv) return NextResponse.json({ error: eEv.message }, { status: 500 });
   }
 
   // Justificatif (devis ou facture, PDF ou image) joint à la création.
