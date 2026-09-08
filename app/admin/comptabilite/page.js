@@ -109,154 +109,6 @@ function voyantJustif(ligne) {
   return { ok: false, label: "Facture manquante" };
 }
 
-// Facture, en version courte pour la colonne du tableau.
-function factureCourt(ligne) {
-  const v = voyantJustif(ligne);
-  if (ligne.sens === "recette" && !ligne.a_justificatif) {
-    return { ok: null, label: "—" };
-  }
-  if (v.ok) return { ok: true, label: "Présente" };
-  if (v.label === "Facture manquante") return { ok: false, label: "Manquante" };
-  return { ok: false, label: v.label.replace(/^Facture /, "") };
-}
-
-// Règlement d'une ligne : une seule information, selon le cas.
-//   - avancée par un bénévole -> à rembourser / remboursé
-//   - dépense réglée par le Sou -> à payer / payée (moyen)
-//   - le reste (recette, facture enseignant) -> rien
-function reglementInfo(ligne) {
-  if (ligne.paye_par === "benevole") {
-    return ligne.rembourse
-      ? { cle: "rembourse", label: "Remboursé", classe: "bg-green-50 text-green-700" }
-      : { cle: "a_rembourser", label: "À rembourser", classe: "bg-amber-50 text-amber-700" };
-  }
-  if (ligne.paiement_concerne) {
-    if (ligne.paiement_statut === "paye") {
-      const moyen = ligne.moyen_paiement
-        ? ` · ${MOYENS_PAIEMENT[ligne.moyen_paiement] || ligne.moyen_paiement}`
-        : "";
-      return { cle: "paye", label: `Payée${moyen}`, classe: "bg-green-50 text-green-700" };
-    }
-    return { cle: "a_payer", label: "À payer", classe: "bg-red-50 text-red-700" };
-  }
-  return { cle: "aucun", label: "—", classe: "text-slate-400" };
-}
-
-// Nom affiché pour le payeur d'une ligne.
-function payeurNom(ligne, parents) {
-  if (ligne.paye_par === "benevole") {
-    return (
-      (parents || []).find((p) => p.id === ligne.paye_par_parent_id)?.nom || "Un bénévole"
-    );
-  }
-  return "Le Sou";
-}
-
-// Ordres de tri pour les colonnes à valeurs qualitatives.
-const ORDRE_FACTURE = { manquante: 0, autre: 1, presente: 2, sansobjet: 3 };
-const ORDRE_REGLEMENT = { a_payer: 0, a_rembourser: 1, paye: 2, rembourse: 3, aucun: 4 };
-const ORDRE_STATUT = { prevu: 0, a_valider: 1, a_verifier: 2, pointe: 3 };
-
-function rangFacture(ligne) {
-  const f = factureCourt(ligne);
-  if (f.ok === null) return ORDRE_FACTURE.sansobjet;
-  if (f.ok) return ORDRE_FACTURE.presente;
-  return f.label === "Manquante" ? ORDRE_FACTURE.manquante : ORDRE_FACTURE.autre;
-}
-
-// Comparateur de deux lignes selon la colonne triée. Les lignes sans date
-// restent toujours en bas, quel que soit le sens.
-function comparerLignes(tri, parents) {
-  const signe = tri.sens === "asc" ? 1 : -1;
-  return (a, b) => {
-    if (tri.cle === "date") {
-      const da = a.date_operation || "";
-      const db = b.date_operation || "";
-      if (!da && !db) return 0;
-      if (!da) return 1;
-      if (!db) return -1;
-      return da < db ? -signe : da > db ? signe : 0;
-    }
-    let va;
-    let vb;
-    if (tri.cle === "montant") {
-      va = a.montant_cents;
-      vb = b.montant_cents;
-    } else if (tri.cle === "libelle") {
-      return (a.libelle || "").localeCompare(b.libelle || "", "fr") * signe;
-    } else if (tri.cle === "payeur") {
-      va = (a.paye_par === "benevole" ? "1" : "0") + payeurNom(a, parents);
-      vb = (b.paye_par === "benevole" ? "1" : "0") + payeurNom(b, parents);
-      return String(va).localeCompare(String(vb), "fr") * signe;
-    } else if (tri.cle === "facture") {
-      va = rangFacture(a);
-      vb = rangFacture(b);
-    } else if (tri.cle === "reglement") {
-      va = ORDRE_REGLEMENT[reglementInfo(a).cle];
-      vb = ORDRE_REGLEMENT[reglementInfo(b).cle];
-    } else if (tri.cle === "statut") {
-      va = ORDRE_STATUT[a.statut] ?? 9;
-      vb = ORDRE_STATUT[b.statut] ?? 9;
-    } else {
-      return 0;
-    }
-    return va < vb ? -signe : va > vb ? signe : 0;
-  };
-}
-
-// Vrai au-dessus de 640 px de large : on affiche le tableau ; en dessous
-// (téléphone en portrait), on repasse en tuiles.
-function useEstLarge() {
-  const [large, setLarge] = useState(true);
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return undefined;
-    const mq = window.matchMedia("(min-width: 640px)");
-    const maj = () => setLarge(mq.matches);
-    maj();
-    mq.addEventListener?.("change", maj);
-    return () => mq.removeEventListener?.("change", maj);
-  }, []);
-  return large;
-}
-
-// Badge générique (même gabarit que les badges de statut).
-function Badge({ label, classe, title }) {
-  return (
-    <span
-      className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full ${classe}`}
-      title={title}
-    >
-      {label}
-    </span>
-  );
-}
-
-// En-tête de colonne cliquable pour le tri.
-function EnTeteTri({ cle, tri, setTri, align = "center", children }) {
-  const actif = tri.cle === cle;
-  const alignement =
-    align === "left" ? "text-left" : align === "right" ? "text-right" : "text-center";
-  return (
-    <th
-      onClick={() =>
-        setTri((t) =>
-          t.cle === cle
-            ? { cle, sens: t.sens === "asc" ? "desc" : "asc" }
-            : { cle, sens: cle === "libelle" || cle === "payeur" ? "asc" : "desc" }
-        )
-      }
-      className={`px-2 py-2 font-medium cursor-pointer select-none whitespace-nowrap ${alignement} ${
-        actif ? "text-slate-700" : ""
-      }`}
-    >
-      {children}
-      <span className="ml-0.5 text-[10px] text-slate-400">
-        {actif ? (tri.sens === "asc" ? "▲" : "▼") : "▼"}
-      </span>
-    </th>
-  );
-}
-
 // Sélecteur de parent avec recherche (tape les premières lettres du nom ou
 // prénom) — la liste complète est trop longue pour un simple menu déroulant.
 function SelecteurParent({ parents, valeur, onChange, champ }) {
@@ -1037,22 +889,11 @@ function LigneForm({ accessToken, annees, evenements, parents, ligne, onDone, on
 // ---------------------------------------------------------------------------
 // Une ligne dans la liste.
 // ---------------------------------------------------------------------------
-function LigneRow({
-  accessToken,
-  ligne,
-  evenements,
-  annees,
-  parents,
-  onChange,
-  vue = "carte",
-}) {
+function LigneRow({ accessToken, ligne, evenements, annees, parents, onChange }) {
   const [edition, setEdition] = useState(false);
   const [envoi, setEnvoi] = useState(false);
-  const [deroule, setDeroule] = useState(false);
   const statut = STATUTS[ligne.statut] || STATUTS.a_verifier;
   const voyant = voyantJustif(ligne);
-  const reglement = reglementInfo(ligne);
-  const factCourt = factureCourt(ligne);
   const idsEvenement =
     ligne.evenements && ligne.evenements.length
       ? ligne.evenements
@@ -1130,24 +971,8 @@ function LigneRow({
     }
   }
 
-  // Rattachement en une ligne de texte (manifestation(s) + classe(s)).
-  const rattachement = [
-    nomEvenement,
-    ligne.rubrique === "classe" && ligne.classes.length
-      ? ligne.classes
-          .map((c) =>
-            classeDiff
-              ? `${libelleClasse(c)} (${euros(ligne.classesMontants?.[c] || 0)})`
-              : libelleClasse(c)
-          )
-          .join(", ")
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
   if (edition) {
-    const form = (
+    return (
       <LigneForm
         accessToken={accessToken}
         annees={annees}
@@ -1161,69 +986,104 @@ function LigneRow({
         onCancel={() => setEdition(false)}
       />
     );
-    return vue === "tableau" ? (
-      <tr>
-        <td colSpan={8} className="p-2">
-          {form}
-        </td>
-      </tr>
-    ) : (
-      form
-    );
   }
 
-  // En-tête (vue carte) : libellé + rattachement à gauche, montant + badges
-  // à droite.
-  const enTete = (
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <p className="font-medium text-slate-800">{ligne.libelle}</p>
-        <p className="text-xs text-slate-500">
-          <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5 mr-1">
-            {RUBRIQUES[ligne.rubrique]}
-          </span>
-          {rattachement && <span>{rattachement}</span>}
-          {ligne.fournisseur && <span> · {ligne.fournisseur}</span>}
-          {ligne.source === "enseignant" && (
-            <span className="text-sou-blue"> · facture enseignant</span>
-          )}
-          {ligne.paye_par === "benevole" && (
-            <span className="text-amber-700"> · avancé par {payeurNom(ligne, parents)}</span>
-          )}
-        </p>
-      </div>
-      <div className="text-right shrink-0">
-        <p
-          className={`font-semibold ${
-            ligne.sens === "recette" ? "text-green-700" : "text-red-700"
-          }`}
-        >
-          {ligne.sens === "recette" ? "+" : "−"} {euros(ligne.montant_cents)}
-        </p>
-        <p className="text-xs text-slate-400">{formatDate(ligne.date_operation)}</p>
-        <div className="flex flex-col items-end gap-1 mt-0.5">
-          <Badge label={statut.label} classe={statut.classe} />
-          <Badge
-            label={voyant.label}
-            classe={voyant.ok ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}
-            title={
-              ligne.a_justificatif && !ligne.a_justificatif_propre
-                ? "Justificatif repris de la facture / demande liée"
-                : undefined
-            }
-          />
-          {reglement.cle !== "aucun" && (
-            <Badge label={reglement.label} classe={reglement.classe} />
-          )}
+  return (
+    <div className="border border-slate-200 rounded-xl p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-medium text-slate-800">{ligne.libelle}</p>
+          <p className="text-xs text-slate-500">
+            <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5 mr-1">
+              {RUBRIQUES[ligne.rubrique]}
+            </span>
+            {nomEvenement && <span>{nomEvenement}</span>}
+            {ligne.rubrique === "classe" && ligne.classes.length > 0 && (
+              <span>
+                {ligne.classes
+                  .map((c) =>
+                    classeDiff
+                      ? `${libelleClasse(c)} (${euros(ligne.classesMontants?.[c] || 0)})`
+                      : libelleClasse(c)
+                  )
+                  .join(", ")}
+              </span>
+            )}
+            {ligne.fournisseur && <span> · {ligne.fournisseur}</span>}
+            {ligne.source === "enseignant" && (
+              <span className="text-sou-blue"> · facture enseignant</span>
+            )}
+            {ligne.paye_par === "benevole" && (
+              <span className="text-amber-700">
+                {" "}
+                · avancé par{" "}
+                {(parents || []).find((p) => p.id === ligne.paye_par_parent_id)?.nom ||
+                  "un bénévole"}
+              </span>
+            )}
+          </p>
+        </div>
+        <div className="text-right shrink-0">
+          <p
+            className={`font-semibold ${
+              ligne.sens === "recette" ? "text-green-700" : "text-red-700"
+            }`}
+          >
+            {ligne.sens === "recette" ? "+" : "−"} {euros(ligne.montant_cents)}
+          </p>
+          <p className="text-xs text-slate-400">{formatDate(ligne.date_operation)}</p>
+          <div className="flex flex-col items-end gap-1 mt-0.5">
+            <span
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statut.classe}`}
+            >
+              {statut.label}
+            </span>
+            <span
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                voyant.ok
+                  ? "bg-green-50 text-green-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+              title={
+                ligne.a_justificatif && !ligne.a_justificatif_propre
+                  ? "Justificatif repris de la facture / demande liée"
+                  : undefined
+              }
+            >
+              {voyant.label}
+            </span>
+            {ligne.paye_par === "benevole" && (
+              <span
+                className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  ligne.rembourse
+                    ? "bg-green-50 text-green-700"
+                    : "bg-red-50 text-red-700"
+                }`}
+              >
+                {ligne.rembourse ? "Remboursé" : "À rembourser"}
+              </span>
+            )}
+            {ligne.paiement_concerne && (
+              <span
+                className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  ligne.paiement_statut === "paye"
+                    ? "bg-green-50 text-green-700"
+                    : "bg-red-50 text-red-700"
+                }`}
+              >
+                {ligne.paiement_statut === "paye"
+                  ? `Payée${
+                      ligne.moyen_paiement
+                        ? ` (${MOYENS_PAIEMENT[ligne.moyen_paiement] || ligne.moyen_paiement})`
+                        : ""
+                    }`
+                  : "À payer"}
+              </span>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
 
-  // Bloc des actions : identique en vue carte et dans le détail déroulé du
-  // tableau.
-  const blocActions = (
-    <>
       {ligne.paye_par === "benevole" && (
         <div className="flex flex-wrap items-center gap-1.5 mt-2 text-xs">
           {ligne.source === "benevole" && (
@@ -1434,96 +1294,6 @@ function LigneRow({
           />
         </div>
       )}
-    </>
-  );
-
-  if (vue === "tableau") {
-    return (
-      <>
-        <tr
-          onClick={() => setDeroule((d) => !d)}
-          className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer align-middle"
-        >
-          <td className="px-2 py-2 text-center text-slate-400">{deroule ? "▾" : "▸"}</td>
-          <td className="px-2 py-2 text-slate-500 whitespace-nowrap">
-            {ligne.date_operation ? formatDate(ligne.date_operation) : "—"}
-          </td>
-          <td className="px-2 py-2">
-            <div className="font-medium text-slate-800 truncate">{ligne.libelle}</div>
-            <div className="text-[11px] text-slate-400 truncate">
-              {RUBRIQUES[ligne.rubrique]}
-              {rattachement ? ` · ${rattachement}` : ""}
-            </div>
-          </td>
-          <td className="px-2 py-2">
-            <div className="truncate">{payeurNom(ligne, parents)}</div>
-            {ligne.paye_par === "benevole" && (
-              <div className="text-[11px] text-amber-700">avance</div>
-            )}
-            {ligne.source === "enseignant" && (
-              <div className="text-[11px] text-sou-blue">facture enseignant</div>
-            )}
-          </td>
-          <td className="px-2 py-2 text-center">
-            {factCourt.ok === null ? (
-              <span className="text-slate-300">—</span>
-            ) : (
-              <Badge
-                label={factCourt.label}
-                classe={
-                  factCourt.ok
-                    ? "bg-green-50 text-green-700"
-                    : "bg-amber-50 text-amber-700"
-                }
-                title={
-                  ligne.a_justificatif && !ligne.a_justificatif_propre
-                    ? "Justificatif repris de la facture / demande liée"
-                    : undefined
-                }
-              />
-            )}
-          </td>
-          <td className="px-2 py-2 text-center">
-            {reglement.cle === "aucun" ? (
-              <span className="text-slate-300">—</span>
-            ) : (
-              <Badge label={reglement.label} classe={reglement.classe} />
-            )}
-          </td>
-          <td className="px-2 py-2 text-center">
-            <Badge label={statut.label} classe={statut.classe} />
-          </td>
-          <td
-            className={`px-2 py-2 text-right font-semibold whitespace-nowrap ${
-              ligne.sens === "recette" ? "text-green-700" : "text-red-700"
-            }`}
-          >
-            {ligne.sens === "recette" ? "+" : "−"} {euros(ligne.montant_cents)}
-          </td>
-        </tr>
-        {deroule && (
-          <tr className="bg-slate-50">
-            <td />
-            <td colSpan={7} className="px-2 pb-3 pt-1">
-              {(rattachement || ligne.fournisseur || ligne.note) && (
-                <p className="text-xs text-slate-500">
-                  {[rattachement, ligne.fournisseur, ligne.note]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              )}
-              {blocActions}
-            </td>
-          </tr>
-        )}
-      </>
-    );
-  }
-
-  return (
-    <div className="border border-slate-200 rounded-xl p-3">
-      {enTete}
-      {blocActions}
     </div>
   );
 }
@@ -1541,8 +1311,6 @@ function ComptaAdmin({ accessToken }) {
   const [statut, setStatut] = useState("");
   const [sens, setSens] = useState("");
   const [ajout, setAjout] = useState(false);
-  const [tri, setTri] = useState({ cle: "date", sens: "desc" });
-  const estLarge = useEstLarge();
 
   const recharger = useCallback(() => {
     setChargement(true);
@@ -1589,12 +1357,6 @@ function ComptaAdmin({ accessToken }) {
     .filter((v) => v.montant_cents > 0)
     .sort((a, b) => b.montant_cents - a.montant_cents);
 
-  // Lignes de la liste, triées selon la colonne choisie (le filtrage, lui,
-  // se fait côté serveur via les pilules du haut).
-  const lignesTriees = data?.lignes
-    ? [...data.lignes].sort(comparerLignes(tri, data.parents || []))
-    : [];
-
   const pilule = (actif, onClick, texte) => (
     <button
       onClick={onClick}
@@ -1621,10 +1383,8 @@ function ComptaAdmin({ accessToken }) {
         par le Sou porte un état <strong>« à payer »</strong> ou{" "}
         <strong>« payée »</strong> (avec le moyen : virement, chèque, carte…).
         Une dépense partagée se répartit à parts égales entre les classes /
-        manifestations, ou avec des montants différenciés. La liste s&apos;affiche
-        en tableau : cliquez sur un en-tête pour trier, sur une ligne pour la
-        dérouler. Import des relevés Crédit Agricole et pointage automatique :
-        à venir.
+        manifestations, ou avec des montants différenciés. Import des relevés
+        Crédit Agricole et pointage automatique : à venir.
       </p>
 
       {data?.error && (
@@ -1816,71 +1576,13 @@ function ComptaAdmin({ accessToken }) {
       {/* Liste */}
       {chargement ? (
         <p className="text-slate-500 text-sm">Chargement…</p>
-      ) : lignesTriees.length === 0 ? (
-        <p className="text-slate-500 text-sm">Aucune ligne pour ces filtres.</p>
-      ) : estLarge ? (
-        <>
-          <div className="overflow-x-auto border border-slate-200 rounded-xl">
-            <table className="w-full text-xs table-fixed" style={{ minWidth: "640px" }}>
-              <colgroup>
-                <col style={{ width: "26px" }} />
-                <col style={{ width: "92px" }} />
-                <col />
-                <col style={{ width: "116px" }} />
-                <col style={{ width: "92px" }} />
-                <col style={{ width: "120px" }} />
-                <col style={{ width: "94px" }} />
-                <col style={{ width: "104px" }} />
-              </colgroup>
-              <thead>
-                <tr className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                  <th />
-                  <EnTeteTri cle="date" tri={tri} setTri={setTri}>
-                    Date
-                  </EnTeteTri>
-                  <EnTeteTri cle="libelle" tri={tri} setTri={setTri} align="left">
-                    Libellé
-                  </EnTeteTri>
-                  <EnTeteTri cle="payeur" tri={tri} setTri={setTri} align="left">
-                    Payé par
-                  </EnTeteTri>
-                  <EnTeteTri cle="facture" tri={tri} setTri={setTri}>
-                    Facture
-                  </EnTeteTri>
-                  <EnTeteTri cle="reglement" tri={tri} setTri={setTri}>
-                    Règlement
-                  </EnTeteTri>
-                  <EnTeteTri cle="statut" tri={tri} setTri={setTri}>
-                    Statut
-                  </EnTeteTri>
-                  <EnTeteTri cle="montant" tri={tri} setTri={setTri} align="right">
-                    Montant
-                  </EnTeteTri>
-                </tr>
-              </thead>
-              <tbody>
-                {lignesTriees.map((l) => (
-                  <LigneRow
-                    key={l.id}
-                    vue="tableau"
-                    accessToken={accessToken}
-                    ligne={l}
-                    evenements={data.evenements || []}
-                    annees={data.annees || []}
-                    parents={data.parents || []}
-                    onChange={recharger}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            Cliquez sur un en-tête pour trier, sur une ligne pour la dérouler et agir.
-          </p>
-        </>
+      ) : !data?.lignes || data.lignes.length === 0 ? (
+        <p className="text-slate-500 text-sm">
+          Aucune ligne pour ces filtres.
+        </p>
       ) : (
         <div className="space-y-2">
-          {lignesTriees.map((l) => (
+          {data.lignes.map((l) => (
             <LigneRow
               key={l.id}
               accessToken={accessToken}
