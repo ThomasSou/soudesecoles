@@ -152,6 +152,27 @@ function payeurNom(ligne, parents) {
   return "Le Sou";
 }
 
+// « Objet » d'une ligne : la manifestation concernée (Foire, Marché de
+// Noël…), la ou les classes, ou la catégorie (Investissement, Fonctionnement
+// courant). Sert de colonne dédiée dans le tableau, et de clé de tri.
+function causeLibelle(ligne, evenements) {
+  if (ligne.rubrique === "evenement") {
+    const ids = ligne.evenements?.length
+      ? ligne.evenements
+      : ligne.evenement_id
+        ? [ligne.evenement_id]
+        : [];
+    const noms = ids
+      .map((id) => (evenements || []).find((e) => e.id === id)?.nom)
+      .filter(Boolean);
+    return noms.join(", ") || "Manifestation";
+  }
+  if (ligne.rubrique === "classe") {
+    return (ligne.classes || []).map((c) => libelleClasse(c)).join(", ") || "Classe";
+  }
+  return RUBRIQUES[ligne.rubrique] || "—";
+}
+
 // Ordres de tri pour les colonnes à valeurs qualitatives.
 const ORDRE_FACTURE = { manquante: 0, autre: 1, presente: 2, sansobjet: 3 };
 const ORDRE_REGLEMENT = { a_payer: 0, a_rembourser: 1, paye: 2, rembourse: 3, aucun: 4 };
@@ -166,7 +187,7 @@ function rangFacture(ligne) {
 
 // Comparateur de deux lignes selon la colonne triée. Les lignes sans date
 // restent toujours en bas, quel que soit le sens.
-function comparerLignes(tri, parents) {
+function comparerLignes(tri, parents, evenements) {
   const signe = tri.sens === "asc" ? 1 : -1;
   return (a, b) => {
     if (tri.cle === "date") {
@@ -184,6 +205,10 @@ function comparerLignes(tri, parents) {
       vb = b.montant_cents;
     } else if (tri.cle === "libelle") {
       return (a.libelle || "").localeCompare(b.libelle || "", "fr") * signe;
+    } else if (tri.cle === "objet") {
+      return (
+        causeLibelle(a, evenements).localeCompare(causeLibelle(b, evenements), "fr") * signe
+      );
     } else if (tri.cle === "payeur") {
       va = (a.paye_par === "benevole" ? "1" : "0") + payeurNom(a, parents);
       vb = (b.paye_par === "benevole" ? "1" : "0") + payeurNom(b, parents);
@@ -1163,7 +1188,7 @@ function LigneRow({
     );
     return vue === "tableau" ? (
       <tr>
-        <td colSpan={8} className="p-2">
+        <td colSpan={9} className="p-2">
           {form}
         </td>
       </tr>
@@ -1450,10 +1475,19 @@ function LigneRow({
           </td>
           <td className="px-2 py-2">
             <div className="font-medium text-slate-800 truncate">{ligne.libelle}</div>
-            <div className="text-[11px] text-slate-400 truncate">
-              {RUBRIQUES[ligne.rubrique]}
-              {rattachement ? ` · ${rattachement}` : ""}
+            {ligne.fournisseur && (
+              <div className="text-[11px] text-slate-400 truncate">{ligne.fournisseur}</div>
+            )}
+          </td>
+          <td className="px-2 py-2">
+            <div className="truncate text-slate-600">
+              {causeLibelle(ligne, evenements)}
             </div>
+            {(ligne.rubrique === "evenement" || ligne.rubrique === "classe") && (
+              <div className="text-[11px] text-slate-400 truncate">
+                {RUBRIQUES[ligne.rubrique]}
+              </div>
+            )}
           </td>
           <td className="px-2 py-2">
             <div className="truncate">{payeurNom(ligne, parents)}</div>
@@ -1504,7 +1538,7 @@ function LigneRow({
         {deroule && (
           <tr className="bg-slate-50">
             <td />
-            <td colSpan={7} className="px-2 pb-3 pt-1">
+            <td colSpan={8} className="px-2 pb-3 pt-1">
               {(rattachement || ligne.fournisseur || ligne.note) && (
                 <p className="text-xs text-slate-500">
                   {[rattachement, ligne.fournisseur, ligne.note]
@@ -1592,7 +1626,9 @@ function ComptaAdmin({ accessToken }) {
   // Lignes de la liste, triées selon la colonne choisie (le filtrage, lui,
   // se fait côté serveur via les pilules du haut).
   const lignesTriees = data?.lignes
-    ? [...data.lignes].sort(comparerLignes(tri, data.parents || []))
+    ? [...data.lignes].sort(
+        comparerLignes(tri, data.parents || [], data.evenements || [])
+      )
     : [];
 
   const pilule = (actif, onClick, texte) => (
@@ -1821,16 +1857,17 @@ function ComptaAdmin({ accessToken }) {
       ) : estLarge ? (
         <>
           <div className="overflow-x-auto border border-slate-200 rounded-xl">
-            <table className="w-full text-xs table-fixed" style={{ minWidth: "640px" }}>
+            <table className="w-full text-xs table-fixed" style={{ minWidth: "760px" }}>
               <colgroup>
                 <col style={{ width: "26px" }} />
-                <col style={{ width: "92px" }} />
+                <col style={{ width: "88px" }} />
                 <col />
-                <col style={{ width: "116px" }} />
-                <col style={{ width: "92px" }} />
-                <col style={{ width: "120px" }} />
-                <col style={{ width: "94px" }} />
-                <col style={{ width: "104px" }} />
+                <col style={{ width: "132px" }} />
+                <col style={{ width: "112px" }} />
+                <col style={{ width: "88px" }} />
+                <col style={{ width: "118px" }} />
+                <col style={{ width: "90px" }} />
+                <col style={{ width: "102px" }} />
               </colgroup>
               <thead>
                 <tr className="bg-slate-50 text-slate-500 border-b border-slate-200">
@@ -1840,6 +1877,9 @@ function ComptaAdmin({ accessToken }) {
                   </EnTeteTri>
                   <EnTeteTri cle="libelle" tri={tri} setTri={setTri} align="left">
                     Libellé
+                  </EnTeteTri>
+                  <EnTeteTri cle="objet" tri={tri} setTri={setTri} align="left">
+                    Objet
                   </EnTeteTri>
                   <EnTeteTri cle="payeur" tri={tri} setTri={setTri} align="left">
                     Payé par
