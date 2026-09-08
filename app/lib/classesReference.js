@@ -25,7 +25,7 @@ export const CLASSES_REFERENCE = [
   { cle: "elem-ce1-ce2", groupe: "elementaire", niveau: "CE1-CE2", enseignant: "Mosca-Guillaud et Petrozzi-Bedanian" },
   { cle: "elem-ce2", groupe: "elementaire", niveau: "CE2", enseignant: "Mathilde Geernaert" },
   { cle: "elem-cm1", groupe: "elementaire", niveau: "CM1", enseignant: "Marie-Claude Breton" },
-  { cle: "elem-cm1-cm2", groupe: "elementaire", niveau: "CM1-CM2", enseignant: "Mathilde Flusin" },
+  { cle: "elem-cm1-cm2", groupe: "elementaire", niveau: "CM1-CM2", enseignant: "Christine Latorre et Mathilde Flusin" },
   { cle: "elem-cm2", groupe: "elementaire", niveau: "CM2", enseignant: "Stéphanie D'Acunto" },
 ];
 
