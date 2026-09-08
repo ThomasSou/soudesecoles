@@ -50,6 +50,16 @@ const REMBOURSEMENT_STATUT = {
 
 const COMPTES = { courant: "Compte courant", placement: "Compte placement" };
 
+// Moyens de paiement d'une facture réglée par le Sou.
+const MOYENS_PAIEMENT = {
+  virement: "Virement",
+  cheque: "Chèque",
+  cb: "Carte bancaire",
+  especes: "Espèces",
+  prelevement: "Prélèvement",
+  autre: "Autre",
+};
+
 function euros(cents) {
   return ((cents || 0) / 100).toLocaleString("fr-FR", {
     style: "currency",
@@ -335,6 +345,11 @@ function LigneForm({ accessToken, annees, evenements, parents, ligne, onDone, on
   const [statut, setStatut] = useState(ligne?.statut || "a_verifier");
   const [payePar, setPayePar] = useState(ligne?.paye_par || "sou");
   const [payeParParentId, setPayeParParentId] = useState(ligne?.paye_par_parent_id || "");
+  const [paiementStatut, setPaiementStatut] = useState(
+    ligne?.paiement_statut === "paye" ? "paye" : "a_payer"
+  );
+  const [moyenPaiement, setMoyenPaiement] = useState(ligne?.moyen_paiement || "virement");
+  const [paiementLe, setPaiementLe] = useState(ligne?.paiement_le || "");
   const [note, setNote] = useState(ligne?.note || "");
   const [justificatif, setJustificatif] = useState(null);
   const [justificatifType, setJustificatifType] = useState(
@@ -446,6 +461,15 @@ function LigneForm({ accessToken, annees, evenements, parents, ligne, onDone, on
       note,
       payePar,
       payeParParentId: payePar === "benevole" ? payeParParentId || null : null,
+      paiementStatut: sens === "depense" && payePar === "sou" ? paiementStatut : undefined,
+      moyenPaiement:
+        sens === "depense" && payePar === "sou" && paiementStatut === "paye"
+          ? moyenPaiement
+          : undefined,
+      paiementLe:
+        sens === "depense" && payePar === "sou" && paiementStatut === "paye"
+          ? paiementLe || null
+          : undefined,
       justificatifDataUrl,
       justificatifType,
       annee: anneeLigne,
@@ -739,6 +763,60 @@ function LigneForm({ accessToken, annees, evenements, parents, ligne, onDone, on
         )}
       </div>
 
+      {/* Règlement — seulement pour une dépense payée par le Sou. Une avance
+          bénévole suit son propre circuit (remboursement). */}
+      {sens === "depense" && payePar === "sou" && (
+        <div className="text-sm space-y-2">
+          <p>Règlement de la facture</p>
+          <div className="flex gap-1.5">
+            {[
+              ["a_payer", "À payer"],
+              ["paye", "Payée"],
+            ].map(([k, lbl]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setPaiementStatut(k)}
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                  paiementStatut === k
+                    ? "bg-sou-blue text-white"
+                    : "bg-white border border-slate-300 text-slate-600"
+                }`}
+              >
+                {lbl}
+              </button>
+            ))}
+          </div>
+          {paiementStatut === "paye" && (
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="text-sm">
+                Moyen de paiement
+                <select
+                  value={moyenPaiement}
+                  onChange={(e) => setMoyenPaiement(e.target.value)}
+                  className={champ}
+                >
+                  {Object.entries(MOYENS_PAIEMENT).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm">
+                Date du paiement (facultatif)
+                <input
+                  type="date"
+                  value={paiementLe}
+                  onChange={(e) => setPaiementLe(e.target.value)}
+                  className={champ}
+                />
+              </label>
+            </div>
+          )}
+        </div>
+      )}
+
       <label className="text-sm block">
         Note interne (facultatif)
         <textarea
@@ -985,6 +1063,23 @@ function LigneRow({ accessToken, ligne, evenements, annees, parents, onChange })
                 {ligne.rembourse ? "Remboursé" : "À rembourser"}
               </span>
             )}
+            {ligne.paiement_concerne && (
+              <span
+                className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  ligne.paiement_statut === "paye"
+                    ? "bg-green-50 text-green-700"
+                    : "bg-red-50 text-red-700"
+                }`}
+              >
+                {ligne.paiement_statut === "paye"
+                  ? `Payée${
+                      ligne.moyen_paiement
+                        ? ` (${MOYENS_PAIEMENT[ligne.moyen_paiement] || ligne.moyen_paiement})`
+                        : ""
+                    }`
+                  : "À payer"}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -1049,6 +1144,43 @@ function LigneRow({ accessToken, ligne, evenements, annees, parents, onChange })
             >
               Marquer remboursé
             </button>
+          )}
+        </div>
+      )}
+
+      {ligne.paiement_concerne && (
+        <div className="flex flex-wrap items-center gap-1.5 mt-2 text-xs">
+          {ligne.paiement_statut === "paye" ? (
+            <>
+              <span className="text-green-700 font-semibold">
+                Payée
+                {ligne.moyen_paiement
+                  ? ` par ${(MOYENS_PAIEMENT[ligne.moyen_paiement] || ligne.moyen_paiement).toLowerCase()}`
+                  : ""}
+                {ligne.paiement_le ? ` le ${formatDate(ligne.paiement_le)}` : ""}
+              </span>
+              <button
+                onClick={() => patch({ paiementStatut: "a_payer" })}
+                disabled={envoi}
+                className="text-slate-400 px-1 disabled:opacity-40"
+              >
+                annuler
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="font-semibold text-slate-500">Marquer payée :</span>
+              {Object.entries(MOYENS_PAIEMENT).map(([k, v]) => (
+                <button
+                  key={k}
+                  onClick={() => patch({ paiementStatut: "paye", moyenPaiement: k })}
+                  disabled={envoi}
+                  className="font-semibold text-sou-blue border border-sou-blue/40 px-2 py-0.5 rounded-full disabled:opacity-40"
+                >
+                  {v}
+                </button>
+              ))}
+            </>
           )}
         </div>
       )}
@@ -1210,6 +1342,7 @@ function ComptaAdmin({ accessToken }) {
   const pointe = data?.totaux?.parStatut?.pointe;
   const previsionnel = data?.totaux?.parStatut?.prevu;
   const aValider = data?.totaux?.parStatut?.a_valider;
+  const aPayer = data?.totaux?.aPayer;
   const entreesClasses = Object.entries(data?.totaux?.parClasse || {}).map(([cle, v]) => ({
     label: v.libelle || libelleClasse(cle),
     realise: v.realise,
@@ -1246,10 +1379,12 @@ function ComptaAdmin({ accessToken }) {
         factures des enseignants et les demandes de remboursement des bénévoles
         apparaissent automatiquement (ces dernières en « à valider »). Un devis
         joint met la ligne en <strong>prévisionnel</strong>{" "}
-        jusqu&apos;à ce qu&apos;une facture le remplace. Une dépense partagée se
-        répartit à parts égales entre les classes / manifestations, ou avec des
-        montants différenciés. Import des relevés Crédit Agricole et pointage
-        automatique : à venir.
+        jusqu&apos;à ce qu&apos;une facture le remplace. Chaque dépense réglée
+        par le Sou porte un état <strong>« à payer »</strong> ou{" "}
+        <strong>« payée »</strong> (avec le moyen : virement, chèque, carte…).
+        Une dépense partagée se répartit à parts égales entre les classes /
+        manifestations, ou avec des montants différenciés. Import des relevés
+        Crédit Agricole et pointage automatique : à venir.
       </p>
 
       {data?.error && (
@@ -1364,8 +1499,13 @@ function ComptaAdmin({ accessToken }) {
           </p>
         </div>
       </div>
-      {(aValider || aVerifier || pointe) && (
+      {(aValider || aVerifier || pointe || aPayer?.montant_cents) && (
         <p className="text-xs text-slate-500 mb-4">
+          {aPayer?.montant_cents ? (
+            <>
+              À payer : {euros(aPayer.montant_cents)} ·{" "}
+            </>
+          ) : null}
           {aValider ? (
             <>
               À valider :{" "}

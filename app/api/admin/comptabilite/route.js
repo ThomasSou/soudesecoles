@@ -11,6 +11,7 @@ const RUBRIQUES = ["evenement", "investissement", "courant", "classe"];
 const STATUTS = ["prevu", "a_verifier", "pointe", "a_valider"];
 const SENS = ["depense", "recette"];
 const COMPTES = ["courant", "placement"];
+const MOYENS_PAIEMENT = ["virement", "cheque", "cb", "especes", "prelevement", "autre"];
 
 // Recopie en lignes de compta les factures des enseignants de l'année qui
 // n'y sont pas encore (source = 'enseignant'). Idempotent grâce à l'index
@@ -249,6 +250,19 @@ export async function GET(request) {
       (l.reimbursement_request_id
         ? demandeParId[l.reimbursement_request_id]?.processed_at || null
         : null),
+    // État de paiement — ne concerne que les dépenses saisies à la main et
+    // réglées par le Sou. Les avances bénévoles ont leur propre suivi
+    // (rembourse_le) ; les factures enseignant sont pilotées depuis leur
+    // fiche. Défaut « à payer » déduit ici : la colonne n'est écrite que
+    // quand le bureau renseigne le paiement (compat avant migration 0049).
+    paiement_concerne:
+      l.sens === "depense" && l.source === "manuel" && (l.paye_par || "sou") !== "benevole",
+    paiement_statut:
+      l.sens === "depense" && l.source === "manuel" && (l.paye_par || "sou") !== "benevole"
+        ? l.paiement_statut || "a_payer"
+        : null,
+    moyen_paiement: l.moyen_paiement || null,
+    paiement_le: l.paiement_le || null,
   }));
 
   // Filtres portant sur les tables de liaison : appliqués ici.
@@ -319,6 +333,13 @@ export async function GET(request) {
       (parBenevole[l.paye_par_parent_id] || 0) + l.montant_cents;
   }
 
+  // À payer : dépenses saisies à la main, réglées par le Sou, pas encore
+  // soldées. Même logique que la ligne « À pointer / Pointé ».
+  let aPayerCents = 0;
+  for (const l of lignes) {
+    if (l.paiement_concerne && l.paiement_statut === "a_payer") aPayerCents += l.montant_cents;
+  }
+
   // Données de référence pour les filtres et le formulaire.
   const [evenementsRes, anneesLignesRes, anneesFacturesRes, parentsRes] = await Promise.all([
     auth.admin.from("benevolat_evenements").select("id, nom").order("created_at", { ascending: false }),
@@ -353,6 +374,7 @@ export async function GET(request) {
       global: totalGlobal,
       parStatut,
       parRubrique,
+      aPayer: { montant_cents: aPayerCents },
       parClasse: Object.fromEntries(
         Object.entries(parClasse).map(([cle, v]) => [cle, { ...v, libelle: libelleClasse(cle) }])
       ),
@@ -406,6 +428,15 @@ export async function POST(request) {
   const payePar = body?.payePar === "benevole" ? "benevole" : "sou";
   const payeParParentId = payePar === "benevole" ? body?.payeParParentId || null : null;
 
+  // État de paiement — uniquement pour une dépense réglée par le Sou. On ne
+  // renseigne la colonne que si la facture est marquée « payée » : une
+  // dépense « à payer » reste la valeur par défaut, déduite à l'affichage,
+  // ce qui garde la saisie possible avant la migration 0049.
+  const concernePaiement = sens === "depense" && payePar === "sou";
+  const paiementPaye = concernePaiement && body?.paiementStatut === "paye";
+  const moyenPaiement = MOYENS_PAIEMENT.includes(body?.moyenPaiement) ? body.moyenPaiement : null;
+  const paiementLe = body?.paiementLe || null;
+
   // Un devis (non validé) est une dépense prévisionnelle : la ligne est
   // forcée en statut « prevu », quel que soit le statut demandé.
   const estDevis = body?.justificatifDataUrl && body?.justificatifType === "devis";
@@ -432,6 +463,12 @@ export async function POST(request) {
   if (payePar === "benevole" && !payeParParentId) {
     return NextResponse.json(
       { error: "Choisissez le bénévole qui a avancé la dépense." },
+      { status: 400 }
+    );
+  }
+  if (paiementPaye && !moyenPaiement) {
+    return NextResponse.json(
+      { error: "Indiquez le moyen de paiement (virement, chèque…)." },
       { status: 400 }
     );
   }
@@ -499,6 +536,13 @@ export async function POST(request) {
   if (payePar === "benevole") {
     nouvelleLigne.paye_par = "benevole";
     nouvelleLigne.paye_par_parent_id = payeParParentId;
+  }
+  // Idem : on n'écrit paiement_* que si la facture est marquée « payée »
+  // (compat avant migration 0049).
+  if (paiementPaye) {
+    nouvelleLigne.paiement_statut = "paye";
+    nouvelleLigne.moyen_paiement = moyenPaiement;
+    if (paiementLe) nouvelleLigne.paiement_le = paiementLe;
   }
 
   const { data: ligne, error } = await auth.admin

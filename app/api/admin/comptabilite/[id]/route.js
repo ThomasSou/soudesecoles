@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 const STATUTS = ["prevu", "a_verifier", "pointe", "a_valider"];
 const COMPTES = ["courant", "placement"];
+const MOYENS_PAIEMENT = ["virement", "cheque", "cb", "especes", "prelevement", "autre"];
 
 // Met à jour une ligne : statut (pointage), montant, libellé, fournisseur,
 // date, compte bancaire, référence du relevé, note, et — pour une ligne
@@ -126,6 +127,56 @@ export async function PATCH(request, { params }) {
   }
   if (body.note !== undefined) {
     update.note = body.note?.trim() || null;
+  }
+
+  // État de paiement — dépenses saisies à la main et réglées par le Sou
+  // uniquement (les avances bénévoles ont leur propre suivi via rembourse_le,
+  // les factures enseignant sont pilotées depuis leur fiche). On n'écrit les
+  // colonnes que si l'état change vraiment : une ligne reste modifiable même
+  // si la migration 0049 n'est pas encore passée, tant qu'on ne touche pas au
+  // paiement.
+  if (body.paiementStatut !== undefined) {
+    const concernePaiement =
+      ligne.sens === "depense" &&
+      ligne.source === "manuel" &&
+      (ligne.paye_par || "sou") !== "benevole";
+    if (!concernePaiement) {
+      return NextResponse.json(
+        { error: "L'état de paiement ne concerne que les dépenses réglées par le Sou." },
+        { status: 400 }
+      );
+    }
+    if (!["a_payer", "paye"].includes(body.paiementStatut)) {
+      return NextResponse.json({ error: "État de paiement invalide." }, { status: 400 });
+    }
+    const statutActuel = ligne.paiement_statut || "a_payer";
+    const moyenActuel = ligne.moyen_paiement || null;
+    const dateActuelle = ligne.paiement_le || null;
+    if (body.paiementStatut === "paye") {
+      const moyen = MOYENS_PAIEMENT.includes(body.moyenPaiement)
+        ? body.moyenPaiement
+        : moyenActuel;
+      if (!moyen) {
+        return NextResponse.json(
+          { error: "Indiquez le moyen de paiement (virement, chèque…)." },
+          { status: 400 }
+        );
+      }
+      const date =
+        body.paiementLe !== undefined
+          ? body.paiementLe || null
+          : dateActuelle || new Date().toISOString().slice(0, 10);
+      if (statutActuel !== "paye" || moyen !== moyenActuel || date !== dateActuelle) {
+        update.paiement_statut = "paye";
+        update.moyen_paiement = moyen;
+        update.paiement_le = date;
+      }
+    } else if (statutActuel === "paye" || moyenActuel || dateActuelle) {
+      // Retour à « à payer » : on efface le moyen et la date.
+      update.paiement_statut = "a_payer";
+      update.moyen_paiement = null;
+      update.paiement_le = null;
+    }
   }
 
   // Justificatif : ajout / remplacement (toutes sources — le bureau peut
