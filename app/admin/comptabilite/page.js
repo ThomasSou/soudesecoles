@@ -1935,18 +1935,18 @@ function ComptaAdmin({ accessToken }) {
       ) : estLarge ? (
         <>
           <div className="overflow-x-auto border border-slate-200 rounded-xl">
-            <table className="w-full text-xs table-fixed" style={{ minWidth: "900px" }}>
+            <table className="w-full text-xs table-fixed" style={{ minWidth: "1024px" }}>
               <colgroup>
-                <col style={{ width: "26px" }} />
+                <col style={{ width: "24px" }} />
                 <col style={{ width: "82px" }} />
-                <col style={{ width: "126px" }} />
-                <col />
-                <col style={{ width: "118px" }} />
-                <col style={{ width: "100px" }} />
+                <col style={{ width: "128px" }} />
+                <col style={{ width: "180px" }} />
+                <col style={{ width: "124px" }} />
+                <col style={{ width: "104px" }} />
                 <col style={{ width: "82px" }} />
-                <col style={{ width: "116px" }} />
+                <col style={{ width: "120px" }} />
                 <col style={{ width: "86px" }} />
-                <col style={{ width: "98px" }} />
+                <col style={{ width: "94px" }} />
               </colgroup>
               <thead>
                 <tr className="bg-slate-50 text-slate-500 border-b border-slate-200">
