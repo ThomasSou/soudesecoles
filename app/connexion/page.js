@@ -38,7 +38,7 @@ export default function ConnexionPage() {
 
   return (
     <section className="max-w-md mx-auto px-4 sm:px-6 py-20">
-      <h1 className="text-3xl font-bold text-sou-blue mb-8">Espace adhérent</h1>
+      <h1 className="text-3xl font-bold text-sou-blue mb-8">Espace parent</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <input

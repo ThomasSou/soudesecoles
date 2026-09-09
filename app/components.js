@@ -40,7 +40,7 @@ export function Header() {
           href="/espace-adherent"
           className="hidden sm:inline-block bg-sou-blue text-white text-sm font-semibold px-4 py-2 rounded-full hover:bg-sou-gold transition-colors"
         >
-          Espace adhérent
+          Espace parent
         </Link>
       </div>
       <nav className="md:hidden flex overflow-x-auto gap-4 px-4 pb-3 text-sm font-medium text-slate-700">
@@ -55,7 +55,7 @@ export function Header() {
           href="/espace-adherent"
           className="block text-center bg-sou-blue text-white text-sm font-semibold px-4 py-2 rounded-full hover:bg-sou-gold transition-colors"
         >
-          Espace adhérent
+          Espace parent
         </Link>
       </div>
     </header>
@@ -124,7 +124,7 @@ export function Footer() {
             /connexion suffit fonctionnellement, ces liens sont un confort. */}
         <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
           <Link href="/espace-adherent" className="hover:text-white transition-colors">
-            Espace adhérent
+            Espace parent
           </Link>
           <span aria-hidden="true">·</span>
           <Link href="/partenaire" className="hover:text-white transition-colors">
