@@ -205,6 +205,8 @@ function comparerLignes(tri, parents, evenements) {
       vb = b.montant_cents;
     } else if (tri.cle === "libelle") {
       return (a.libelle || "").localeCompare(b.libelle || "", "fr") * signe;
+    } else if (tri.cle === "fournisseur") {
+      return (a.fournisseur || "").localeCompare(b.fournisseur || "", "fr") * signe;
     } else if (tri.cle === "objet") {
       return (
         causeLibelle(a, evenements).localeCompare(causeLibelle(b, evenements), "fr") * signe
@@ -267,7 +269,12 @@ function EnTeteTri({ cle, tri, setTri, align = "center", children }) {
         setTri((t) =>
           t.cle === cle
             ? { cle, sens: t.sens === "asc" ? "desc" : "asc" }
-            : { cle, sens: cle === "libelle" || cle === "payeur" ? "asc" : "desc" }
+            : {
+                cle,
+                sens: ["libelle", "payeur", "fournisseur", "objet"].includes(cle)
+                  ? "asc"
+                  : "desc",
+              }
         )
       }
       className={`px-2 py-2 font-medium cursor-pointer select-none whitespace-nowrap ${alignement} ${
@@ -475,7 +482,16 @@ function lireFichier(file) {
 // ---------------------------------------------------------------------------
 // Formulaire d'une ligne (création ou édition d'une ligne manuelle).
 // ---------------------------------------------------------------------------
-function LigneForm({ accessToken, annees, evenements, parents, ligne, onDone, onCancel }) {
+function LigneForm({
+  accessToken,
+  annees,
+  evenements,
+  parents,
+  fournisseurs = [],
+  ligne,
+  onDone,
+  onCancel,
+}) {
   const edition = Boolean(ligne);
   const groupes = GROUPES;
   const anneesOptions = [
@@ -587,6 +603,11 @@ function LigneForm({ accessToken, annees, evenements, parents, ligne, onDone, on
     repartitionEvenements !== "differenciee" ||
     sommeRepartie(evenementsSel, evenementsMontants) === totalLigneCents;
 
+  // Une ligne « prévisionnelle » n'exige pas de date : soit son statut est
+  // « prévisionnel », soit c'est un devis (qui force ce statut).
+  const estPrevisionnel =
+    statut === "prevu" || (Boolean(justificatif) && justificatifType === "devis");
+
   async function soumettre(e) {
     e.preventDefault();
     setErreur("");
@@ -594,6 +615,16 @@ function LigneForm({ accessToken, annees, evenements, parents, ligne, onDone, on
     if (!classesDiffOk || !evenementsDiffOk) {
       setErreur(
         "La somme des montants répartis ne correspond pas au montant de la ligne."
+      );
+      return;
+    }
+    if (!fournisseur.trim()) {
+      setErreur("Le fournisseur est obligatoire.");
+      return;
+    }
+    if (!estPrevisionnel && !dateOperation) {
+      setErreur(
+        "La date de l'opération est obligatoire (sauf pour une ligne prévisionnelle)."
       );
       return;
     }
@@ -650,15 +681,43 @@ function LigneForm({ accessToken, annees, evenements, parents, ligne, onDone, on
     const url = edition
       ? `/api/admin/comptabilite/${ligne.id}`
       : "/api/admin/comptabilite";
-    const res = await fetch(url, {
-      method: edition ? "PATCH" : "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(corps),
-    });
-    const data = await res.json().catch(() => ({}));
+    const envoyer = async (corpsEnvoye) => {
+      const r = await fetch(url, {
+        method: edition ? "PATCH" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(corpsEnvoye),
+      });
+      const d = await r.json().catch(() => ({}));
+      return { r, d };
+    };
+
+    let { r: res, d: data } = await envoyer(corps);
+
+    // Doublon possible détecté côté serveur : on demande confirmation, puis
+    // on renvoie en forçant.
+    if (res.status === 409 && data.doublonPossible) {
+      const detail = (data.lignesSimilaires || [])
+        .map(
+          (l) =>
+            `• ${l.libelle}${l.date_operation ? ` (${l.date_operation})` : ""}`
+        )
+        .join("\n");
+      if (
+        window.confirm(
+          `${data.message}\n\n${detail}\n\nEnregistrer quand même cette ligne ?`
+        )
+      ) {
+        ({ r: res, d: data } = await envoyer({ ...corps, ignorerDoublon: true }));
+      } else {
+        setEnvoi(false);
+        setErreur("Enregistrement annulé (doublon possible).");
+        return;
+      }
+    }
+
     setEnvoi(false);
     if (!res.ok) {
       setErreur(data.error || "Enregistrement impossible.");
@@ -836,12 +895,20 @@ function LigneForm({ accessToken, annees, evenements, parents, ligne, onDone, on
           />
         </label>
         <label className="text-sm">
-          Fournisseur (facultatif)
+          Fournisseur
           <input
             value={fournisseur}
             onChange={(e) => setFournisseur(e.target.value)}
             className={champ}
+            list="compta-fournisseurs"
+            placeholder="Commencez à taper : les fournisseurs connus s'affichent"
+            autoComplete="off"
           />
+          <datalist id="compta-fournisseurs">
+            {fournisseurs.map((f) => (
+              <option key={f} value={f} />
+            ))}
+          </datalist>
         </label>
         <label className="text-sm">
           Montant (€ TTC)
@@ -854,7 +921,10 @@ function LigneForm({ accessToken, annees, evenements, parents, ligne, onDone, on
           />
         </label>
         <label className="text-sm">
-          Date de l&apos;opération (facultatif)
+          Date de l&apos;opération{" "}
+          <span className="text-slate-400">
+            {estPrevisionnel ? "(facultative — ligne prévisionnelle)" : "(obligatoire)"}
+          </span>
           <input
             type="date"
             value={dateOperation}
@@ -1068,6 +1138,7 @@ function LigneRow({
   evenements,
   annees,
   parents,
+  fournisseurs = [],
   onChange,
   vue = "carte",
 }) {
@@ -1178,6 +1249,7 @@ function LigneRow({
         annees={annees}
         evenements={evenements}
         parents={parents}
+        fournisseurs={fournisseurs}
         ligne={ligne}
         onDone={() => {
           setEdition(false);
@@ -1188,7 +1260,7 @@ function LigneRow({
     );
     return vue === "tableau" ? (
       <tr>
-        <td colSpan={9} className="p-2">
+        <td colSpan={10} className="p-2">
           {form}
         </td>
       </tr>
@@ -1474,10 +1546,10 @@ function LigneRow({
             {ligne.date_operation ? formatDate(ligne.date_operation) : "—"}
           </td>
           <td className="px-2 py-2">
+            <div className="truncate text-slate-700">{ligne.fournisseur || "—"}</div>
+          </td>
+          <td className="px-2 py-2">
             <div className="font-medium text-slate-800 truncate">{ligne.libelle}</div>
-            {ligne.fournisseur && (
-              <div className="text-[11px] text-slate-400 truncate">{ligne.fournisseur}</div>
-            )}
           </td>
           <td className="px-2 py-2">
             <div className="truncate text-slate-600">
@@ -1538,7 +1610,7 @@ function LigneRow({
         {deroule && (
           <tr className="bg-slate-50">
             <td />
-            <td colSpan={8} className="px-2 pb-3 pt-1">
+            <td colSpan={9} className="px-2 pb-3 pt-1">
               {(rattachement || ligne.fournisseur || ligne.note) && (
                 <p className="text-xs text-slate-500">
                   {[rattachement, ligne.fournisseur, ligne.note]
@@ -1657,10 +1729,15 @@ function ComptaAdmin({ accessToken }) {
         par le Sou porte un état <strong>« à payer »</strong> ou{" "}
         <strong>« payée »</strong> (avec le moyen : virement, chèque, carte…).
         Une dépense partagée se répartit à parts égales entre les classes /
-        manifestations, ou avec des montants différenciés. La liste s&apos;affiche
-        en tableau : cliquez sur un en-tête pour trier, sur une ligne pour la
-        dérouler. Import des relevés Crédit Agricole et pointage automatique :
-        à venir.
+        manifestations, ou avec des montants différenciés. Le{" "}
+        <strong>fournisseur</strong> est obligatoire (les fournisseurs déjà
+        saisis sont proposés à la frappe, pour toujours les écrire pareil) et la{" "}
+        <strong>date</strong> l&apos;est aussi sauf pour une ligne
+        prévisionnelle. Si une ligne au même fournisseur et au même montant
+        existe déjà, un message d&apos;alerte demande confirmation. La liste
+        s&apos;affiche en tableau : cliquez sur un en-tête pour trier, sur une
+        ligne pour la dérouler. Import des relevés Crédit Agricole et pointage
+        automatique : à venir.
       </p>
 
       {data?.error && (
@@ -1833,6 +1910,7 @@ function ComptaAdmin({ accessToken }) {
             annees={data?.annees || []}
             evenements={data?.evenements || []}
             parents={data?.parents || []}
+            fournisseurs={data?.fournisseurs || []}
             onDone={() => {
               setAjout(false);
               recharger();
@@ -1857,23 +1935,27 @@ function ComptaAdmin({ accessToken }) {
       ) : estLarge ? (
         <>
           <div className="overflow-x-auto border border-slate-200 rounded-xl">
-            <table className="w-full text-xs table-fixed" style={{ minWidth: "760px" }}>
+            <table className="w-full text-xs table-fixed" style={{ minWidth: "900px" }}>
               <colgroup>
                 <col style={{ width: "26px" }} />
-                <col style={{ width: "88px" }} />
+                <col style={{ width: "82px" }} />
+                <col style={{ width: "126px" }} />
                 <col />
-                <col style={{ width: "132px" }} />
-                <col style={{ width: "112px" }} />
-                <col style={{ width: "88px" }} />
                 <col style={{ width: "118px" }} />
-                <col style={{ width: "90px" }} />
-                <col style={{ width: "102px" }} />
+                <col style={{ width: "100px" }} />
+                <col style={{ width: "82px" }} />
+                <col style={{ width: "116px" }} />
+                <col style={{ width: "86px" }} />
+                <col style={{ width: "98px" }} />
               </colgroup>
               <thead>
                 <tr className="bg-slate-50 text-slate-500 border-b border-slate-200">
                   <th />
                   <EnTeteTri cle="date" tri={tri} setTri={setTri}>
                     Date
+                  </EnTeteTri>
+                  <EnTeteTri cle="fournisseur" tri={tri} setTri={setTri} align="left">
+                    Fournisseur
                   </EnTeteTri>
                   <EnTeteTri cle="libelle" tri={tri} setTri={setTri} align="left">
                     Libellé
@@ -1908,6 +1990,7 @@ function ComptaAdmin({ accessToken }) {
                     evenements={data.evenements || []}
                     annees={data.annees || []}
                     parents={data.parents || []}
+                    fournisseurs={data.fournisseurs || []}
                     onChange={recharger}
                   />
                 ))}
@@ -1928,6 +2011,7 @@ function ComptaAdmin({ accessToken }) {
               evenements={data.evenements || []}
               annees={data.annees || []}
               parents={data.parents || []}
+              fournisseurs={data.fournisseurs || []}
               onChange={recharger}
             />
           ))}

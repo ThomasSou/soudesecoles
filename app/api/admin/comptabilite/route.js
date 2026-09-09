@@ -341,12 +341,40 @@ export async function GET(request) {
   }
 
   // Données de référence pour les filtres et le formulaire.
-  const [evenementsRes, anneesLignesRes, anneesFacturesRes, parentsRes] = await Promise.all([
+  const [
+    evenementsRes,
+    anneesLignesRes,
+    anneesFacturesRes,
+    parentsRes,
+    fournLignesRes,
+    fournFacturesRes,
+    fournDemandesRes,
+  ] = await Promise.all([
     auth.admin.from("benevolat_evenements").select("id, nom").order("created_at", { ascending: false }),
     auth.admin.from("compta_lignes").select("school_year"),
     auth.admin.from("teacher_invoices").select("school_year"),
     auth.admin.from("parents").select("id, first_name, last_name").order("last_name"),
+    auth.admin.from("compta_lignes").select("fournisseur").not("fournisseur", "is", null),
+    auth.admin.from("teacher_invoices").select("supplier_name").not("supplier_name", "is", null),
+    auth.admin
+      .from("reimbursement_requests")
+      .select("supplier_name")
+      .not("supplier_name", "is", null),
   ]);
+
+  // Fournisseurs déjà saisis (toutes sources confondues), dédoublonnés à la
+  // casse près : sert de liste de suggestions pour toujours écrire un même
+  // fournisseur de la même manière.
+  const fournMap = new Map();
+  for (const v of [
+    ...(fournLignesRes.data || []).map((x) => x.fournisseur),
+    ...(fournFacturesRes.data || []).map((x) => x.supplier_name),
+    ...(fournDemandesRes.data || []).map((x) => x.supplier_name),
+  ]) {
+    const nom = (v || "").trim();
+    if (nom && !fournMap.has(nom.toLowerCase())) fournMap.set(nom.toLowerCase(), nom);
+  }
+  const fournisseurs = [...fournMap.values()].sort((a, b) => a.localeCompare(b, "fr"));
   const parents = (parentsRes.data || []).map((p) => ({
     id: p.id,
     nom: `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Sans nom",
@@ -390,6 +418,7 @@ export async function GET(request) {
     },
     evenements: evenementsRes.data || [],
     parents,
+    fournisseurs,
     classesRef: CLASSES_REFERENCE.map((c) => ({
       cle: c.cle,
       groupe: c.groupe,
@@ -451,11 +480,25 @@ export async function POST(request) {
   if (!libelle) {
     return NextResponse.json({ error: "Donnez un libellé à la ligne." }, { status: 400 });
   }
+  if (!fournisseur) {
+    return NextResponse.json(
+      { error: "Le fournisseur est obligatoire (il sert aussi à repérer les doublons)." },
+      { status: 400 }
+    );
+  }
   if (!Number.isFinite(montant) || montant <= 0) {
     return NextResponse.json({ error: "Le montant doit être supérieur à 0." }, { status: 400 });
   }
   if (!STATUTS.includes(statut)) {
     return NextResponse.json({ error: "Statut invalide." }, { status: 400 });
+  }
+  // Date obligatoire dès que la ligne n'est pas prévisionnelle (un devis, lui,
+  // n'a pas encore de date d'opération).
+  if (statutEffectif !== "prevu" && !dateOperation) {
+    return NextResponse.json(
+      { error: "La date de l'opération est obligatoire (sauf pour une ligne prévisionnelle)." },
+      { status: 400 }
+    );
   }
   if (compte && !COMPTES.includes(compte)) {
     return NextResponse.json({ error: "Compte bancaire invalide." }, { status: 400 });
@@ -510,6 +553,36 @@ export async function POST(request) {
     });
     if (r.error) return NextResponse.json({ error: r.error }, { status: 400 });
     montantsEvenements = r.montants;
+  }
+
+  // Détection de doublon : même fournisseur (à la casse près), même montant
+  // et même sens sur l'année scolaire. On bloque avec un 409 « à confirmer »,
+  // que le formulaire peut forcer (ignorerDoublon) après validation humaine.
+  if (!body?.ignorerDoublon) {
+    const { data: memeMontant } = await auth.admin
+      .from("compta_lignes")
+      .select("id, libelle, date_operation, statut, fournisseur")
+      .eq("school_year", annee)
+      .eq("sens", sens)
+      .eq("montant_cents", montantCentsTotal);
+    const cible = fournisseur.trim().toLowerCase();
+    const similaires = (memeMontant || []).filter(
+      (l) => (l.fournisseur || "").trim().toLowerCase() === cible
+    );
+    if (similaires.length > 0) {
+      return NextResponse.json(
+        {
+          doublonPossible: true,
+          message: `Attention : ${similaires.length} ligne(s) existe(nt) déjà avec « ${fournisseur} » au même montant (${(montantCentsTotal / 100).toFixed(2)} €) cette année.`,
+          lignesSimilaires: similaires.map((l) => ({
+            libelle: l.libelle,
+            date_operation: l.date_operation,
+            statut: l.statut,
+          })),
+        },
+        { status: 409 }
+      );
+    }
   }
 
   const nouvelleLigne = {

@@ -223,6 +223,21 @@ export async function PATCH(request, { params }) {
     }
   }
 
+  // Date obligatoire dès que la ligne n'est pas prévisionnelle. Ne concerne
+  // que les enregistrements du formulaire (qui envoient toujours la date) —
+  // pas les boutons rapides de pointage.
+  if (body.dateOperation !== undefined) {
+    const statutFinal = update.statut !== undefined ? update.statut : ligne.statut;
+    const dateFinale =
+      update.date_operation !== undefined ? update.date_operation : ligne.date_operation;
+    if (statutFinal !== "prevu" && !dateFinale) {
+      return NextResponse.json(
+        { error: "La date de l'opération est obligatoire (sauf pour une ligne prévisionnelle)." },
+        { status: 400 }
+      );
+    }
+  }
+
   // Manifestations d'une ligne « événement » manuelle : la colonne
   // evenement_id porte la 1re de la liste (contrainte de cohérence), la
   // liste complète est remplacée plus bas dans compta_ligne_evenements.
@@ -248,7 +263,14 @@ export async function PATCH(request, { params }) {
       update.libelle = v;
     }
     if (body.fournisseur !== undefined) {
-      update.fournisseur = body.fournisseur?.trim() || null;
+      const v = body.fournisseur?.trim() || null;
+      if (!v) {
+        return NextResponse.json(
+          { error: "Le fournisseur est obligatoire." },
+          { status: 400 }
+        );
+      }
+      update.fournisseur = v;
     }
     if (body.annee) {
       update.school_year = String(body.annee).trim();
@@ -277,6 +299,45 @@ export async function PATCH(request, { params }) {
         return NextResponse.json({ error: "Le montant doit être supérieur à 0." }, { status: 400 });
       }
       update.montant_cents = Math.round(m * 100);
+    }
+  }
+
+  // Doublon possible après édition : mêmes fournisseur (à la casse près),
+  // montant et sens qu'une AUTRE ligne de l'année. 409 « à confirmer »,
+  // forçable via ignorerDoublon.
+  if (manuelle && body.libelle !== undefined && !body.ignorerDoublon) {
+    const montantFinal =
+      update.montant_cents !== undefined ? update.montant_cents : ligne.montant_cents;
+    const fournFinal =
+      (update.fournisseur !== undefined ? update.fournisseur : ligne.fournisseur) || "";
+    const anneeFinale =
+      update.school_year !== undefined ? update.school_year : ligne.school_year;
+    if (fournFinal.trim()) {
+      const { data: memeMontant } = await auth.admin
+        .from("compta_lignes")
+        .select("id, libelle, date_operation, statut, fournisseur")
+        .eq("school_year", anneeFinale)
+        .eq("sens", ligne.sens)
+        .eq("montant_cents", montantFinal)
+        .neq("id", params.id);
+      const cible = fournFinal.trim().toLowerCase();
+      const similaires = (memeMontant || []).filter(
+        (l) => (l.fournisseur || "").trim().toLowerCase() === cible
+      );
+      if (similaires.length > 0) {
+        return NextResponse.json(
+          {
+            doublonPossible: true,
+            message: `Attention : ${similaires.length} autre(s) ligne(s) avec « ${fournFinal.trim()} » au même montant (${(montantFinal / 100).toFixed(2)} €) cette année.`,
+            lignesSimilaires: similaires.map((l) => ({
+              libelle: l.libelle,
+              date_operation: l.date_operation,
+              statut: l.statut,
+            })),
+          },
+          { status: 409 }
+        );
+      }
     }
   }
 
