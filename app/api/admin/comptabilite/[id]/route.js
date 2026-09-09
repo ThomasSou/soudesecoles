@@ -98,6 +98,11 @@ export async function PATCH(request, { params }) {
 
   const update = {};
   const manuelle = ligne.source === "manuel";
+  // Une ligne issue d'une demande bénévole (source 'benevole') est
+  // complétable par le bureau (libellé, fournisseur, date, note, classement)
+  // — mais son montant et « qui a avancé » restent ceux déclarés par le
+  // bénévole.
+  const modifiable = manuelle || ligne.source === "benevole";
 
   if (body.statut !== undefined) {
     if (!STATUTS.includes(body.statut)) {
@@ -242,7 +247,7 @@ export async function PATCH(request, { params }) {
   // evenement_id porte la 1re de la liste (contrainte de cohérence), la
   // liste complète est remplacée plus bas dans compta_ligne_evenements.
   const evenementsMaj =
-    manuelle && ligne.rubrique === "evenement" && Array.isArray(body.evenements)
+    modifiable && ligne.rubrique === "evenement" && Array.isArray(body.evenements)
       ? [...new Set(body.evenements.map((e) => String(e).trim()).filter(Boolean))]
       : null;
   if (evenementsMaj) {
@@ -255,8 +260,9 @@ export async function PATCH(request, { params }) {
     update.evenement_id = evenementsMaj[0];
   }
 
-  // Champs réservés aux lignes manuelles.
-  if (manuelle) {
+  // Libellé, fournisseur, année, classement : modifiables aussi sur une
+  // ligne bénévole (le bureau complète ce que le bénévole n'a pas renseigné).
+  if (modifiable) {
     if (body.libelle !== undefined) {
       const v = body.libelle?.trim();
       if (!v) return NextResponse.json({ error: "Le libellé ne peut pas être vide." }, { status: 400 });
@@ -275,6 +281,10 @@ export async function PATCH(request, { params }) {
     if (body.annee) {
       update.school_year = String(body.annee).trim();
     }
+  }
+
+  // Montant et « qui a avancé » : lignes manuelles uniquement.
+  if (manuelle) {
     // On n'écrit paye_par que si ça change vraiment quelque chose : évite de
     // toucher la colonne (donc de planter) tant que 0046 n'est pas passée
     // pour les lignes « le Sou ».
@@ -341,9 +351,9 @@ export async function PATCH(request, { params }) {
     }
   }
 
-  // Classes d'une ligne « classe » manuelle à remplacer (le cas échéant).
+  // Classes d'une ligne « classe » à remplacer (le cas échéant).
   const classesMaj =
-    manuelle && ligne.rubrique === "classe" && Array.isArray(body.classes)
+    modifiable && ligne.rubrique === "classe" && Array.isArray(body.classes)
       ? [...new Set(body.classes.map((c) => String(c).trim()).filter((c) => CLES_CLASSES.includes(c)))]
       : null;
   if (classesMaj && classesMaj.length === 0) {

@@ -59,6 +59,15 @@ const MOYENS_PAIEMENT = {
   prelevement: "Prélèvement",
   autre: "Autre",
 };
+// Versions courtes, pour le badge « Règlement » dans le tableau.
+const MOYENS_PAIEMENT_COURT = {
+  virement: "vir.",
+  cheque: "chèque",
+  cb: "CB",
+  especes: "esp.",
+  prelevement: "prlvt",
+  autre: "autre",
+};
 
 function euros(cents) {
   return ((cents || 0) / 100).toLocaleString("fr-FR", {
@@ -74,6 +83,14 @@ function formatDate(iso) {
     month: "short",
     year: "numeric",
   });
+}
+
+// Date compacte jj/mm/aa pour les cellules serrées du tableau.
+function formatDateCourt(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${String(d.getFullYear()).slice(2)}`;
 }
 
 // Justificatif accepté : image ou PDF (même limite que l'espace enseignant,
@@ -127,19 +144,37 @@ function factureCourt(ligne) {
 function reglementInfo(ligne) {
   if (ligne.paye_par === "benevole") {
     return ligne.rembourse
-      ? { cle: "rembourse", label: "Remboursé", classe: "bg-green-50 text-green-700" }
-      : { cle: "a_rembourser", label: "À rembourser", classe: "bg-amber-50 text-amber-700" };
+      ? {
+          cle: "rembourse",
+          label: "Remboursé",
+          labelCourt: "Remboursé",
+          classe: "bg-green-50 text-green-700",
+        }
+      : {
+          cle: "a_rembourser",
+          label: "À rembourser",
+          labelCourt: "À rembourser",
+          classe: "bg-amber-50 text-amber-700",
+        };
   }
   if (ligne.paiement_concerne) {
     if (ligne.paiement_statut === "paye") {
-      const moyen = ligne.moyen_paiement
-        ? ` · ${MOYENS_PAIEMENT[ligne.moyen_paiement] || ligne.moyen_paiement}`
-        : "";
-      return { cle: "paye", label: `Payée${moyen}`, classe: "bg-green-50 text-green-700" };
+      const m = ligne.moyen_paiement;
+      return {
+        cle: "paye",
+        label: `Payée${m ? ` · ${MOYENS_PAIEMENT[m] || m}` : ""}`,
+        labelCourt: `Payée${m ? ` · ${MOYENS_PAIEMENT_COURT[m] || m}` : ""}`,
+        classe: "bg-green-50 text-green-700",
+      };
     }
-    return { cle: "a_payer", label: "À payer", classe: "bg-red-50 text-red-700" };
+    return {
+      cle: "a_payer",
+      label: "À payer",
+      labelCourt: "À payer",
+      classe: "bg-red-50 text-red-700",
+    };
   }
-  return { cle: "aucun", label: "—", classe: "text-slate-400" };
+  return { cle: "aucun", label: "—", labelCourt: "—", classe: "text-slate-400" };
 }
 
 // Nom affiché pour le payeur d'une ligne.
@@ -493,6 +528,11 @@ function LigneForm({
   onCancel,
 }) {
   const edition = Boolean(ligne);
+  // Ligne venue d'une demande de remboursement bénévole : le bureau peut la
+  // compléter (date, fournisseur, libellé, note, classement) mais pas
+  // toucher au montant ni à « qui a avancé » — ça reste ce que le bénévole
+  // a déclaré.
+  const estBenevole = ligne?.source === "benevole";
   const groupes = GROUPES;
   const anneesOptions = [
     ...new Set([
@@ -915,10 +955,16 @@ function LigneForm({
           <input
             value={montant}
             onChange={(e) => setMontant(e.target.value)}
-            className={champ}
+            className={`${champ} ${estBenevole ? "bg-slate-100 text-slate-500" : ""}`}
             inputMode="decimal"
             placeholder="0,00"
+            disabled={estBenevole}
           />
+          {estBenevole && (
+            <span className="block text-xs text-slate-400">
+              Fixé par la demande du bénévole.
+            </span>
+          )}
         </label>
         <label className="text-sm">
           Date de l&apos;opération{" "}
@@ -954,6 +1000,9 @@ function LigneForm({
             onChange={(e) => setStatut(e.target.value)}
             className={champ}
           >
+            {statut === "a_valider" && (
+              <option value="a_valider">{STATUTS.a_valider.label}</option>
+            )}
             {STATUTS_CYCLE.map((k) => (
               <option key={k} value={k}>
                 {STATUTS[k].label}
@@ -978,33 +1027,45 @@ function LigneForm({
         </label>
       </div>
 
-      <div className="text-sm space-y-2">
-        <p>Payé par</p>
-        <div className="flex gap-1.5">
-          {Object.entries(PAYE_PAR).map(([k, lbl]) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setPayePar(k)}
-              className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                payePar === k
-                  ? "bg-sou-blue text-white"
-                  : "bg-white border border-slate-300 text-slate-600"
-              }`}
-            >
-              {lbl}
-            </button>
-          ))}
+      {estBenevole ? (
+        <p className="text-sm">
+          Avance de{" "}
+          <strong>
+            {(parents || []).find((p) => p.id === payeParParentId)?.nom || "un bénévole"}
+          </strong>{" "}
+          <span className="text-slate-400">
+            (déclarée depuis l&apos;espace famille — non modifiable ici)
+          </span>
+        </p>
+      ) : (
+        <div className="text-sm space-y-2">
+          <p>Payé par</p>
+          <div className="flex gap-1.5">
+            {Object.entries(PAYE_PAR).map(([k, lbl]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setPayePar(k)}
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                  payePar === k
+                    ? "bg-sou-blue text-white"
+                    : "bg-white border border-slate-300 text-slate-600"
+                }`}
+              >
+                {lbl}
+              </button>
+            ))}
+          </div>
+          {payePar === "benevole" && (
+            <SelecteurParent
+              parents={parents}
+              valeur={payeParParentId}
+              onChange={setPayeParParentId}
+              champ={champ}
+            />
+          )}
         </div>
-        {payePar === "benevole" && (
-          <SelecteurParent
-            parents={parents}
-            valeur={payeParParentId}
-            onChange={setPayeParParentId}
-            champ={champ}
-          />
-        )}
-      </div>
+      )}
 
       {/* Règlement — seulement pour une dépense payée par le Sou. Une avance
           bénévole suit son propre circuit (remboursement). */}
@@ -1260,7 +1321,7 @@ function LigneRow({
     );
     return vue === "tableau" ? (
       <tr>
-        <td colSpan={10} className="p-2">
+        <td colSpan={9} className="p-2">
           {form}
         </td>
       </tr>
@@ -1439,22 +1500,22 @@ function LigneRow({
             </button>
           ))}
 
+        {(ligne.source === "manuel" || ligne.source === "benevole") && (
+          <button
+            onClick={() => setEdition(true)}
+            className="text-xs font-semibold text-sou-blue px-2"
+          >
+            Éditer
+          </button>
+        )}
         {ligne.source === "manuel" && (
-          <>
-            <button
-              onClick={() => setEdition(true)}
-              className="text-xs font-semibold text-sou-blue px-2"
-            >
-              Éditer
-            </button>
-            <button
-              onClick={supprimer}
-              disabled={envoi}
-              className="text-xs font-semibold text-red-600 px-2 disabled:opacity-40"
-            >
-              Supprimer
-            </button>
-          </>
+          <button
+            onClick={supprimer}
+            disabled={envoi}
+            className="text-xs font-semibold text-red-600 px-2 disabled:opacity-40"
+          >
+            Supprimer
+          </button>
         )}
 
         <span className="mx-1 text-slate-300">|</span>
@@ -1539,27 +1600,18 @@ function LigneRow({
       <>
         <tr
           onClick={() => setDeroule((d) => !d)}
-          className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer align-middle"
+          className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer align-top"
         >
-          <td className="px-2 py-2 text-center text-slate-400">{deroule ? "▾" : "▸"}</td>
+          <td className="px-1 py-2 text-center text-slate-400">{deroule ? "▾" : "▸"}</td>
           <td className="px-2 py-2 text-slate-500 whitespace-nowrap">
-            {ligne.date_operation ? formatDate(ligne.date_operation) : "—"}
+            {formatDateCourt(ligne.date_operation)}
           </td>
           <td className="px-2 py-2">
-            <div className="truncate text-slate-700">{ligne.fournisseur || "—"}</div>
+            <div className="truncate text-slate-800">{ligne.fournisseur || "—"}</div>
+            <div className="text-[11px] text-slate-400 truncate">{ligne.libelle}</div>
           </td>
           <td className="px-2 py-2">
-            <div className="font-medium text-slate-800 truncate">{ligne.libelle}</div>
-          </td>
-          <td className="px-2 py-2">
-            <div className="truncate text-slate-600">
-              {causeLibelle(ligne, evenements)}
-            </div>
-            {(ligne.rubrique === "evenement" || ligne.rubrique === "classe") && (
-              <div className="text-[11px] text-slate-400 truncate">
-                {RUBRIQUES[ligne.rubrique]}
-              </div>
-            )}
+            <div className="truncate text-slate-600">{causeLibelle(ligne, evenements)}</div>
           </td>
           <td className="px-2 py-2">
             <div className="truncate">{payeurNom(ligne, parents)}</div>
@@ -1567,7 +1619,7 @@ function LigneRow({
               <div className="text-[11px] text-amber-700">avance</div>
             )}
             {ligne.source === "enseignant" && (
-              <div className="text-[11px] text-sou-blue">facture enseignant</div>
+              <div className="text-[11px] text-sou-blue">enseignant</div>
             )}
           </td>
           <td className="px-2 py-2 text-center">
@@ -1593,7 +1645,7 @@ function LigneRow({
             {reglement.cle === "aucun" ? (
               <span className="text-slate-300">—</span>
             ) : (
-              <Badge label={reglement.label} classe={reglement.classe} />
+              <Badge label={reglement.labelCourt} classe={reglement.classe} />
             )}
           </td>
           <td className="px-2 py-2 text-center">
@@ -1610,7 +1662,7 @@ function LigneRow({
         {deroule && (
           <tr className="bg-slate-50">
             <td />
-            <td colSpan={9} className="px-2 pb-3 pt-1">
+            <td colSpan={8} className="px-2 pb-3 pt-1">
               {(rattachement || ligne.fournisseur || ligne.note) && (
                 <p className="text-xs text-slate-500">
                   {[rattachement, ligne.fournisseur, ligne.note]
@@ -1935,18 +1987,17 @@ function ComptaAdmin({ accessToken }) {
       ) : estLarge ? (
         <>
           <div className="overflow-x-auto border border-slate-200 rounded-xl">
-            <table className="w-full text-xs table-fixed" style={{ minWidth: "1024px" }}>
+            <table className="w-full text-xs table-fixed" style={{ minWidth: "840px" }}>
               <colgroup>
-                <col style={{ width: "24px" }} />
-                <col style={{ width: "82px" }} />
-                <col style={{ width: "128px" }} />
-                <col style={{ width: "180px" }} />
-                <col style={{ width: "124px" }} />
-                <col style={{ width: "104px" }} />
-                <col style={{ width: "82px" }} />
-                <col style={{ width: "120px" }} />
-                <col style={{ width: "86px" }} />
-                <col style={{ width: "94px" }} />
+                <col style={{ width: "20px" }} />
+                <col style={{ width: "64px" }} />
+                <col style={{ width: "190px" }} />
+                <col style={{ width: "112px" }} />
+                <col style={{ width: "96px" }} />
+                <col style={{ width: "78px" }} />
+                <col style={{ width: "110px" }} />
+                <col style={{ width: "78px" }} />
+                <col style={{ width: "92px" }} />
               </colgroup>
               <thead>
                 <tr className="bg-slate-50 text-slate-500 border-b border-slate-200">
@@ -1956,9 +2007,6 @@ function ComptaAdmin({ accessToken }) {
                   </EnTeteTri>
                   <EnTeteTri cle="fournisseur" tri={tri} setTri={setTri} align="left">
                     Fournisseur
-                  </EnTeteTri>
-                  <EnTeteTri cle="libelle" tri={tri} setTri={setTri} align="left">
-                    Libellé
                   </EnTeteTri>
                   <EnTeteTri cle="objet" tri={tri} setTri={setTri} align="left">
                     Objet
