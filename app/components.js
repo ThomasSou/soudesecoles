@@ -66,30 +66,46 @@ export function Footer() {
   return (
     <footer className="bg-sou-blue text-slate-200 mt-20">
       <div className="bg-white border-b border-slate-200">
-        <Link
-          href="/partenaires"
-          aria-label="Voir la page de nos partenaires"
-          className="block max-w-6xl mx-auto px-4 sm:px-6 py-6"
-        >
-          <p className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400 mb-4">
-            Merci à nos partenaires
-          </p>
-          <div className="flex flex-wrap items-end justify-center gap-x-10 gap-y-5">
-            {PARTNERS.map((p) => (
-              <div
-                key={p.slug}
-                className={`relative ${BANNER_SIZES[p.tier] || BANNER_SIZES.Bronze}`}
-              >
-                <Image
-                  src={`/partenaires/${p.file}`}
-                  alt={`Logo ${p.name}`}
-                  fill
-                  className="object-contain"
-                />
-              </div>
-            ))}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-10">
+          <Link
+            href="/partenaires"
+            aria-label="Voir la page de nos partenaires"
+            className="block"
+          >
+            <p className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400 mb-4">
+              Merci à nos partenaires
+            </p>
+            <div className="flex flex-wrap items-end justify-center gap-x-10 gap-y-5">
+              {PARTNERS.map((p) => (
+                <div
+                  key={p.slug}
+                  className={`relative ${BANNER_SIZES[p.tier] || BANNER_SIZES.Bronze}`}
+                >
+                  <Image
+                    src={`/partenaires/${p.file}`}
+                    alt={`Logo ${p.name}`}
+                    fill
+                    className="object-contain"
+                  />
+                </div>
+              ))}
+            </div>
+          </Link>
+          <div className="hidden sm:block w-px self-stretch bg-slate-200" aria-hidden="true" />
+          <div>
+            <p className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400 mb-4">
+              Avec le soutien de
+            </p>
+            <div className="relative w-20 h-20 mx-auto">
+              <Image
+                src="/partenaires/region-auvergne-rhone-alpes.png"
+                alt="La Région Auvergne-Rhône-Alpes soutient votre projet"
+                fill
+                className="object-contain"
+              />
+            </div>
           </div>
-        </Link>
+        </div>
       </div>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-8 sm:grid-cols-3 text-sm">
         <div>
