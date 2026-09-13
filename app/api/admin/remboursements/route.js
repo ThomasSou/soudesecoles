@@ -18,16 +18,56 @@ export async function GET(request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const parentIds = [...new Set((data || []).map((d) => d.parent_id))];
+  // Dépenses saisies directement en comptabilité et attribuées à un·e
+  // bénévole (« payé par un bénévole ») : elles n'ont pas de demande déposée
+  // par la famille (pas de ligne dans reimbursement_requests) mais doivent
+  // quand même apparaître ici, sinon le bureau perd leur trace de ce côté.
+  // Même logique que côté famille (api/remboursements), en lecture seule :
+  // leur remboursement se marque depuis la Comptabilité, pas ici.
+  const { data: avancesBureau } = await auth.admin
+    .from("compta_lignes")
+    .select("id, libelle, fournisseur, montant_cents, rembourse_le, created_at, rubrique, paye_par_parent_id")
+    .eq("source", "manuel")
+    .eq("paye_par", "benevole")
+    .order("created_at", { ascending: false });
+
+  const CAT_PAR_RUBRIQUE = {
+    evenement: "manifestation",
+    investissement: "investissement",
+    courant: "fonctionnement",
+    classe: "autre",
+  };
+  const avances = (avancesBureau || []).map((l) => ({
+    id: `compta-${l.id}`,
+    parent_id: l.paye_par_parent_id,
+    category: CAT_PAR_RUBRIQUE[l.rubrique] || "autre",
+    event_name: null,
+    description: l.libelle,
+    supplier_name: l.fournisseur,
+    amount_cents: l.montant_cents,
+    invoice_path: null,
+    rib_path: null,
+    status: l.rembourse_le ? "reimbursed" : "pending",
+    admin_note: null,
+    created_at: l.created_at,
+    processed_at: l.rembourse_le,
+    origine: "bureau",
+  }));
+
+  const parentIds = [
+    ...new Set([...(data || []).map((d) => d.parent_id), ...avances.map((d) => d.parent_id)].filter(Boolean)),
+  ];
   const { data: parents } = parentIds.length
     ? await auth.admin.from("parents").select("id, first_name, last_name, email").in("id", parentIds)
     : { data: [] };
   const parentsById = Object.fromEntries((parents || []).map((p) => [p.id, p]));
 
-  const demandes = (data || []).map((d) => ({
-    ...d,
-    parent: parentsById[d.parent_id] || null,
-  }));
+  const demandes = [...(data || []), ...avances]
+    .map((d) => ({
+      ...d,
+      parent: parentsById[d.parent_id] || null,
+    }))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   return NextResponse.json({ ok: true, demandes });
 }

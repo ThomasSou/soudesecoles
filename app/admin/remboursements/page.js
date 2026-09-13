@@ -99,63 +99,76 @@ function DemandeCard({ demande, accessToken, onChange }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 mt-3 text-sm">
-        <button
-          onClick={() => ouvrirFichier(accessToken, demande.id, "facture")}
-          className="text-sou-blue underline"
-        >
-          Voir la facture
-        </button>
-        {demande.rib_path && (
-          <button
-            onClick={() => ouvrirFichier(accessToken, demande.id, "rib")}
-            className="text-sou-blue underline"
-          >
-            Voir le RIB
-          </button>
-        )}
-      </div>
+      {demande.origine === "bureau" ? (
+        <p className="text-xs text-slate-400 mt-3 italic">
+          Dépense saisie directement en comptabilité (pas de demande déposée par la
+          famille) — à traiter depuis la{" "}
+          <a href="/admin/comptabilite" className="text-sou-blue underline not-italic">
+            Comptabilité
+          </a>
+          , pas ici.
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-3 mt-3 text-sm">
+            <button
+              onClick={() => ouvrirFichier(accessToken, demande.id, "facture")}
+              className="text-sou-blue underline"
+            >
+              Voir la facture
+            </button>
+            {demande.rib_path && (
+              <button
+                onClick={() => ouvrirFichier(accessToken, demande.id, "rib")}
+                className="text-sou-blue underline"
+              >
+                Voir le RIB
+              </button>
+            )}
+          </div>
 
-      <div className="mt-3">
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          onBlur={enregistrerNote}
-          placeholder="Note interne (facultatif)"
-          rows={2}
-          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-        />
-      </div>
+          <div className="mt-3">
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              onBlur={enregistrerNote}
+              placeholder="Note interne (facultatif)"
+              rows={2}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
 
-      <div className="flex flex-wrap gap-2 mt-3">
-        {demande.status !== "reimbursed" && (
-          <button
-            disabled={envoi}
-            onClick={() => changerStatut("reimbursed")}
-            className="bg-green-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-50"
-          >
-            Marquer remboursé
-          </button>
-        )}
-        {demande.status !== "refused" && (
-          <button
-            disabled={envoi}
-            onClick={() => changerStatut("refused")}
-            className="bg-red-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-50"
-          >
-            Refuser
-          </button>
-        )}
-        {demande.status !== "pending" && (
-          <button
-            disabled={envoi}
-            onClick={() => changerStatut("pending")}
-            className="border border-slate-300 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-50"
-          >
-            Remettre en attente
-          </button>
-        )}
-      </div>
+          <div className="flex flex-wrap gap-2 mt-3">
+            {demande.status !== "reimbursed" && (
+              <button
+                disabled={envoi}
+                onClick={() => changerStatut("reimbursed")}
+                className="bg-green-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-50"
+              >
+                Marquer remboursé
+              </button>
+            )}
+            {demande.status !== "refused" && (
+              <button
+                disabled={envoi}
+                onClick={() => changerStatut("refused")}
+                className="bg-red-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-50"
+              >
+                Refuser
+              </button>
+            )}
+            {demande.status !== "pending" && (
+              <button
+                disabled={envoi}
+                onClick={() => changerStatut("pending")}
+                className="border border-slate-300 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-50"
+              >
+                Remettre en attente
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -189,7 +202,9 @@ function RemboursementsAdmin({ accessToken }) {
       <p className="text-slate-500 text-sm mb-6">
         Frais engagés par les parents (manifestation, investissement général, frais de fonctionnement,
         ou autre) à rembourser par virement — cette page suit le statut de chaque demande, elle ne
-        déclenche pas le virement.
+        déclenche pas le virement. Les dépenses saisies directement en comptabilité comme « payées par
+        un bénévole » apparaissent aussi ici pour ne rien perdre de vue, mais se traitent depuis la
+        Comptabilité.
       </p>
 
       <div className="flex gap-1 border-b border-slate-200 mb-4">
