@@ -35,6 +35,7 @@ export const GROUPES_CLASSES = {
 };
 
 const PAR_CLE = Object.fromEntries(CLASSES_REFERENCE.map((c) => [c.cle, c]));
+const PAR_NIVEAU = Object.fromEntries(CLASSES_REFERENCE.map((c) => [c.niveau, c]));
 
 export const CLES_CLASSES = CLASSES_REFERENCE.map((c) => c.cle);
 
@@ -43,4 +44,13 @@ export const CLES_CLASSES = CLASSES_REFERENCE.map((c) => c.cle);
 export function libelleClasse(cle) {
   const c = PAR_CLE[cle];
   return c ? `${c.niveau} · ${c.enseignant}` : cle;
+}
+
+// Enseignant·e actuel·le d'un niveau (ex. "CP-CE1" -> "Stéphanie Martinaud").
+// À utiliser pour tout affichage lié à `children.class_level` : le champ
+// `children.teacher_name` est une valeur libre saisie une fois par la famille
+// à l'inscription et ne se met jamais à jour toute seule quand l'enfant
+// change de classe d'une année sur l'autre.
+export function enseignantDuNiveau(niveau) {
+  return PAR_NIVEAU[niveau]?.enseignant || null;
 }

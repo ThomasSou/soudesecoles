@@ -10,6 +10,7 @@ import {
   findCurrentMembership,
   isMembershipValid,
 } from "../lib/anneeScolaire";
+import { enseignantDuNiveau } from "../lib/classesReference";
 
 const EMPTY_CHILD = { firstName: "", lastName: "", classLevel: "", teacherName: "" };
 
@@ -525,7 +526,11 @@ export default function EspaceAdherentPage() {
     const [familyRes, parentsRes, childrenRes, purchasesRes, membershipRes] = await Promise.all([
       supabase.from("families").select("*").maybeSingle(),
       supabase.from("parents").select("*").order("first_name"),
-      supabase.from("children").select("*").order("first_name"),
+      supabase
+        .from("children")
+        .select("*")
+        .eq("school_year", currentSchoolYear())
+        .order("first_name"),
       supabase
         .from("purchases")
         .select("*")
@@ -838,7 +843,10 @@ export default function EspaceAdherentPage() {
                     </span>
                     <span className="text-slate-500">
                       {child.class_level}
-                      {child.teacher_name ? ` — ${child.teacher_name}` : ""}
+                      {(() => {
+                        const enseignant = enseignantDuNiveau(child.class_level) || child.teacher_name;
+                        return enseignant ? ` — ${enseignant}` : "";
+                      })()}
                     </span>
                   </li>
                 ))}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AdminShell from "../admin-shell";
 import { currentSchoolYear, isMembershipValid } from "../../lib/anneeScolaire";
+import { enseignantDuNiveau } from "../../lib/classesReference";
 
 export default function AdminEnfantsPage() {
   return (
@@ -57,17 +58,19 @@ function ListeEnfants({ token }) {
           ? `Famille ${f.children[0].last_name}`
           : "Famille sans nom";
 
-      return f.children.map((c) => ({
-        id: c.id,
-        firstName: c.first_name || "",
-        lastName: c.last_name || "",
-        classLevel: c.class_level || "",
-        teacherName: c.teacher_name || "",
-        schoolYear: c.school_year || "",
-        familyName,
-        familyId: f.id,
-        aJour,
-      }));
+      return f.children
+        .filter((c) => c.school_year === annee)
+        .map((c) => ({
+          id: c.id,
+          firstName: c.first_name || "",
+          lastName: c.last_name || "",
+          classLevel: c.class_level || "",
+          teacherName: enseignantDuNiveau(c.class_level) || c.teacher_name || "",
+          schoolYear: c.school_year || "",
+          familyName,
+          familyId: f.id,
+          aJour,
+        }));
     });
   }, [familles, annee]);
 
