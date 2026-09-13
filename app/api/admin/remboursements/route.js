@@ -12,7 +12,7 @@ export async function GET(request) {
   const { data, error } = await auth.admin
     .from("reimbursement_requests")
     .select(
-      "id, family_id, parent_id, category, event_name, description, amount_cents, invoice_path, rib_path, status, admin_note, created_at, processed_at"
+      "id, family_id, parent_id, category, event_name, description, supplier_name, amount_cents, invoice_path, rib_path, status, admin_note, created_at, processed_at"
     )
     .order("created_at", { ascending: false });
 

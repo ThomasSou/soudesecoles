@@ -55,7 +55,12 @@ function DemandeCard({ demande, accessToken, onChange }) {
       body: JSON.stringify({ status, adminNote: note }),
     });
     setEnvoi(false);
-    if (res.ok) onChange();
+    if (res.ok) {
+      onChange();
+    } else {
+      const data = await res.json().catch(() => null);
+      alert(data?.error || "Impossible de mettre à jour cette demande.");
+    }
   }
 
   async function enregistrerNote() {
@@ -66,7 +71,12 @@ function DemandeCard({ demande, accessToken, onChange }) {
       body: JSON.stringify({ adminNote: note }),
     });
     setEnvoi(false);
-    if (res.ok) onChange();
+    if (res.ok) {
+      onChange();
+    } else {
+      const data = await res.json().catch(() => null);
+      alert(data?.error || "Impossible d'enregistrer la note.");
+    }
   }
 
   return (
@@ -77,6 +87,9 @@ function DemandeCard({ demande, accessToken, onChange }) {
             {demande.parent ? `${demande.parent.first_name} ${demande.parent.last_name}` : "—"}
           </p>
           <p className="text-sm text-slate-500">{libelle(demande)}</p>
+          {demande.supplier_name && (
+            <p className="text-sm text-slate-500">Prestataire : {demande.supplier_name}</p>
+          )}
           {demande.description && <p className="text-sm text-slate-500 italic">{demande.description}</p>}
           <p className="text-xs text-slate-400 mt-1">Déposée le {formatDate(demande.created_at)}</p>
         </div>
