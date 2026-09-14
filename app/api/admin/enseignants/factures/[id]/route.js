@@ -3,6 +3,7 @@ import { requirePermission } from "../../../../../lib/adminAuth";
 import { BUCKET } from "../../../../../lib/enseignantFichiers";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 const STATUSES = ["soumise", "remboursee"];
 

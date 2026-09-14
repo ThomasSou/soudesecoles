@@ -3,6 +3,7 @@ import { requirePermission } from "../../../lib/adminAuth";
 import { CONTACT_EMAIL, sendMail } from "../../../lib/mail";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export async function GET(request) {
   const auth = await requirePermission(request, "messages");

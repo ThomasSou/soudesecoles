@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Liste les inscriptions avec le nom de l'événement, de l'atelier et les
 // horaires du créneau déjà joints, prête à afficher/imprimer/exporter.

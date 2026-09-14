@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 import { currentSchoolYear, isMembershipValid } from "../../../../lib/anneeScolaire";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 // Liste légère des contacts (parents avec e-mail), pour le sélecteur
 // "Aperçu avec..." de l'éditeur d'e-mails — permet de vérifier que les
 // champs dynamiques (prénom, statut d'adhésion) s'affichent bien pour une

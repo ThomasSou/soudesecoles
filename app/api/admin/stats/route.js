@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Agrégats pour le tableau de bord : sur les N derniers jours, on renvoie le
 // total par jour et le classement des pages, liens sortants et e-mails.

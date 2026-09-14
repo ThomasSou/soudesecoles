@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // GET : tous les événements avec leurs ateliers, créneaux et nombre
 // d'inscrits par créneau, en un seul appel (sert tout le tableau de bord).

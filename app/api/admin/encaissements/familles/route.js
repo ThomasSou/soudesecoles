@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Liste légère des familles (id + parents avec leur e-mail), pour le champ
 // de recherche du formulaire d'encaissement libre : rattachement à une

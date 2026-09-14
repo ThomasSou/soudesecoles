@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // PATCH : renommer ou activer/désactiver un événement (un événement
 // désactivé disparaît de la page publique d'inscription).

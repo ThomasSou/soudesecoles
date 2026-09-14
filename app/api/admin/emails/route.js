@@ -5,6 +5,7 @@ import { currentSchoolYear, isMembershipValid } from "../../../lib/anneeScolaire
 import { renderBlocksToHtml, renderBlocksToText } from "../../../lib/emailBlocks";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Canal d'envoi réellement actif en production, pour l'afficher dans le
 // back-office. Depuis le correctif « SMTP en primaire » (cf. emailCampagne.js,

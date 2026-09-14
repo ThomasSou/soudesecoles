@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Tous les RIB déposés par les enseignants (données sensibles : jamais de
 // contenu ni d'URL ici, juste le libellé, la date et l'enseignant ; la

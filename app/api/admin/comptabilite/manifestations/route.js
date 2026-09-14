@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Manifestations partagées avec la partie Bénévoles (table
 // benevolat_evenements). Ici, permission « comptabilite » : le bureau peut

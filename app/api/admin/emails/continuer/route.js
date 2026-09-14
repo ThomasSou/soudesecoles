@@ -4,6 +4,7 @@ import { isMailConfigured } from "../../../../lib/mail";
 import { envoyerVague } from "../../../../lib/emailCampagne";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Fenêtre du verrou d'envoi. Tant qu'une vague écrit `updated_at` plus
 // souvent que ça (elle l'écrit avant ET après chaque e-mail), aucune autre

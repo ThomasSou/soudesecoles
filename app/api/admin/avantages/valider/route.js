@@ -3,6 +3,7 @@ import { requirePermission } from "../../../../lib/adminAuth";
 import { resolveFamilleParToken } from "../../../../lib/avantages";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Valide un avantage interne pour la famille correspondant au jeton de
 // carte scanné. Le jeton fait foi : on ne fait jamais confiance à un

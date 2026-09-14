@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // GET : tous les avantages avec leur nombre d'utilisations et, pour les
 // avantages partenaires, le nom du partenaire associé.

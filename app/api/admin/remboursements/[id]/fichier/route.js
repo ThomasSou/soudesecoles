@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Fournit une URL signée (valable 5 minutes) vers la facture ou le RIB
 // d'une demande. Le bucket "remboursements" est privé : c'est la seule

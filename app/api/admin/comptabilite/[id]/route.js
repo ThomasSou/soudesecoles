@@ -9,6 +9,7 @@ import { CLES_CLASSES, libelleClasse } from "../../../../lib/classesReference";
 import { resoudreRepartition } from "../../../../lib/comptaRepartition";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 const STATUTS = ["prevu", "a_verifier", "pointe", "a_valider"];
 const COMPTES = ["courant", "placement"];

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Permission dédiée au module partenaires (fiches, périodes, paiements,
 // documents, messages, niveaux). Le module Avantages garde sa propre

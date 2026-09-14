@@ -3,6 +3,7 @@ import { requirePermission } from "../../../../../../lib/adminAuth";
 import { urlSignee } from "../../../../../../lib/enseignantFichiers";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // URL signée (5 minutes) vers le fichier du devis. Le bucket
 // `remboursements` est privé : c'est la seule façon d'y accéder.

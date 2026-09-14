@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "../../../lib/adminAuth";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 // Permet au front de savoir si l'utilisateur connecté fait partie du bureau,
 // et avec quels droits précis (permissions individuelles).
 export async function GET(request) {

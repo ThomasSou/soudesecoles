@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../lib/adminAuth";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 // Enregistre (ou met à jour) la cotisation d'une famille pour une année
 // scolaire donnée. Permet au bureau d'encaisser un chèque/espèces lors des
 // permanences ou manifestations sans passer par la base directement.

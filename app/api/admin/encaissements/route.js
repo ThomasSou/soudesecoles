@@ -5,6 +5,7 @@ import { envoyerEmailTransactionnel, isSenderConfigured } from "../../../lib/sen
 import { SITE_URL } from "../../../lib/emailBlocks";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 function formatMontant(cents) {
   return (cents / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });

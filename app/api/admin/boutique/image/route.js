@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 const MAX_BYTES = 4 * 1024 * 1024; // 4 Mo
 
 // Dépose une image de produit dans le bucket public "shop-images"

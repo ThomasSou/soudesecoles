@@ -3,6 +3,7 @@ import { requirePermission } from "../../../../lib/adminAuth";
 import { envoyerInvitationEnseignant } from "../../../../lib/invitationsEnseignants";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 const ROLES = ["enseignant", "direction"];
 

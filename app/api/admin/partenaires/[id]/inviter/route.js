@@ -3,6 +3,7 @@ import { requirePermission } from "../../../../../lib/adminAuth";
 import { envoyerInvitationPartenaire } from "../../../../../lib/partenaires";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 const PERM = "partenaires";
 

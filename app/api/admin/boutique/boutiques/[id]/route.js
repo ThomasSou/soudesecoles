@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // PATCH : modifier le nom, la description, la date de fermeture, l'ordre
 // d'affichage ou activer/désactiver une boutique.

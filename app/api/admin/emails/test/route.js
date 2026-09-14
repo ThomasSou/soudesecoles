@@ -5,6 +5,7 @@ import { entetesDesinscription, renderBlocksToHtml, renderBlocksToText } from ".
 import { chargerPlanningEvenementBorne } from "../../../../lib/benevolesPlanning";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Envoie un e-mail de test (à une seule adresse), avec le rendu exact d'un
 // destinataire choisi — pour vérifier avant un envoi réel que les champs

@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 import { envoyerInvitation } from "../../../../lib/invitations";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 // Renvoie une invitation à un parent qui a déjà une fiche `parents` mais dont
 // le compte de connexion (auth.users) n'a jamais été activé (lien précédent
 // expiré, perdu dans les spams, jamais cliqué...). Pour un compte auth déjà

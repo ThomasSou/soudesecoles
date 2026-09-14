@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 // Liste des commandes de la boutique, les plus récentes en premier.
 export async function GET(request) {
   const auth = await requirePermission(request, "boutique");

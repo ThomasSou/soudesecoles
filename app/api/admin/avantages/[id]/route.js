@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // GET : détail d'un avantage avec la liste des familles l'ayant utilisé.
 export async function GET(request, { params }) {

@@ -3,6 +3,7 @@ import { requirePermission } from "../../../../lib/adminAuth";
 import { currentSchoolYear } from "../../../../lib/anneeScolaire";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Tableau de bord « Enseignants » (décision D11).
 //   - total engagé sur l'année (devis validés + factures)

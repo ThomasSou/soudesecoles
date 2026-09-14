@@ -3,6 +3,7 @@ import { requirePermission } from "../../../../../lib/adminAuth";
 import { urlSignee } from "../../../../../lib/comptaFichiers";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // URL signée (5 minutes) vers le justificatif d'une ligne de compta. Le
 // bucket `remboursements` est privé : c'est la seule façon d'y accéder.

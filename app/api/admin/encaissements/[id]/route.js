@@ -3,6 +3,7 @@ import { requirePermission } from "../../../../lib/adminAuth";
 import { confirmEncaissementIfPaid } from "../../../../lib/encaissementsLibres";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Statut d'un encaissement, consulté depuis la page de retour du
 // back-office. Revérifie systématiquement auprès de HelloAsso plutôt que de

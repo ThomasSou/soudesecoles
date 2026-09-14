@@ -4,6 +4,7 @@ import { CONTACT_EMAIL, sendMail } from "../../../lib/mail";
 import { envoyerInvitation } from "../../../lib/invitations";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 const SCHOOL_YEAR = process.env.NEXT_PUBLIC_SCHOOL_YEAR || "2025-2026";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://sou-montmerle.fr";

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Toutes les factures déposées par les enseignants, avec le nom de
 // l'enseignant, les classes concernées, et l'indication d'un RIB joint

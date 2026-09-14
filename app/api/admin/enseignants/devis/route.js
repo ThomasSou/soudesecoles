@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Tous les devis déposés par les enseignants, le plus récent d'abord, avec
 // le nom de l'enseignant et les classes concernées, pour l'affichage

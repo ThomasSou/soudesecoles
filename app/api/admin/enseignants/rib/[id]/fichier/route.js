@@ -3,6 +3,7 @@ import { requirePermission } from "../../../../../../lib/adminAuth";
 import { urlSignee } from "../../../../../../lib/enseignantFichiers";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // URL signée (5 minutes) vers un RIB déposé par un enseignant.
 export async function GET(request, { params }) {

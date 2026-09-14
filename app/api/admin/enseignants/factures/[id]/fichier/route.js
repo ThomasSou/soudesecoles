@@ -3,6 +3,7 @@ import { requirePermission } from "../../../../../../lib/adminAuth";
 import { urlSignee } from "../../../../../../lib/enseignantFichiers";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // URL signée (5 minutes) vers la facture (?type=facture, défaut) ou vers son
 // RIB (?type=rib). Le RIB peut être un fichier joint directement à la facture

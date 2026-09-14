@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { PERMISSIONS, requirePermission } from "../../../lib/adminAuth";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 const PERMISSION_KEYS = PERMISSIONS.map((p) => p.key);
 
 function cleanPermissions(input) {

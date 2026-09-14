@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Liste les avantages internes actifs et indique, pour la famille donnée,
 // lesquels ont déjà été utilisés. Sert au panneau affiché sur la page de

@@ -6,6 +6,7 @@ import { CLASSES_REFERENCE, CLES_CLASSES, libelleClasse } from "../../../lib/cla
 import { repartirEgal, resoudreRepartition } from "../../../lib/comptaRepartition";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 const RUBRIQUES = ["evenement", "investissement", "courant", "classe"];
 const STATUTS = ["prevu", "a_verifier", "pointe", "a_valider"];
