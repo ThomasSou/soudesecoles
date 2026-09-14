@@ -205,9 +205,11 @@ function RemboursementsAdmin({ accessToken }) {
 
   const filtres = [
     { key: "pending", label: `En attente (${demandes.filter((d) => d.status === "pending").length})` },
+    { key: "reimbursed", label: `Remboursé (${demandes.filter((d) => d.status === "reimbursed").length})` },
+    { key: "refused", label: `Refusé (${demandes.filter((d) => d.status === "refused").length})` },
     { key: "toutes", label: `Toutes (${demandes.length})` },
   ];
-  const visibles = filtre === "pending" ? demandes.filter((d) => d.status === "pending") : demandes;
+  const visibles = filtre === "toutes" ? demandes : demandes.filter((d) => d.status === filtre);
 
   return (
     <div>
