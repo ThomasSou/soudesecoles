@@ -7,8 +7,17 @@ export const dynamic = "force-dynamic";
 // n'envoie qu'un en-tête "no-cache" (négociable) — repéré en direct sur le
 // CDN Netlify qui continuait à servir une réponse vieille de plusieurs
 // minutes après une modification (statut "remboursé" jamais visible après
-// un clic). "no-store" est sans ambiguïté : jamais mis en cache.
-const NO_STORE = { headers: { "Cache-Control": "no-store" } };
+// un clic). "no-store" est sans ambiguïté : jamais mis en cache. On ajoute
+// aussi "Netlify-CDN-Cache-Control", l'en-tête que le CDN Netlify regarde
+// en priorité pour SON PROPRE cache (indépendamment de Cache-Control,
+// destiné au navigateur) : même constaté avec "Cache-Control: no-store"
+// seul, le CDN continuait à servir une réponse en cache.
+const NO_STORE = {
+  headers: {
+    "Cache-Control": "no-store",
+    "Netlify-CDN-Cache-Control": "no-store",
+  },
+};
 
 // Liste de toutes les demandes de remboursement, la plus récente d'abord,
 // avec le nom de la famille et du parent pour l'affichage back-office.

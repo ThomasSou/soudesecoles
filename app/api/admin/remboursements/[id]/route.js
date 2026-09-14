@@ -8,8 +8,14 @@ const STATUSES = ["pending", "refused", "reimbursed"];
 // "force-dynamic" empêche Next.js de mettre en cache la route, mais
 // n'envoie qu'un en-tête "no-cache" (négociable) — le CDN Netlify a été vu
 // servir une réponse périmée après une modification. "no-store" est sans
-// ambiguïté : jamais mis en cache.
-const NO_STORE = { headers: { "Cache-Control": "no-store" } };
+// ambiguïté : jamais mis en cache. "Netlify-CDN-Cache-Control" est l'en-tête
+// que le CDN Netlify regarde en priorité pour SON PROPRE cache.
+const NO_STORE = {
+  headers: {
+    "Cache-Control": "no-store",
+    "Netlify-CDN-Cache-Control": "no-store",
+  },
+};
 
 // Change le statut d'une demande (traitée : remboursée ou refusée) et/ou sa
 // note interne. C'est ce changement, fait ici, qui fait apparaître le
