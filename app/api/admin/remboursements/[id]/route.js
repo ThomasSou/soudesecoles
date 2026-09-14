@@ -27,11 +27,21 @@ export async function PATCH(request, { params }) {
     update.processed_by = status === "pending" ? null : auth.parent.id;
   }
 
-  const { error } = await auth.admin
+  const { data, error } = await auth.admin
     .from("reimbursement_requests")
     .update(update)
-    .eq("id", params.id);
+    .eq("id", params.id)
+    .select("id");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // .update() ne renvoie pas d'erreur quand aucune ligne ne correspond (id
+  // inconnu, ligne déjà supprimée...) : sans ce contrôle, l'API répondait
+  // "ok" alors que rien n'avait changé — silencieux côté bureau.
+  if (!data || data.length === 0) {
+    return NextResponse.json(
+      { error: "Cette demande n'existe plus ou a déjà été modifiée ailleurs." },
+      { status: 404 }
+    );
+  }
   return NextResponse.json({ ok: true });
 }
