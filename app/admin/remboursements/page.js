@@ -42,11 +42,16 @@ async function ouvrirFichier(accessToken, id, type) {
   window.open(data.url, "_blank", "noopener,noreferrer");
 }
 
-function DemandeCard({ demande, accessToken, onChange }) {
+function DemandeCard({ demande, accessToken, onUpdateLocal }) {
   const [note, setNote] = useState(demande.admin_note || "");
   const [envoi, setEnvoi] = useState(false);
   const statut = STATUTS[demande.status] || STATUTS.pending;
 
+  // On répercute le changement localement dès que le serveur confirme le
+  // succès, au lieu de recharger la liste : la ligne peut être liée à une
+  // dépense de comptabilité dont la synchronisation prend quelques
+  // secondes, et un rechargement immédiat montrait alors encore l'ancien
+  // statut (l'écriture avait pourtant bien réussi).
   async function changerStatut(status) {
     setEnvoi(true);
     const res = await fetch(`/api/admin/remboursements/${demande.id}`, {
@@ -56,7 +61,11 @@ function DemandeCard({ demande, accessToken, onChange }) {
     });
     setEnvoi(false);
     if (res.ok) {
-      onChange();
+      onUpdateLocal(demande.id, {
+        status,
+        admin_note: note || null,
+        processed_at: status === "pending" ? null : new Date().toISOString(),
+      });
     } else {
       const data = await res.json().catch(() => null);
       alert(data?.error || "Impossible de mettre à jour cette demande.");
@@ -72,7 +81,7 @@ function DemandeCard({ demande, accessToken, onChange }) {
     });
     setEnvoi(false);
     if (res.ok) {
-      onChange();
+      onUpdateLocal(demande.id, { admin_note: note || null });
     } else {
       const data = await res.json().catch(() => null);
       alert(data?.error || "Impossible d'enregistrer la note.");
@@ -185,6 +194,10 @@ function RemboursementsAdmin({ accessToken }) {
       .finally(() => setChargement(false));
   }
 
+  function mettreAJourLocalement(id, patch) {
+    setDemandes((liste) => liste.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  }
+
   useEffect(() => {
     recharger();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -228,7 +241,12 @@ function RemboursementsAdmin({ accessToken }) {
       ) : (
         <div className="space-y-3">
           {visibles.map((d) => (
-            <DemandeCard key={d.id} demande={d} accessToken={accessToken} onChange={recharger} />
+            <DemandeCard
+              key={d.id}
+              demande={d}
+              accessToken={accessToken}
+              onUpdateLocal={mettreAJourLocalement}
+            />
           ))}
         </div>
       )}
