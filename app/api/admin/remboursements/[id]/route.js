@@ -43,7 +43,7 @@ export async function PATCH(request, { params }) {
     .from("reimbursement_requests")
     .update(update)
     .eq("id", params.id)
-    .select("id");
+    .select("id, status, processed_at");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500, ...NO_STORE });
   // .update() ne renvoie pas d'erreur quand aucune ligne ne correspond (id
@@ -55,5 +55,7 @@ export async function PATCH(request, { params }) {
       { status: 404, ...NO_STORE }
     );
   }
-  return NextResponse.json({ ok: true }, NO_STORE);
+  // DIAGNOSTIC TEMPORAIRE : renvoie la ligne telle que Supabase la voit
+  // juste après l'update, dans la même requête (aucun cache possible ici).
+  return NextResponse.json({ ok: true, debug: data[0] }, NO_STORE);
 }
