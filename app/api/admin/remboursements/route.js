@@ -3,11 +3,18 @@ import { requirePermission } from "../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 
+// "force-dynamic" empêche Next.js de mettre en cache la route, mais
+// n'envoie qu'un en-tête "no-cache" (négociable) — repéré en direct sur le
+// CDN Netlify qui continuait à servir une réponse vieille de plusieurs
+// minutes après une modification (statut "remboursé" jamais visible après
+// un clic). "no-store" est sans ambiguïté : jamais mis en cache.
+const NO_STORE = { headers: { "Cache-Control": "no-store" } };
+
 // Liste de toutes les demandes de remboursement, la plus récente d'abord,
 // avec le nom de la famille et du parent pour l'affichage back-office.
 export async function GET(request) {
   const auth = await requirePermission(request, "remboursements");
-  if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status, ...NO_STORE });
 
   const { data, error } = await auth.admin
     .from("reimbursement_requests")
@@ -16,7 +23,7 @@ export async function GET(request) {
     )
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500, ...NO_STORE });
 
   // Dépenses saisies directement en comptabilité et attribuées à un·e
   // bénévole (« payé par un bénévole ») : elles n'ont pas de demande déposée
@@ -69,5 +76,5 @@ export async function GET(request) {
     }))
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-  return NextResponse.json({ ok: true, demandes });
+  return NextResponse.json({ ok: true, demandes }, NO_STORE);
 }
