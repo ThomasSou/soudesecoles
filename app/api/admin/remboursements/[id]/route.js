@@ -2,14 +2,13 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+// Voir le commentaire détaillé dans ../route.js : "force-dynamic" seul ne
+// coupe pas le cache interne de Next.js sur les fetch() faits en coulisses
+// par le client Supabase — d'où "force-no-store" en plus ici.
+export const fetchCache = "force-no-store";
 
 const STATUSES = ["pending", "refused", "reimbursed"];
 
-// "force-dynamic" empêche Next.js de mettre en cache la route, mais
-// n'envoie qu'un en-tête "no-cache" (négociable) — le CDN Netlify a été vu
-// servir une réponse périmée après une modification. "no-store" est sans
-// ambiguïté : jamais mis en cache. "Netlify-CDN-Cache-Control" est l'en-tête
-// que le CDN Netlify regarde en priorité pour SON PROPRE cache.
 const NO_STORE = {
   headers: {
     "Cache-Control": "no-store",

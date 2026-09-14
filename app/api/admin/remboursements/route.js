@@ -2,16 +2,21 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+// "force-dynamic" empêche Next.js de mettre en cache CETTE route, mais ne
+// désactive pas forcément le cache interne ("Data Cache") qu'il applique à
+// TOUT appel fetch() exécuté pendant son traitement — y compris ceux que le
+// client Supabase fait lui-même en coulisses vers PostgREST. Ce cache vit
+// dans le processus serveur : une valeur mise en cache peut donc rester
+// fausse indéfiniment tant que ce processus ne redémarre pas (constaté :
+// un statut modifié ne réapparaissait jamais correctement, même après
+// plusieurs minutes de rechargements manuels, jusqu'au prochain déploiement
+// qui recrée les fonctions serveur). "force-no-store" coupe ce cache pour
+// toute la route, pas seulement pour sa propre réponse HTTP.
+export const fetchCache = "force-no-store";
 
-// "force-dynamic" empêche Next.js de mettre en cache la route, mais
-// n'envoie qu'un en-tête "no-cache" (négociable) — repéré en direct sur le
-// CDN Netlify qui continuait à servir une réponse vieille de plusieurs
-// minutes après une modification (statut "remboursé" jamais visible après
-// un clic). "no-store" est sans ambiguïté : jamais mis en cache. On ajoute
-// aussi "Netlify-CDN-Cache-Control", l'en-tête que le CDN Netlify regarde
-// en priorité pour SON PROPRE cache (indépendamment de Cache-Control,
-// destiné au navigateur) : même constaté avec "Cache-Control: no-store"
-// seul, le CDN continuait à servir une réponse en cache.
+// En complément, on empêche aussi explicitement toute mise en cache de la
+// réponse HTTP elle-même (navigateur/CDN) — sans lien avec le problème
+// ci-dessus, mais par prudence.
 const NO_STORE = {
   headers: {
     "Cache-Control": "no-store",
