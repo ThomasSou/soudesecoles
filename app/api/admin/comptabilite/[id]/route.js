@@ -439,9 +439,18 @@ export async function DELETE(request, { params }) {
     .eq("id", params.id)
     .maybeSingle();
   if (!ligne) return NextResponse.json({ error: "Ligne introuvable." }, { status: 404 });
-  if (ligne.source !== "manuel") {
+  if (ligne.source === "enseignant") {
     return NextResponse.json(
       { error: "Cette ligne vient d'une facture enseignant : elle se gère depuis l'onglet Enseignants." },
+      { status: 400 }
+    );
+  }
+  if (ligne.source === "benevole") {
+    return NextResponse.json(
+      {
+        error:
+          "Cette ligne vient d'une demande de remboursement : utilisez le bouton « Refuser » sur la ligne (par exemple pour retirer un doublon), pas la suppression directe.",
+      },
       { status: 400 }
     );
   }

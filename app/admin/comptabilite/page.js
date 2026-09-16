@@ -1388,25 +1388,29 @@ function LigneRow({
             <span className="font-semibold text-slate-500">Demande bénévole</span>
           )}
           {ligne.source === "benevole" && ligne.statut === "a_valider" && (
-            <>
-              <button
-                onClick={() => patch({ statut: "a_verifier" })}
-                disabled={envoi}
-                className="font-semibold text-white bg-sou-blue px-2.5 py-1 rounded-full disabled:opacity-40"
-              >
-                Valider
-              </button>
-              <button
-                onClick={() => {
-                  if (confirm("Refuser cette demande ? La ligne sera retirée de la compta."))
-                    patch({ refuserRemboursement: true });
-                }}
-                disabled={envoi}
-                className="font-semibold text-red-600 px-2 disabled:opacity-40"
-              >
-                Refuser
-              </button>
-            </>
+            <button
+              onClick={() => patch({ statut: "a_verifier" })}
+              disabled={envoi}
+              className="font-semibold text-white bg-sou-blue px-2.5 py-1 rounded-full disabled:opacity-40"
+            >
+              Valider
+            </button>
+          )}
+          {ligne.source === "benevole" && (
+            <button
+              onClick={() => {
+                if (
+                  confirm(
+                    "Refuser cette demande ? La ligne sera retirée de la compta (utile pour supprimer un doublon)."
+                  )
+                )
+                  patch({ refuserRemboursement: true });
+              }}
+              disabled={envoi}
+              className="font-semibold text-red-600 px-2 disabled:opacity-40"
+            >
+              Refuser
+            </button>
           )}
           {ligne.rembourse ? (
             <>
