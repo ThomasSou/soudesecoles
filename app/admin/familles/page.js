@@ -172,10 +172,12 @@ function ListeFamilles({ token }) {
   const [familles, setFamilles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [ouvert, setOuvert] = useState(null);
-  // Deux filtres indépendants, combinés en ET : présence d'un compte de
-  // connexion activé, et statut de cotisation pour l'année en cours.
+  // Trois filtres indépendants, combinés en ET : présence d'un compte de
+  // connexion activé, statut de cotisation pour l'année en cours, et
+  // familles n'ayant plus aucun enfant scolarisé cette année.
   const [filtreCompte, setFiltreCompte] = useState("tous"); // tous | avec | sans
   const [filtreCotis, setFiltreCotis] = useState("tous"); // tous | ajour | non
+  const [filtreScolarite, setFiltreScolarite] = useState("tous"); // tous | actuelle | ancienne
   const [recherche, setRecherche] = useState("");
 
   const charger = useCallback(async () => {
@@ -204,16 +206,24 @@ function ListeFamilles({ token }) {
   const aUnCompte = (f) => f.parents.some((p) => p.authActivated);
   const estAJour = (f) =>
     isMembershipValid(f.memberships.find((m) => m.school_year === annee));
+  // Une famille est "ancienne" quand aucun de ses enfants n'a l'année
+  // scolaire en cours : leurs fiches restent en base (jamais supprimées),
+  // seul leur `school_year` ne suit plus les imports récents. Même règle que
+  // pour le ciblage des campagnes e-mail (cf. app/api/admin/emails/route.js).
+  const estAncienne = (f) => !f.children.some((c) => c.school_year === annee);
 
   const sansCompte = familles.filter((f) => !aUnCompte(f));
   const nbAvecCompte = familles.length - sansCompte.length;
   const nbAJour = familles.filter(estAJour).length;
+  const nbAnciennes = familles.filter(estAncienne).length;
 
   const parFiltre = familles.filter((f) => {
     if (filtreCompte === "avec" && !aUnCompte(f)) return false;
     if (filtreCompte === "sans" && aUnCompte(f)) return false;
     if (filtreCotis === "ajour" && !estAJour(f)) return false;
     if (filtreCotis === "non" && estAJour(f)) return false;
+    if (filtreScolarite === "actuelle" && estAncienne(f)) return false;
+    if (filtreScolarite === "ancienne" && !estAncienne(f)) return false;
     return true;
   });
 
@@ -276,6 +286,15 @@ function ListeFamilles({ token }) {
             { key: "non", label: `Non cotisant (${familles.length - nbAJour})` },
           ]}
         />
+        <FiltrePills
+          valeur={filtreScolarite}
+          onChange={setFiltreScolarite}
+          options={[
+            { key: "tous", label: `Toute scolarité` },
+            { key: "actuelle", label: `Famille actuelle (${familles.length - nbAnciennes})` },
+            { key: "ancienne", label: `Ancienne famille (${nbAnciennes})` },
+          ]}
+        />
       </div>
 
       <p className="text-sm text-slate-500 mb-3">
@@ -287,6 +306,7 @@ function ListeFamilles({ token }) {
           const adhesion = f.memberships.find((m) => m.school_year === annee);
           const aJour = isMembershipValid(adhesion);
           const nom = nomFamille(f);
+          const ancienne = estAncienne(f);
 
           return (
             <div key={f.id} className="border border-slate-200 rounded-xl p-5">
@@ -300,6 +320,11 @@ function ListeFamilles({ token }) {
                   </p>
                 </div>
                 <div className="flex gap-2">
+                  {ancienne && (
+                    <span className="text-xs font-semibold px-3 py-1 rounded-full bg-orange-50 text-orange-700">
+                      Ancienne famille
+                    </span>
+                  )}
                   <span
                     className={`text-xs font-semibold px-3 py-1 rounded-full ${
                       aJour
@@ -333,6 +358,11 @@ function ListeFamilles({ token }) {
                         <li key={p.id}>
                           {p.first_name} {p.last_name}
                           {p.email && <span className="text-slate-400"> — {p.email}</span>}
+                          {p.email_opt_out && (
+                            <span className="text-red-600 text-xs ml-1">
+                              · désinscrit des e-mails
+                            </span>
+                          )}
                           {p.title && (
                             <span className="text-slate-400 text-xs ml-1">
                               ({p.title})
@@ -378,14 +408,25 @@ function ListeFamilles({ token }) {
                     Enfants ({f.children.length})
                   </p>
                   <ul className="text-slate-600 space-y-0.5">
-                    {f.children.map((c) => (
-                      <li key={c.id}>
-                        {c.first_name} {c.last_name}
-                        {c.class_level ? (
-                          <span className="text-slate-400"> — {c.class_level}</span>
-                        ) : null}
-                      </li>
-                    ))}
+                    {f.children.map((c) => {
+                      const scolarise = c.school_year === annee;
+                      return (
+                        <li key={c.id}>
+                          {c.first_name} {c.last_name}
+                          {scolarise ? (
+                            c.class_level && (
+                              <span className="text-slate-400"> — {c.class_level}</span>
+                            )
+                          ) : (
+                            <span className="text-orange-600">
+                              {" "}
+                              — Non scolarisé cette année
+                              {c.class_level ? ` (dernière classe : ${c.class_level})` : ""}
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               </div>
