@@ -76,6 +76,34 @@ export async function POST(request) {
     return NextResponse.json({ error: "Le montant doit être supérieur à 0." }, { status: 400 });
   }
 
+  const amountCents = Math.round(amount * 100);
+
+  // Détection de doublon : même famille, même prestataire (à la casse
+  // près) et même montant, sur une demande pas encore refusée. Bloque avec
+  // un 409 « à confirmer », que le formulaire peut forcer (ignorerDoublon)
+  // après validation humaine — même logique que côté comptabilité.
+  if (supplierName && !body?.ignorerDoublon) {
+    const { data: existantes } = await admin
+      .from("reimbursement_requests")
+      .select("id, supplier_name, description, amount_cents")
+      .eq("family_id", parent.family_id)
+      .eq("amount_cents", amountCents)
+      .neq("status", "refused");
+    const cible = supplierName.toLowerCase();
+    const similaires = (existantes || []).filter(
+      (d) => (d.supplier_name || "").trim().toLowerCase() === cible
+    );
+    if (similaires.length > 0) {
+      return NextResponse.json(
+        {
+          doublonPossible: true,
+          message: `Vous avez déjà déposé une demande pour « ${supplierName} » au même montant (${amount} €).`,
+        },
+        { status: 409 }
+      );
+    }
+  }
+
   const invoice = decodeDataUrl(body?.invoiceDataUrl);
   if (!invoice) {
     return NextResponse.json(
@@ -120,7 +148,7 @@ export async function POST(request) {
     event_name: category === "manifestation" ? eventName : null,
     description,
     supplier_name: supplierName,
-    amount_cents: Math.round(amount * 100),
+    amount_cents: amountCents,
     invoice_path: invoicePath,
     rib_path: ribPath,
   });

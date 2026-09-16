@@ -300,20 +300,39 @@ function MesRemboursements({ accessToken }) {
       const invoiceDataUrl = await fichierEnDataUrl(factureFile);
       const ribDataUrl = ribFile ? await fichierEnDataUrl(ribFile) : null;
 
-      const res = await fetch("/api/remboursements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({
-          category,
-          evenementId: category === "manifestation" ? evenementId : null,
-          description: description.trim() || null,
-          supplierName: supplierName.trim() || null,
-          amount,
-          invoiceDataUrl,
-          ribDataUrl,
-        }),
-      });
-      const data = await res.json();
+      const corps = {
+        category,
+        evenementId: category === "manifestation" ? evenementId : null,
+        description: description.trim() || null,
+        supplierName: supplierName.trim() || null,
+        amount,
+        invoiceDataUrl,
+        ribDataUrl,
+      };
+      const envoyer = async (c) => {
+        const r = await fetch("/api/remboursements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+          body: JSON.stringify(c),
+        });
+        const d = await r.json().catch(() => ({}));
+        return { r, d };
+      };
+
+      let { r: res, d: data } = await envoyer(corps);
+
+      // Doublon possible détecté côté serveur (même prestataire, même
+      // montant, demande déjà en cours) : on demande confirmation avant de
+      // renvoyer en forçant.
+      if (res.status === 409 && data.doublonPossible) {
+        if (window.confirm(`${data.message}\n\nEnvoyer quand même cette demande ?`)) {
+          ({ r: res, d: data } = await envoyer({ ...corps, ignorerDoublon: true }));
+        } else {
+          setEnvoi(false);
+          return;
+        }
+      }
+
       if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
 
       setSucces("Votre demande a bien été envoyée.");
