@@ -29,6 +29,16 @@ const NIVEAUX = [
   { key: "anciens", label: "Anciens parents (plus d'enfant scolarisé cette année)" },
 ];
 
+// Niveau individuel de l'enfant (indépendant de sa classe) : utile pour les
+// classes à double niveau, où seuls les enfants du niveau coché doivent
+// recevoir l'e-mail — pas toute la classe. Élémentaire pas encore disponible
+// (le niveau individuel n'y est pas encore distingué de la classe).
+const NIVEAUX_ENFANT = [
+  { key: "PS", label: "Petite section (PS)" },
+  { key: "MS", label: "Moyenne section (MS)" },
+  { key: "GS", label: "Grande section (GS)" },
+];
+
 // Pause entre deux vagues d'envoi (cf. app/lib/emailCampagne.js : ~20
 // e-mails par vague). Laisse respirer le serveur d'envoi et évite un pic
 // de centaines d'e-mails en quelques secondes.
@@ -51,6 +61,7 @@ function EnvoiEmails({ token, parent }) {
   const [scope, setScope] = useState("toute");
   const [classes, setClasses] = useState([]);
   const [niveaux, setNiveaux] = useState([]);
+  const [niveauEnfant, setNiveauEnfant] = useState([]);
   const [adherents, setAdherents] = useState("tous");
   // Envoi ciblé sur une liste d'adresses collées (scope "liste").
   const [adresses, setAdresses] = useState("");
@@ -182,6 +193,7 @@ function EnvoiEmails({ token, parent }) {
         scope: "liste",
         classes: [],
         niveaux: [],
+        niveauEnfant: [],
         adherents: "tous",
         inclureContacts: false,
         adresses,
@@ -192,6 +204,7 @@ function EnvoiEmails({ token, parent }) {
       scope,
       classes: scope === "toute" ? [] : classes,
       niveaux: scope === "toute" ? [] : niveaux,
+      niveauEnfant: scope === "toute" ? [] : niveauEnfant,
       adherents,
       inclureContacts,
       exclureDejaServis,
@@ -557,6 +570,7 @@ function EnvoiEmails({ token, parent }) {
     setScope(["personnalise", "liste"].includes(seg.scope) ? seg.scope : "toute");
     setClasses(Array.isArray(seg.classes) ? seg.classes : []);
     setNiveaux(Array.isArray(seg.niveaux) ? seg.niveaux : []);
+    setNiveauEnfant(Array.isArray(seg.niveauEnfant) ? seg.niveauEnfant : []);
     setAdherents(seg.adherents || "tous");
     setAdresses(
       typeof seg.adresses === "string"
@@ -653,7 +667,7 @@ function EnvoiEmails({ token, parent }) {
         )}
 
         {scope === "personnalise" && (
-          <div className="grid gap-6 sm:grid-cols-2 mb-4 border border-slate-200 rounded-xl p-4">
+          <div className="grid gap-6 sm:grid-cols-3 mb-4 border border-slate-200 rounded-xl p-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Niveaux</p>
               {NIVEAUX.map((n) => (
@@ -689,6 +703,25 @@ function EnvoiEmails({ token, parent }) {
                   </label>
                 ))}
               </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                Niveau exact de l&apos;enfant
+              </p>
+              <p className="text-xs text-slate-400 mb-2">
+                Dans une classe à double niveau (ex. Moyens-Grands), ne cible que les
+                enfants du niveau coché.
+              </p>
+              {NIVEAUX_ENFANT.map((n) => (
+                <label key={n.key} className="flex items-center gap-2 text-sm mb-1">
+                  <input
+                    type="checkbox"
+                    checked={niveauEnfant.includes(n.key)}
+                    onChange={() => toggle(niveauEnfant, setNiveauEnfant, n.key)}
+                  />
+                  {n.label}
+                </label>
+              ))}
             </div>
           </div>
         )}

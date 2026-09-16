@@ -44,7 +44,7 @@ function familleEstAncienne(f, annee) {
 // famille, réutilisé ensuite pour personnaliser chaque e-mail.
 function famillesCorrespondantes(familles, segment) {
   const annee = currentSchoolYear();
-  const { scope, classes = [], niveaux = [], adherents = "tous" } = segment || {};
+  const { scope, classes = [], niveaux = [], niveauEnfant = [], adherents = "tous" } = segment || {};
 
   return familles
     .map((f) => {
@@ -79,8 +79,15 @@ function famillesCorrespondantes(familles, segment) {
         if (ok) return true;
         if (niveaux.includes("anciens") && familleEstAncienne(f, annee)) return true;
       }
+      // Niveau individuel de l'enfant (PS/MS/GS), indépendant de sa classe :
+      // dans une classe à double niveau (ex. "Moyens-Grands"), seuls les
+      // enfants du niveau coché reçoivent l'e-mail, pas toute la classe.
+      if (niveauEnfant.length > 0) {
+        const ok = f.children.some((c) => c.niveau && niveauEnfant.includes(c.niveau));
+        if (ok) return true;
+      }
       // Aucun filtre classe/niveau coché : ne restreint pas sur ce critère.
-      if (classes.length === 0 && niveaux.length === 0) return true;
+      if (classes.length === 0 && niveaux.length === 0 && niveauEnfant.length === 0) return true;
       return false;
     });
 }
@@ -110,7 +117,7 @@ function resumeSegment(segment) {
     return `Liste d'adresses (${n})${horsServis}`;
   }
 
-  const { scope, classes = [], niveaux = [], adherents = "tous" } = segment || {};
+  const { scope, classes = [], niveaux = [], niveauEnfant = [], adherents = "tous" } = segment || {};
   const parts = [];
   parts.push(scope === "toute" ? "Toute l'école (hors anciens parents)" : "Sélection personnalisée");
   if (scope !== "toute") {
@@ -119,6 +126,7 @@ function resumeSegment(segment) {
       const labels = { maternelle: "Maternelle", elementaire: "Élémentaire", anciens: "Anciens parents" };
       parts.push(`Niveaux : ${niveaux.map((n) => labels[n] || n).join(", ")}`);
     }
+    if (niveauEnfant.length) parts.push(`Niveau exact : ${niveauEnfant.join(", ")}`);
   }
   if (adherents === "adherents") parts.push("Adhérents à jour uniquement");
   if (adherents === "non_adherents") parts.push("Non-adhérents uniquement");
