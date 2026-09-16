@@ -27,6 +27,17 @@ function tokensDeClasse(classLevel) {
   return (classLevel || "").split(/[-\/]/).map((t) => t.trim()).filter(Boolean);
 }
 
+// Une famille est "ancienne" quand plus aucun de ses enfants n'a l'année
+// scolaire en cours : leur ligne `children` existe encore (on ne supprime
+// jamais un enfant qui a quitté l'école), mais son `school_year` date d'un
+// import précédent. Même détection que scripts/marquer-anciennes-familles.mjs
+// (qui pose le statut `status_current_year = 'ancien_parent'', jamais
+// automatique) — calculée ici à la volée pour rester juste sans dépendre de
+// ce script manuel.
+function familleEstAncienne(f, annee) {
+  return !(f.children || []).some((c) => c.school_year === annee);
+}
+
 // Calcule la liste des familles correspondant au segment demandé, à partir
 // des tables families/parents/children/memberships (mêmes données que
 // /api/admin/familles). Ajoute le statut d'adhésion (aJour) sur chaque
@@ -48,7 +59,10 @@ function famillesCorrespondantes(familles, segment) {
         if (adherents === "non_adherents" && f.aJour) return false;
       }
 
-      if (scope === "toute") return true;
+      // "Toute l'école" = les familles ayant réellement un enfant scolarisé
+      // cette année. Les anciens parents ne doivent jamais s'y retrouver
+      // mélangés : ils ne sont joignables que via la case dédiée ci-dessous.
+      if (scope === "toute") return !familleEstAncienne(f, annee);
 
       const classesEnfants = f.children.map((c) => c.class_level || "");
       if (classes.length > 0) {
@@ -63,6 +77,7 @@ function famillesCorrespondantes(familles, segment) {
           return false;
         });
         if (ok) return true;
+        if (niveaux.includes("anciens") && familleEstAncienne(f, annee)) return true;
       }
       // Aucun filtre classe/niveau coché : ne restreint pas sur ce critère.
       if (classes.length === 0 && niveaux.length === 0) return true;
@@ -97,11 +112,11 @@ function resumeSegment(segment) {
 
   const { scope, classes = [], niveaux = [], adherents = "tous" } = segment || {};
   const parts = [];
-  parts.push(scope === "toute" ? "Toute l'école" : "Sélection personnalisée");
+  parts.push(scope === "toute" ? "Toute l'école (hors anciens parents)" : "Sélection personnalisée");
   if (scope !== "toute") {
     if (classes.length) parts.push(`Classes : ${classes.join(", ")}`);
     if (niveaux.length) {
-      const labels = { maternelle: "Maternelle", elementaire: "Élémentaire" };
+      const labels = { maternelle: "Maternelle", elementaire: "Élémentaire", anciens: "Anciens parents" };
       parts.push(`Niveaux : ${niveaux.map((n) => labels[n] || n).join(", ")}`);
     }
   }

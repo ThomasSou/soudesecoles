@@ -26,6 +26,7 @@ export default function AdminEmailsPage() {
 const NIVEAUX = [
   { key: "maternelle", label: "Maternelle (PS, MS, GS)" },
   { key: "elementaire", label: "Élémentaire (CP au CM2)" },
+  { key: "anciens", label: "Anciens parents (plus d'enfant scolarisé cette année)" },
 ];
 
 // Pause entre deux vagues d'envoi (cf. app/lib/emailCampagne.js : ~20
@@ -622,6 +623,14 @@ function EnvoiEmails({ token, parent }) {
             Liste d&apos;adresses
           </button>
         </div>
+
+        {scope === "toute" && (
+          <p className="text-xs text-slate-500 mb-4">
+            Familles ayant un enfant scolarisé cette année uniquement — les anciens parents
+            (plus aucun enfant scolarisé) n&apos;y sont pas inclus. Pour les joindre, utilisez
+            « Sélection personnalisée » → « Anciens parents ».
+          </p>
+        )}
 
         {scope === "liste" && (
           <div className="mb-4 border border-slate-200 rounded-xl p-4">
