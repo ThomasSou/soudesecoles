@@ -226,3 +226,32 @@ export async function POST(request) {
     { status: 500 }
   );
 }
+
+// Marque (ou retire) l'alerte "e-mail invalide" sur un parent — posée à la
+// main par le bureau quand un envoi de campagne rebondit (pas de détection
+// automatique : les rebonds arrivent dans la boîte contact@, pas via un
+// webhook). Tant que le marqueur est posé, cette adresse est exclue des
+// campagnes (cf. destinatairesDe dans /api/admin/emails).
+export async function PATCH(request) {
+  const auth = await requirePermission(request, "familles");
+  if (auth.error) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  const { parentId, invalide } = await request.json().catch(() => ({}));
+  if (!parentId) {
+    return NextResponse.json({ error: "parentId manquant." }, { status: 400 });
+  }
+
+  const { data, error } = await auth.admin
+    .from("parents")
+    .update({ email_invalide_le: invalide ? new Date().toISOString() : null })
+    .eq("id", parentId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data) return NextResponse.json({ error: "Parent introuvable." }, { status: 404 });
+
+  return NextResponse.json({ ok: true });
+}

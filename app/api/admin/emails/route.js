@@ -271,6 +271,7 @@ function destinatairesDe(familles) {
     for (const p of f.parents) {
       if (!p.email || vus.has(p.email.toLowerCase())) continue;
       if (p.email_opt_out) continue; // désinscrit des e-mails
+      if (p.email_invalide_le) continue; // adresse signalée invalide (rebond)
       vus.add(p.email.toLowerCase());
       destinataires.push({
         parentId: p.id,

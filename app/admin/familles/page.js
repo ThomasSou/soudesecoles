@@ -86,6 +86,42 @@ function RenvoyerInvitation({ parentId, token, onDone }) {
   );
 }
 
+// Bascule l'alerte "e-mail invalide" (posée à la main par le bureau quand un
+// envoi de campagne rebondit — pas de détection automatique, cf. l'API).
+// Tant qu'elle est posée, cette adresse est exclue des campagnes.
+function MarquerEmailInvalide({ parentId, invalide, token, onDone }) {
+  const [busy, setBusy] = useState(false);
+
+  async function basculer() {
+    setBusy(true);
+    const res = await fetch("/api/admin/familles", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ parentId, invalide: !invalide }),
+    });
+    setBusy(false);
+    if (res.ok) onDone();
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={basculer}
+      disabled={busy}
+      className={`text-xs ml-1 disabled:opacity-60 ${
+        invalide
+          ? "font-semibold text-red-600 hover:text-red-700"
+          : "text-slate-400 hover:text-red-600"
+      }`}
+    >
+      {invalide ? "⚠ e-mail invalide (corrigé ?)" : "signaler e-mail invalide"}
+    </button>
+  );
+}
+
 // Pour une fiche "sans compte" qui n'a pas encore d'adresse e-mail : on la
 // saisit ici, ce qui déclenche l'invitation sur la fiche existante — jamais
 // de doublon créé.
@@ -362,6 +398,14 @@ function ListeFamilles({ token }) {
                             <span className="text-red-600 text-xs ml-1">
                               · désinscrit des e-mails
                             </span>
+                          )}
+                          {p.email && (
+                            <MarquerEmailInvalide
+                              parentId={p.id}
+                              invalide={Boolean(p.email_invalide_le)}
+                              token={token}
+                              onDone={charger}
+                            />
                           )}
                           {p.title && (
                             <span className="text-slate-400 text-xs ml-1">
