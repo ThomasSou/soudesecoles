@@ -270,10 +270,15 @@ function ListeFamilles({ token }) {
         const dansParents = f.parents.some((p) =>
           `${p.first_name || ""} ${p.last_name || ""}`.toLowerCase().includes(q)
         );
+        const dansEmail = f.parents.some((p) =>
+          (p.email || "").toLowerCase().includes(q)
+        );
         const dansEnfants = f.children.some((c) =>
           `${c.first_name || ""} ${c.last_name || ""}`.toLowerCase().includes(q)
         );
-        return dansParents || dansEnfants || nomFamille(f).toLowerCase().includes(q);
+        return (
+          dansParents || dansEmail || dansEnfants || nomFamille(f).toLowerCase().includes(q)
+        );
       });
 
   return (
@@ -296,7 +301,7 @@ function ListeFamilles({ token }) {
       <div className="flex flex-wrap gap-3 mb-4">
         <input
           type="text"
-          placeholder="Rechercher une famille par nom de parent ou d'enfant..."
+          placeholder="Rechercher une famille par nom de parent, e-mail ou nom d'enfant..."
           value={recherche}
           onChange={(e) => setRecherche(e.target.value)}
           className="flex-1 min-w-[260px] border border-slate-300 rounded-lg px-3 py-2 text-sm"

@@ -60,7 +60,13 @@ export async function GET(request) {
     const envoi = dernierEnvoiParEmail.get((p.email || "").toLowerCase());
     return {
       ...p,
-      authActivated: Boolean(u?.last_sign_in_at || u?.confirmed_at),
+      // `confirmed_at` ne prouve rien ici : le circuit maison (Sender)
+      // crée le compte Auth avec `email_confirm: true` dès l'envoi de
+      // l'invitation (cf. app/lib/invitations.js), donc `confirmed_at` est
+      // déjà rempli avant même que la personne ait ouvert le lien. Seul
+      // `last_sign_in_at` prouve qu'un mot de passe a réellement été défini
+      // (activer-compte connecte l'utilisateur juste après).
+      authActivated: Boolean(u?.last_sign_in_at),
       authInvitedAt: u?.invited_at || null,
       invitationEnvoyeeLe: envoi?.sent_at || null,
       invitationOuverteLe: envoi?.opened_at || null,
