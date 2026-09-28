@@ -88,19 +88,40 @@ function EnvoiEmails({ token, parent }) {
   // Double validation : l'envoi réel ne part qu'après confirmation explicite.
   const [confirmation, setConfirmation] = useState(false);
   const [confirmCoche, setConfirmCoche] = useState(false);
-  // Envoi par vagues en cours : { campaignId, sent, total, done, enPause, enErreur }.
-  const [progres, setProgres] = useState(null);
-  // Id de la campagne que CET éditeur vient de démarrer (distinct de
-  // progres.campaignId, qui peut être une autre campagne restée "en_cours"
-  // et reprise automatiquement en arrière-plan à l'ouverture de la page —
-  // cf. l'effet plus bas). Sert uniquement à savoir si l'éditeur doit se
-  // masquer (envoi en cours pour CE brouillon) ou rester utilisable (un
-  // ancien envoi continue pendant qu'on en compose un autre).
+  // Envois par vagues en cours, un par campagne : { [campaignId]: { campaignId,
+  // sent, total, done, enPause, enErreur } }. Plusieurs campagnes peuvent
+  // envoyer en parallèle (ex. une reprise automatique en arrière-plan pendant
+  // qu'on en compose et envoie une autre) : chacune a son propre état, sa
+  // propre boucle et son propre "stop", pour ne jamais interférer entre elles.
+  const [progresMap, setProgresMap] = useState({});
+  const progresMapRef = useRef({});
+  useEffect(() => {
+    progresMapRef.current = progresMap;
+  }, [progresMap]);
+  // Id de la campagne que CET éditeur vient de démarrer. Sert à savoir si
+  // l'éditeur doit se masquer (envoi en cours pour CE brouillon) ou rester
+  // utilisable (un ancien envoi continue pendant qu'on en compose un autre).
   const [envoiEditeurId, setEnvoiEditeurId] = useState(null);
-  const stopRef = useRef(false);
-  // Id de la campagne pour laquelle une reprise automatique a déjà été
+  const envoiEditeurIdRef = useRef(null);
+  useEffect(() => {
+    envoiEditeurIdRef.current = envoiEditeurId;
+  }, [envoiEditeurId]);
+  // Un "stop" par campagne (et non un seul partagé) : mettre en pause l'une
+  // ne doit jamais couper les vagues d'une autre en cours d'envoi.
+  const stopRefs = useRef({});
+  // Ids de campagnes pour lesquelles une reprise automatique a déjà été
   // tentée sur cette page (évite de la relancer à chaque re-render).
-  const autoRepriseRef = useRef(null);
+  const autoRepriseRef = useRef(new Set());
+
+  function progresDe(campaignId) {
+    return campaignId ? progresMap[campaignId] || null : null;
+  }
+  function majProgres(campaignId, patch) {
+    setProgresMap((m) => ({
+      ...m,
+      [campaignId]: { ...(m[campaignId] || { campaignId }), ...patch },
+    }));
+  }
 
   const [testEmail, setTestEmail] = useState("");
   const [busyTest, setBusyTest] = useState(false);
@@ -140,59 +161,60 @@ function EnvoiEmails({ token, parent }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parent]);
 
-  // Reprise automatique : si une campagne est restée « en cours » (onglet
-  // fermé, fonction coupée), on relance l'envoi dès l'ouverture de la page,
-  // sans attendre un clic. Le verrou serveur empêche un double envoi si un
-  // autre onglet fait pareil.
+  // Reprise automatique : toute campagne restée « en cours » (onglet fermé,
+  // fonction coupée) relance son envoi dès l'ouverture de la page, sans
+  // attendre un clic — chacune dans sa propre boucle indépendante, pour que
+  // plusieurs campagnes interrompues puissent reprendre en même temps sans se
+  // marcher dessus. Le verrou serveur (par campagne) empêche un double envoi
+  // si un autre onglet fait pareil.
   useEffect(() => {
-    const enCours = campagnes.find((c) => c.status === "en_cours");
-    if (!enCours) return;
-    if (progres && !progres.enPause && !progres.enErreur) return;
-    if (autoRepriseRef.current === enCours.id) return;
-    autoRepriseRef.current = enCours.id;
-    setProgres({
-      campaignId: enCours.id,
-      sent: enCours.sent_count,
-      total: enCours.recipients_count,
-      done: false,
-    });
-    boucleEnvoi(enCours.id, { depuisEditeur: false });
+    for (const c of campagnes) {
+      if (c.status !== "en_cours") continue;
+      if (autoRepriseRef.current.has(c.id)) continue;
+      const p = progresMapRef.current[c.id];
+      if (p && !p.enPause && !p.enErreur) continue; // déjà une boucle active
+      autoRepriseRef.current.add(c.id);
+      majProgres(c.id, { sent: c.sent_count, total: c.recipients_count, done: false });
+      boucleEnvoi(c.id, { depuisEditeur: false });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campagnes]);
 
-  // Progression « live » : tant qu'un envoi est en cours, on relit
-  // l'avancement toutes les 4 s. Le compteur bouge donc même quand la boucle
+  // Progression « live » : tant qu'au moins un envoi est en cours, on relit
+  // l'avancement de CHACUN toutes les 4 s (une seule minuterie pour toutes
+  // les campagnes actives, relue via la ref pour ne jamais rater celles
+  // démarrées entre deux ticks). Le compteur bouge donc même quand une boucle
   // d'envoi est entre deux vagues, et se rétablit après un rechargement de
   // page (la reprise auto ci-dessus redémarre la boucle, ce polling reflète
   // l'avancement en attendant).
   useEffect(() => {
-    if (!progres || progres.done || progres.enErreur || !progres.campaignId) return;
-    const id = progres.campaignId;
     const t = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/admin/emails/continuer?id=${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const d = await res.json().catch(() => ({}));
-        if (!res.ok) return;
-        setProgres((p) =>
-          p && p.campaignId === id
-            ? { ...p, sent: d.sentCount, total: d.recipientsCount }
-            : p
-        );
-        if (d.status && d.status !== "en_cours") {
-          finaliser(
-            { campaignId: id, sent: d.sentCount, total: d.recipientsCount },
-            { depuisEditeur: false }
-          );
+      const actives = Object.values(progresMapRef.current).filter(
+        (p) => p && !p.done && !p.enErreur && p.campaignId
+      );
+      for (const p of actives) {
+        const id = p.campaignId;
+        try {
+          const res = await fetch(`/api/admin/emails/continuer?id=${id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const d = await res.json().catch(() => ({}));
+          if (!res.ok) continue;
+          majProgres(id, { sent: d.sentCount, total: d.recipientsCount });
+          if (d.status && d.status !== "en_cours") {
+            finaliser(
+              { campaignId: id, sent: d.sentCount, total: d.recipientsCount },
+              { depuisEditeur: id === envoiEditeurIdRef.current }
+            );
+          }
+        } catch {
+          /* le polling ne doit jamais casser la page */
         }
-      } catch {
-        /* le polling ne doit jamais casser la page */
       }
     }, 4000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [progres?.campaignId, progres?.done, progres?.enErreur, token]);
+  }, [token]);
 
   function segment() {
     if (scope === "liste") {
@@ -345,7 +367,7 @@ function EnvoiEmails({ token, parent }) {
       done: data.done,
     };
     setEnvoiEditeurId(data.campaignId);
-    setProgres(etat);
+    majProgres(data.campaignId, etat);
     if (data.done) {
       finaliser(etat, { depuisEditeur: true });
     } else {
@@ -364,13 +386,13 @@ function EnvoiEmails({ token, parent }) {
   // vague suivante, et on n'abandonne qu'après plusieurs échecs d'affilée
   // (vrai incident : fonction cassée, réseau coupé).
   async function boucleEnvoi(campaignId, { depuisEditeur = false } = {}) {
-    stopRef.current = false;
-    setProgres((p) => ({ ...(p || {}), campaignId, enPause: false, enErreur: false }));
+    stopRefs.current[campaignId] = false;
+    majProgres(campaignId, { enPause: false, enErreur: false });
     let echecsConsecutifs = 0;
     const MAX_ECHECS_CONSECUTIFS = 6;
-    while (!stopRef.current) {
+    while (!stopRefs.current[campaignId]) {
       await attendre(PAUSE_ENTRE_VAGUES_MS);
-      if (stopRef.current) break;
+      if (stopRefs.current[campaignId]) break;
       let data;
       try {
         const res = await fetch("/api/admin/emails/continuer", {
@@ -388,7 +410,7 @@ function EnvoiEmails({ token, parent }) {
       } catch (e) {
         echecsConsecutifs += 1;
         if (echecsConsecutifs >= MAX_ECHECS_CONSECUTIFS) {
-          setProgres((p) => ({ ...(p || {}), enErreur: true }));
+          majProgres(campaignId, { enErreur: true });
           setError(
             (e.message || "Erreur réseau") +
               ` L'envoi s'est arrêté après ${MAX_ECHECS_CONSECUTIFS} tentatives. Il peut être repris.`
@@ -399,17 +421,15 @@ function EnvoiEmails({ token, parent }) {
         // peut-être quand même été envoyée en partie côté serveur. On patiente
         // un peu plus longtemps et on réessaie — sans marquer l'envoi en
         // erreur, pour que la progression continue de s'afficher.
-        setProgres((p) => ({ ...(p || {}), enErreur: false }));
+        majProgres(campaignId, { enErreur: false });
         await attendre(4000);
         continue;
       }
-      setProgres((p) => ({
-        ...(p || {}),
-        campaignId,
+      majProgres(campaignId, {
         sent: data.sentCount,
         total: data.recipientsCount,
         done: data.done,
-      }));
+      });
       if (data.done) {
         finaliser(
           { campaignId, sent: data.sentCount, total: data.recipientsCount },
@@ -423,15 +443,19 @@ function EnvoiEmails({ token, parent }) {
       // à jour via data.sentCount.
     }
     // Sortie de boucle sans « done » = mise en pause manuelle.
-    setProgres((p) => ({ ...(p || {}), enPause: true }));
+    majProgres(campaignId, { enPause: true });
   }
 
-  function mettreEnPause() {
-    stopRef.current = true;
+  function mettreEnPause(campaignId) {
+    stopRefs.current[campaignId] = true;
   }
 
   function finaliser(etat, { depuisEditeur = true } = {}) {
-    setProgres(null);
+    setProgresMap((m) => {
+      const suite = { ...m };
+      delete suite[etat.campaignId];
+      return suite;
+    });
     // Le résultat et le vidage de l'éditeur ne concernent que l'envoi qu'on
     // vient de composer ici. Une reprise automatique d'une campagne plus
     // ancienne (autre onglet, autre session) se termine en arrière-plan sans
@@ -600,14 +624,8 @@ function EnvoiEmails({ token, parent }) {
   // fonction coupée, mise en pause).
   function reprendreEnvoi(c) {
     setError("");
-    setResultat(null);
-    autoRepriseRef.current = c.id;
-    setProgres({
-      campaignId: c.id,
-      sent: c.sent_count,
-      total: c.recipients_count,
-      done: false,
-    });
+    autoRepriseRef.current.add(c.id);
+    majProgres(c.id, { sent: c.sent_count, total: c.recipients_count, done: false });
     window.scrollTo({ top: 0, behavior: "smooth" });
     boucleEnvoi(c.id, { depuisEditeur: false });
   }
@@ -952,7 +970,7 @@ function EnvoiEmails({ token, parent }) {
           </p>
         </div>
 
-        {!confirmation && !(progres && progres.campaignId === envoiEditeurId) && (
+        {!confirmation && !progresDe(envoiEditeurId) && (
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
               onClick={ouvrirConfirmation}
@@ -1028,59 +1046,60 @@ function EnvoiEmails({ token, parent }) {
           </div>
         )}
 
-        {progres && (
-          <div className="mt-4 border border-slate-200 rounded-xl p-4 text-sm">
-            {progres.campaignId !== envoiEditeurId && (
-              <p className="text-xs text-slate-500 mb-2">
-                Envoi d&apos;une autre campagne encore en cours en arrière-plan
-                {(() => {
-                  const c = campagnes.find((c) => c.id === progres.campaignId);
-                  return c ? ` : « ${c.subject} »` : "";
-                })()}
-                . Vous pouvez continuer à composer ci-dessus, ça n&apos;interfère pas.
+        {Object.values(progresMap)
+          .slice()
+          .sort((a, b) => (a.campaignId === envoiEditeurId ? -1 : b.campaignId === envoiEditeurId ? 1 : 0))
+          .map((p) => (
+            <div key={p.campaignId} className="mt-4 border border-slate-200 rounded-xl p-4 text-sm">
+              {p.campaignId !== envoiEditeurId && (
+                <p className="text-xs text-slate-500 mb-2">
+                  Envoi d&apos;une autre campagne encore en cours en arrière-plan
+                  {(() => {
+                    const c = campagnes.find((c) => c.id === p.campaignId);
+                    return c ? ` : « ${c.subject} »` : "";
+                  })()}
+                  . Vous pouvez continuer à composer ci-dessus, ça n&apos;interfère pas.
+                </p>
+              )}
+              <p className="font-medium text-slate-700 mb-2">
+                {p.enErreur
+                  ? "Envoi interrompu"
+                  : p.enPause
+                  ? "Envoi en pause"
+                  : "Envoi en cours par vagues…"}{" "}
+                {p.sent} / {p.total}
               </p>
-            )}
-            <p className="font-medium text-slate-700 mb-2">
-              {progres.enErreur
-                ? "Envoi interrompu"
-                : progres.enPause
-                ? "Envoi en pause"
-                : "Envoi en cours par vagues…"}{" "}
-              {progres.sent} / {progres.total}
-            </p>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
-              <div
-                className="h-full bg-sou-blue transition-all"
-                style={{
-                  width: `${
-                    progres.total ? Math.round((progres.sent / progres.total) * 100) : 0
-                  }%`,
-                }}
-              />
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
+                <div
+                  className="h-full bg-sou-blue transition-all"
+                  style={{
+                    width: `${p.total ? Math.round((p.sent / p.total) * 100) : 0}%`,
+                  }}
+                />
+              </div>
+              <div className="flex gap-3">
+                {!p.enPause && !p.enErreur && (
+                  <button
+                    onClick={() => mettreEnPause(p.campaignId)}
+                    className="text-sm text-slate-500 hover:text-sou-blue px-3"
+                  >
+                    Mettre en pause
+                  </button>
+                )}
+                {(p.enPause || p.enErreur) && (
+                  <button
+                    onClick={() => boucleEnvoi(p.campaignId, { depuisEditeur: p.campaignId === envoiEditeurId })}
+                    className="bg-sou-blue text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-sou-gold transition-colors"
+                  >
+                    Reprendre l&apos;envoi
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 mt-2">
+                Vous pouvez fermer cette page : l&apos;envoi est repris depuis l&apos;historique.
+              </p>
             </div>
-            <div className="flex gap-3">
-              {!progres.enPause && !progres.enErreur && (
-                <button
-                  onClick={mettreEnPause}
-                  className="text-sm text-slate-500 hover:text-sou-blue px-3"
-                >
-                  Mettre en pause
-                </button>
-              )}
-              {(progres.enPause || progres.enErreur) && (
-                <button
-                  onClick={() => boucleEnvoi(progres.campaignId)}
-                  className="bg-sou-blue text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-sou-gold transition-colors"
-                >
-                  Reprendre l&apos;envoi
-                </button>
-              )}
-            </div>
-            <p className="text-xs text-slate-400 mt-2">
-              Vous pouvez fermer cette page : l&apos;envoi est repris depuis l&apos;historique.
-            </p>
-          </div>
-        )}
+          ))}
 
         {resultat && (
           <div className="mt-4 border border-slate-200 rounded-xl p-4 text-sm">
@@ -1175,14 +1194,13 @@ function EnvoiEmails({ token, parent }) {
                     <button
                       onClick={() => reprendreEnvoi(c)}
                       disabled={
-                        !!progres &&
-                        progres.campaignId === c.id &&
-                        !progres.enErreur &&
-                        !progres.enPause
+                        !!progresDe(c.id) &&
+                        !progresDe(c.id).enErreur &&
+                        !progresDe(c.id).enPause
                       }
                       className="text-xs font-semibold text-white bg-sou-blue rounded-full px-3 py-1.5 hover:bg-sou-gold disabled:opacity-50"
                     >
-                      {progres && progres.campaignId === c.id && !progres.enErreur && !progres.enPause
+                      {progresDe(c.id) && !progresDe(c.id).enErreur && !progresDe(c.id).enPause
                         ? "Envoi en cours…"
                         : "Reprendre l'envoi"}
                     </button>
