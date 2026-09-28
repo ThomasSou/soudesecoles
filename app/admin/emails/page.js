@@ -90,6 +90,13 @@ function EnvoiEmails({ token, parent }) {
   const [confirmCoche, setConfirmCoche] = useState(false);
   // Envoi par vagues en cours : { campaignId, sent, total, done, enPause, enErreur }.
   const [progres, setProgres] = useState(null);
+  // Id de la campagne que CET éditeur vient de démarrer (distinct de
+  // progres.campaignId, qui peut être une autre campagne restée "en_cours"
+  // et reprise automatiquement en arrière-plan à l'ouverture de la page —
+  // cf. l'effet plus bas). Sert uniquement à savoir si l'éditeur doit se
+  // masquer (envoi en cours pour CE brouillon) ou rester utilisable (un
+  // ancien envoi continue pendant qu'on en compose un autre).
+  const [envoiEditeurId, setEnvoiEditeurId] = useState(null);
   const stopRef = useRef(false);
   // Id de la campagne pour laquelle une reprise automatique a déjà été
   // tentée sur cette page (évite de la relancer à chaque re-render).
@@ -337,6 +344,7 @@ function EnvoiEmails({ token, parent }) {
       total: data.recipientsCount,
       done: data.done,
     };
+    setEnvoiEditeurId(data.campaignId);
     setProgres(etat);
     if (data.done) {
       finaliser(etat, { depuisEditeur: true });
@@ -423,17 +431,19 @@ function EnvoiEmails({ token, parent }) {
   }
 
   function finaliser(etat, { depuisEditeur = true } = {}) {
-    setResultat({
-      mailConfigured: true,
-      sentCount: etat.sent,
-      recipientsCount: etat.total,
-    });
     setProgres(null);
-    setApercu(null);
-    // On ne vide l'éditeur que si l'envoi qui vient de finir est celui qu'on
-    // venait de composer. Une reprise automatique d'une campagne plus ancienne
-    // ne doit pas effacer ce que l'utilisateur est en train d'écrire.
+    // Le résultat et le vidage de l'éditeur ne concernent que l'envoi qu'on
+    // vient de composer ici. Une reprise automatique d'une campagne plus
+    // ancienne (autre onglet, autre session) se termine en arrière-plan sans
+    // perturber ce que l'utilisateur est en train d'écrire ou de regarder.
     if (depuisEditeur) {
+      setResultat({
+        mailConfigured: true,
+        sentCount: etat.sent,
+        recipientsCount: etat.total,
+      });
+      setApercu(null);
+      setEnvoiEditeurId(null);
       setSubject("");
       setBlocks(TEMPLATES[0].blocks());
       setBenevolesEvenementId("");
@@ -942,7 +952,7 @@ function EnvoiEmails({ token, parent }) {
           </p>
         </div>
 
-        {!confirmation && !progres && (
+        {!confirmation && !(progres && progres.campaignId === envoiEditeurId) && (
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
               onClick={ouvrirConfirmation}
@@ -1020,6 +1030,16 @@ function EnvoiEmails({ token, parent }) {
 
         {progres && (
           <div className="mt-4 border border-slate-200 rounded-xl p-4 text-sm">
+            {progres.campaignId !== envoiEditeurId && (
+              <p className="text-xs text-slate-500 mb-2">
+                Envoi d&apos;une autre campagne encore en cours en arrière-plan
+                {(() => {
+                  const c = campagnes.find((c) => c.id === progres.campaignId);
+                  return c ? ` : « ${c.subject} »` : "";
+                })()}
+                . Vous pouvez continuer à composer ci-dessus, ça n&apos;interfère pas.
+              </p>
+            )}
             <p className="font-medium text-slate-700 mb-2">
               {progres.enErreur
                 ? "Envoi interrompu"
