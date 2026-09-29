@@ -100,7 +100,7 @@ function MarquerEmailInvalide({ parentId, invalide, token, onDone }) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ parentId, invalide: !invalide }),
+      body: JSON.stringify({ type: "email_invalide", parentId, invalide: !invalide }),
     });
     setBusy(false);
     if (res.ok) onDone();
@@ -179,6 +179,218 @@ function AjouterAdresseEtInviter({ familyId, parentId, token, onDone }) {
         Annuler
       </button>
       {error && <span className="text-xs text-red-600">{error}</span>}
+    </form>
+  );
+}
+
+// Corrige l'adresse postale d'une famille (typo, déménagement...).
+function ModifierAdresseFamille({ family, token, onDone }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [addressLine, setAddressLine] = useState(family.address_line || "");
+  const [postalCode, setPostalCode] = useState(family.postal_code || "");
+  const [city, setCity] = useState(family.city || "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    const res = await fetch("/api/admin/familles", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ type: "famille", familyId: family.id, addressLine, postalCode, city }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      setError(data.error || "Une erreur est survenue.");
+      return;
+    }
+    setOuvert(false);
+    onDone();
+  }
+
+  if (!ouvert) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOuvert(true)}
+        className="text-xs font-semibold text-sou-blue hover:text-sou-gold"
+      >
+        Modifier l&apos;adresse
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-wrap items-center gap-2 mt-1">
+      <input
+        autoFocus
+        placeholder="Adresse"
+        value={addressLine}
+        onChange={(e) => setAddressLine(e.target.value)}
+        className="border border-slate-300 rounded-lg px-2 py-1 text-xs flex-1 min-w-[160px]"
+      />
+      <input
+        placeholder="Code postal"
+        value={postalCode}
+        onChange={(e) => setPostalCode(e.target.value)}
+        className="border border-slate-300 rounded-lg px-2 py-1 text-xs w-24"
+      />
+      <input
+        placeholder="Ville"
+        value={city}
+        onChange={(e) => setCity(e.target.value)}
+        className="border border-slate-300 rounded-lg px-2 py-1 text-xs w-32"
+      />
+      <button type="submit" disabled={busy} className="text-xs font-semibold text-sou-blue disabled:opacity-60">
+        {busy ? "..." : "Enregistrer"}
+      </button>
+      <button type="button" onClick={() => setOuvert(false)} className="text-xs text-slate-400">
+        Annuler
+      </button>
+      {error && <span className="text-xs text-red-600 w-full">{error}</span>}
+    </form>
+  );
+}
+
+// Corrige le nom, prénom ou téléphone d'un parent (typo, nom mal orthographié
+// à l'inscription...).
+function ModifierParent({ parent, token, onDone }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [firstName, setFirstName] = useState(parent.first_name || "");
+  const [lastName, setLastName] = useState(parent.last_name || "");
+  const [phone, setPhone] = useState(parent.phone || "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    const res = await fetch("/api/admin/familles", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ type: "parent", parentId: parent.id, firstName, lastName, phone }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      setError(data.error || "Une erreur est survenue.");
+      return;
+    }
+    setOuvert(false);
+    onDone();
+  }
+
+  if (!ouvert) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOuvert(true)}
+        className="text-xs text-slate-400 hover:text-sou-blue ml-1"
+      >
+        modifier
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-wrap items-center gap-2 mt-1 ml-1">
+      <input
+        autoFocus
+        placeholder="Prénom"
+        value={firstName}
+        onChange={(e) => setFirstName(e.target.value)}
+        className="border border-slate-300 rounded-lg px-2 py-1 text-xs w-28"
+      />
+      <input
+        placeholder="Nom"
+        value={lastName}
+        onChange={(e) => setLastName(e.target.value)}
+        className="border border-slate-300 rounded-lg px-2 py-1 text-xs w-28"
+      />
+      <input
+        placeholder="Téléphone"
+        value={phone}
+        onChange={(e) => setPhone(e.target.value)}
+        className="border border-slate-300 rounded-lg px-2 py-1 text-xs w-28"
+      />
+      <button type="submit" disabled={busy} className="text-xs font-semibold text-sou-blue disabled:opacity-60">
+        {busy ? "..." : "Enregistrer"}
+      </button>
+      <button type="button" onClick={() => setOuvert(false)} className="text-xs text-slate-400">
+        Annuler
+      </button>
+      {error && <span className="text-xs text-red-600 w-full">{error}</span>}
+    </form>
+  );
+}
+
+// Corrige le nom ou le prénom d'un enfant.
+function ModifierEnfant({ child, token, onDone }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [firstName, setFirstName] = useState(child.first_name || "");
+  const [lastName, setLastName] = useState(child.last_name || "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    const res = await fetch("/api/admin/familles", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ type: "enfant", childId: child.id, firstName, lastName }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      setError(data.error || "Une erreur est survenue.");
+      return;
+    }
+    setOuvert(false);
+    onDone();
+  }
+
+  if (!ouvert) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOuvert(true)}
+        className="text-xs text-slate-400 hover:text-sou-blue ml-1"
+      >
+        modifier
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-wrap items-center gap-2 mt-1 ml-1">
+      <input
+        autoFocus
+        required
+        placeholder="Prénom"
+        value={firstName}
+        onChange={(e) => setFirstName(e.target.value)}
+        className="border border-slate-300 rounded-lg px-2 py-1 text-xs w-28"
+      />
+      <input
+        required
+        placeholder="Nom"
+        value={lastName}
+        onChange={(e) => setLastName(e.target.value)}
+        className="border border-slate-300 rounded-lg px-2 py-1 text-xs w-28"
+      />
+      <button type="submit" disabled={busy} className="text-xs font-semibold text-sou-blue disabled:opacity-60">
+        {busy ? "..." : "Enregistrer"}
+      </button>
+      <button type="button" onClick={() => setOuvert(false)} className="text-xs text-slate-400">
+        Annuler
+      </button>
+      {error && <span className="text-xs text-red-600 w-full">{error}</span>}
     </form>
   );
 }
@@ -359,6 +571,7 @@ function ListeFamilles({ token }) {
                     {f.address_line ? ", " : ""}
                     {f.postal_code} {f.city}
                   </p>
+                  <ModifierAdresseFamille family={f} token={token} onDone={charger} />
                 </div>
                 <div className="flex gap-2">
                   {ancienne && (
@@ -398,6 +611,7 @@ function ListeFamilles({ token }) {
                       {f.parents.map((p) => (
                         <li key={p.id}>
                           {p.first_name} {p.last_name}
+                          <ModifierParent parent={p} token={token} onDone={charger} />
                           {p.email && <span className="text-slate-400"> — {p.email}</span>}
                           {p.email_opt_out && (
                             <span className="text-red-600 text-xs ml-1">
@@ -462,6 +676,7 @@ function ListeFamilles({ token }) {
                       return (
                         <li key={c.id}>
                           {c.first_name} {c.last_name}
+                          <ModifierEnfant child={c} token={token} onDone={charger} />
                           {scolarise ? (
                             c.class_level && (
                               <span className="text-slate-400"> — {c.class_level}</span>

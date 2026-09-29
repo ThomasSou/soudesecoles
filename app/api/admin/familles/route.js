@@ -233,31 +233,98 @@ export async function POST(request) {
   );
 }
 
-// Marque (ou retire) l'alerte "e-mail invalide" sur un parent — posée à la
-// main par le bureau quand un envoi de campagne rebondit (pas de détection
-// automatique : les rebonds arrivent dans la boîte contact@, pas via un
-// webhook). Tant que le marqueur est posé, cette adresse est exclue des
-// campagnes (cf. destinatairesDe dans /api/admin/emails).
+// Point d'entrée unique pour les petites corrections faites depuis la fiche
+// famille (adresse, nom d'un parent ou d'un enfant, alerte e-mail invalide).
+// Le champ `type` dit quelle ligne modifier — plus sûr que de deviner à
+// partir des clés présentes dans le corps de la requête.
 export async function PATCH(request) {
   const auth = await requirePermission(request, "familles");
   if (auth.error) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const { parentId, invalide } = await request.json().catch(() => ({}));
-  if (!parentId) {
-    return NextResponse.json({ error: "parentId manquant." }, { status: 400 });
+  const body = await request.json().catch(() => ({}));
+  const { type } = body;
+
+  if (type === "famille") {
+    const { familyId, addressLine, postalCode, city } = body;
+    if (!familyId) {
+      return NextResponse.json({ error: "familyId manquant." }, { status: 400 });
+    }
+    const { data, error } = await auth.admin
+      .from("families")
+      .update({
+        address_line: addressLine?.trim() || null,
+        postal_code: postalCode?.trim() || null,
+        city: city?.trim() || null,
+      })
+      .eq("id", familyId)
+      .select("id")
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!data) return NextResponse.json({ error: "Famille introuvable." }, { status: 404 });
+    return NextResponse.json({ ok: true });
   }
 
-  const { data, error } = await auth.admin
-    .from("parents")
-    .update({ email_invalide_le: invalide ? new Date().toISOString() : null })
-    .eq("id", parentId)
-    .select("id")
-    .maybeSingle();
+  if (type === "parent") {
+    const { parentId, firstName, lastName, phone } = body;
+    if (!parentId) {
+      return NextResponse.json({ error: "parentId manquant." }, { status: 400 });
+    }
+    const { data, error } = await auth.admin
+      .from("parents")
+      .update({
+        first_name: firstName?.trim() || null,
+        last_name: lastName?.trim() || null,
+        phone: phone?.trim() || null,
+      })
+      .eq("id", parentId)
+      .select("id")
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!data) return NextResponse.json({ error: "Parent introuvable." }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!data) return NextResponse.json({ error: "Parent introuvable." }, { status: 404 });
+  if (type === "enfant") {
+    const { childId, firstName, lastName } = body;
+    if (!childId) {
+      return NextResponse.json({ error: "childId manquant." }, { status: 400 });
+    }
+    if (!firstName?.trim() || !lastName?.trim()) {
+      return NextResponse.json({ error: "Prénom et nom obligatoires." }, { status: 400 });
+    }
+    const { data, error } = await auth.admin
+      .from("children")
+      .update({ first_name: firstName.trim(), last_name: lastName.trim() })
+      .eq("id", childId)
+      .select("id")
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!data) return NextResponse.json({ error: "Enfant introuvable." }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  }
 
-  return NextResponse.json({ ok: true });
+  // Marque (ou retire) l'alerte "e-mail invalide" sur un parent — posée à la
+  // main par le bureau quand un envoi de campagne rebondit (pas de détection
+  // automatique : les rebonds arrivent dans la boîte contact@, pas via un
+  // webhook). Tant que le marqueur est posé, cette adresse est exclue des
+  // campagnes (cf. destinatairesDe dans /api/admin/emails).
+  if (type === "email_invalide") {
+    const { parentId, invalide } = body;
+    if (!parentId) {
+      return NextResponse.json({ error: "parentId manquant." }, { status: 400 });
+    }
+    const { data, error } = await auth.admin
+      .from("parents")
+      .update({ email_invalide_le: invalide ? new Date().toISOString() : null })
+      .eq("id", parentId)
+      .select("id")
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!data) return NextResponse.json({ error: "Parent introuvable." }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  }
+
+  return NextResponse.json({ error: "type inconnu." }, { status: 400 });
 }
