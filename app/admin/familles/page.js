@@ -442,6 +442,44 @@ function ListeFamilles({ token }) {
     charger();
   }, [charger]);
 
+  // Retour de la page de paiement HelloAsso (cotisation réglée pour une
+  // famille depuis cette page) : on vérifie le paiement auprès de HelloAsso
+  // et on affiche le résultat, puis on nettoie l'adresse.
+  const [retourPaiement, setRetourPaiement] = useState(null);
+  useEffect(() => {
+    if (!token) return;
+    const params = new URLSearchParams(window.location.search);
+    const etat = params.get("cotisation");
+    if (!etat) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    if (etat === "erreur") {
+      setRetourPaiement({ ok: false, texte: "Le paiement HelloAsso n'a pas abouti. Rien n'a été encaissé." });
+      return;
+    }
+    const familyId = params.get("famille");
+    if (etat !== "retour" || !familyId) return;
+    setRetourPaiement({ ok: null, texte: "Vérification du paiement auprès de HelloAsso..." });
+    fetch("/api/admin/adhesions/helloasso/confirmer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ familyId }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        setRetourPaiement(
+          d.paid
+            ? { ok: true, texte: "Paiement reçu : la cotisation est enregistrée." }
+            : {
+                ok: false,
+                texte:
+                  "Paiement non confirmé pour l'instant. S'il vient d'être fait, rechargez la page dans une minute ; sinon rien n'a été encaissé.",
+              }
+        );
+        charger();
+      })
+      .catch(() => setRetourPaiement({ ok: false, texte: "Vérification impossible, rechargez la page." }));
+  }, [token, charger]);
+
   if (loading) {
     return <p className="text-slate-500">Chargement des familles...</p>;
   }
@@ -495,6 +533,19 @@ function ListeFamilles({ token }) {
 
   return (
     <div>
+      {retourPaiement && (
+        <div
+          className={`rounded-xl border p-4 mb-6 text-sm font-medium ${
+            retourPaiement.ok === true
+              ? "bg-green-50 border-green-200 text-green-800"
+              : retourPaiement.ok === false
+              ? "bg-red-50 border-red-200 text-red-700"
+              : "bg-slate-50 border-slate-200 text-slate-600"
+          }`}
+        >
+          {retourPaiement.texte}
+        </div>
+      )}
       {sansCompte.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-6">
           <p className="font-semibold text-amber-800">
@@ -834,10 +885,35 @@ function EncaissementCotisation({ famille, annee, adhesion, aJour, token, onDone
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  // HelloAsso « à faire » : pas d'encaissement enregistré ici. On ouvre la
+  // page de paiement HelloAsso (redirection pleine page, HelloAsso refuse
+  // l'iframe) ; l'adhésion est confirmée au retour, après vérification.
+  async function payerViaHelloAsso() {
+    const res = await fetch("/api/admin/adhesions/helloasso", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ familyId: famille.id, amountEuros: montant }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.redirectUrl) {
+      setBusy(false);
+      setError(data.error || "Impossible d'ouvrir la page de paiement.");
+      return;
+    }
+    window.location.href = data.redirectUrl;
+  }
+
   async function confirmer(e) {
     e.preventDefault();
     setBusy(true);
     setError("");
+    if (moyen === "helloasso_a_faire") {
+      await payerViaHelloAsso();
+      return;
+    }
     const res = await fetch("/api/admin/adhesions", {
       method: "POST",
       headers: {
@@ -941,25 +1017,32 @@ function EncaissementCotisation({ famille, annee, adhesion, aJour, token, onDone
           <option value="cheque">Chèque</option>
           <option value="especes">Espèces</option>
           <option value="sumup">Carte bancaire</option>
-          <option value="helloasso">HelloAsso</option>
+          <option value="helloasso">HelloAsso — déjà réglé en ligne</option>
+          <option value="helloasso_a_faire">HelloAsso — à régler maintenant</option>
         </select>
       </div>
-      <div>
-        <label className="block text-xs text-slate-500 mb-1">Note (optionnel)</label>
-        <input
-          type="text"
-          placeholder="ex : n° de chèque"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
-        />
-      </div>
+      {moyen !== "helloasso_a_faire" && (
+        <div>
+          <label className="block text-xs text-slate-500 mb-1">Note (optionnel)</label>
+          <input
+            type="text"
+            placeholder="ex : n° de chèque"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+      )}
       <button
         type="submit"
         disabled={busy}
         className="bg-green-600 text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-green-700 transition-colors disabled:opacity-60"
       >
-        {busy ? "Enregistrement..." : "Confirmer l'adhésion"}
+        {busy
+          ? "Enregistrement..."
+          : moyen === "helloasso_a_faire"
+          ? "Ouvrir la page de paiement HelloAsso"
+          : "Confirmer l'adhésion"}
       </button>
       <button
         type="button"
