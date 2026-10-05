@@ -57,6 +57,35 @@ export function hasPermission(parent, key) {
   return Boolean(parent?.permissions && parent.permissions[key]);
 }
 
+// Droit « comptabilité limitée à certaines manifestations » (ex. des membres
+// de la commission Fête de l'école qui saisissent leurs factures sans voir
+// le reste de la compta). Stocké dans permissions.compta_evenements, liste
+// d'ids de benevolat_evenements ; absent quand il n'y en a aucune (une
+// liste vide serait « vraie » pour les tests de droit du menu).
+export function evenementsComptaAutorises(parent) {
+  const liste = parent?.permissions?.compta_evenements;
+  return Array.isArray(liste) ? liste.filter((id) => typeof id === "string") : [];
+}
+
+// Autorise la saisie de compta pour des manifestations : soit le droit
+// complet « comptabilite » (toutes les manifestations, evenementIds = null),
+// soit une liste limitée. Renvoie aussi `evenementIds` pour que la route
+// n'ouvre jamais qu'une manifestation autorisée.
+export async function requireComptaEvenements(request) {
+  const auth = await requireAdmin(request);
+  if (auth.error) return auth;
+
+  const complet = hasPermission(auth.parent, "comptabilite");
+  const ids = evenementsComptaAutorises(auth.parent);
+  if (!complet && ids.length === 0) {
+    return {
+      error: "Vous n'avez pas les droits nécessaires pour cette section.",
+      status: 403,
+    };
+  }
+  return { ...auth, evenementIds: complet ? null : ids };
+}
+
 // Comme requireAdmin, mais exige en plus un droit précis (cf. PERMISSIONS).
 export async function requirePermission(request, key) {
   const auth = await requireAdmin(request);

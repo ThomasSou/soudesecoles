@@ -20,6 +20,7 @@ function aUnAcces(m) {
 function GestionAcces({ token, moi }) {
   const [membres, setMembres] = useState([]);
   const [permissions, setPermissions] = useState([]);
+  const [evenements, setEvenements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [recherche, setRecherche] = useState("");
   // Filtre par état d'accès : "tous", "avec" ou "sans".
@@ -33,6 +34,7 @@ function GestionAcces({ token, moi }) {
     const data = await res.json();
     setMembres(data.membres || []);
     setPermissions(data.permissions || []);
+    setEvenements(data.evenements || []);
     setLoading(false);
   }, [token]);
 
@@ -110,6 +112,7 @@ function GestionAcces({ token, moi }) {
             key={m.id}
             membre={m}
             permissions={permissions}
+            evenements={evenements}
             moi={moi}
             token={token}
             onDone={charger}
@@ -123,7 +126,7 @@ function GestionAcces({ token, moi }) {
   );
 }
 
-function LigneMembre({ membre, permissions, moi, token, onDone }) {
+function LigneMembre({ membre, permissions, evenements, moi, token, onDone }) {
   const [ouvert, setOuvert] = useState(false);
   const [isAdmin, setIsAdmin] = useState(membre.isAdmin);
   const [title, setTitle] = useState(membre.title || "");
@@ -226,6 +229,50 @@ function LigneMembre({ membre, permissions, moi, token, onDone }) {
               ))}
             </div>
           </div>
+
+          {evenements.length > 0 && (
+            <div>
+              <p className="text-xs text-slate-500 mb-1">
+                Comptabilité limitée à certaines manifestations
+              </p>
+              <p className="text-xs text-slate-400 mb-2">
+                Pour des bénévoles (ex. commission Fête de l&apos;école) : ils saisissent leurs
+                factures et recettes pour ces manifestations uniquement, sans voir le reste de la
+                compta. Leurs lignes arrivent « à valider ». Inutile si le droit « Comptabilité »
+                complet est coché.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {evenements.map((e) => {
+                  const liste = Array.isArray(perms.compta_evenements) ? perms.compta_evenements : [];
+                  return (
+                    <label key={e.id} className="flex items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={liste.includes(e.id)}
+                        disabled={!isAdmin}
+                        onChange={(ev) =>
+                          setPerms((prev) => {
+                            const actuelle = Array.isArray(prev.compta_evenements)
+                              ? prev.compta_evenements
+                              : [];
+                            const suite = ev.target.checked
+                              ? [...actuelle, e.id]
+                              : actuelle.filter((id) => id !== e.id);
+                            const copie = { ...prev };
+                            if (suite.length > 0) copie.compta_evenements = suite;
+                            else delete copie.compta_evenements;
+                            return copie;
+                          })
+                        }
+                      />
+                      {e.nom}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {error && <p className="text-red-600 text-sm">{error}</p>}
 

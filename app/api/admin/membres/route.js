@@ -6,11 +6,17 @@ export const fetchCache = "force-no-store";
 
 const PERMISSION_KEYS = PERMISSIONS.map((p) => p.key);
 
-function cleanPermissions(input) {
+function cleanPermissions(input, evenementsValides) {
   const out = {};
   for (const key of PERMISSION_KEYS) {
     out[key] = Boolean(input && input[key]);
   }
+  // Comptabilité limitée à certaines manifestations : liste d'ids existants,
+  // omise quand elle est vide (cf. evenementsComptaAutorises dans adminAuth).
+  const evts = Array.isArray(input?.compta_evenements)
+    ? [...new Set(input.compta_evenements.filter((id) => evenementsValides.has(id)))]
+    : [];
+  if (evts.length > 0) out.compta_evenements = evts;
   return out;
 }
 
@@ -22,9 +28,10 @@ export async function GET(request) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const [parentsRes, familiesRes] = await Promise.all([
+  const [parentsRes, familiesRes, evenementsRes] = await Promise.all([
     auth.admin.from("parents").select("*").order("last_name"),
     auth.admin.from("families").select("id, address_line, city"),
+    auth.admin.from("benevolat_evenements").select("id, nom").order("nom"),
   ]);
 
   if (parentsRes.error) {
@@ -47,7 +54,7 @@ export async function GET(request) {
     familyAddress: familiesById[p.family_id]?.address_line || "",
   }));
 
-  return NextResponse.json({ membres, permissions: PERMISSIONS });
+  return NextResponse.json({ membres, permissions: PERMISSIONS, evenements: evenementsRes.data || [] });
 }
 
 // Met à jour l'accès back-office, les droits individuels et la fonction
@@ -76,11 +83,14 @@ export async function POST(request) {
     );
   }
 
+  const { data: evenements } = await auth.admin.from("benevolat_evenements").select("id");
+  const evenementsValides = new Set((evenements || []).map((e) => e.id));
+
   const { error } = await auth.admin
     .from("parents")
     .update({
       is_admin: Boolean(isAdmin),
-      permissions: cleanPermissions(permissions),
+      permissions: cleanPermissions(permissions, evenementsValides),
       title: title?.trim() || null,
     })
     .eq("id", parentId);
