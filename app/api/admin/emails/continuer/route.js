@@ -110,9 +110,10 @@ async function avancerUneCampagne(admin, campagne) {
 // - jeton d'admin (Bearer, via requirePermission) : c'est l'éditeur qui
 //   appelle, avec un campaignId précis.
 // - jeton de service (en-tête x-admin-token = ADMIN_IMPORT_TOKEN, même jeton
-//   que les autres routes d'automatisation) : c'est le cron GitHub Actions
-//   (.github/workflows/continuer-envois-email.yml) qui appelle SANS
-//   campaignId, pour avancer TOUTES les campagnes restées "en_cours" — afin
+//   que les autres routes d'automatisation) : c'est la fonction de fond
+//   Netlify (netlify/functions/envoi-emails-background.mjs, déclenchée toutes
+//   les 10 min) qui appelle SANS campaignId, pour avancer TOUTES les
+//   campagnes restées "en_cours" — afin
 //   qu'un envoi continue même si personne n'a d'onglet /admin/emails ouvert
 //   (cf. panne du 29/09/2026 : l'AG s'est arrêtée net dès que l'ordinateur a
 //   été fermé, faute d'autre mécanisme pour faire avancer les vagues).
