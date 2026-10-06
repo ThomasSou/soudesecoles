@@ -16,7 +16,12 @@ function formatDateFermeture(iso) {
 export default function BoutiquePage() {
   const [produits, setProduits] = useState([]);
   const [boutiqueActiveId, setBoutiqueActiveId] = useState(null);
-  const [panier, setPanier] = useState({}); // { productId: qty }
+  // Lignes du panier : un produit sans personnalisation = une ligne ; avec
+  // personnalisations, une ligne par combinaison choisie (taille M, taille L...).
+  const [panier, setPanier] = useState([]); // [{ cle, productId, qty, choix }]
+  // Personnalisations en cours de saisie sur les fiches produit.
+  const [saisies, setSaisies] = useState({}); // { productId: { optionId: valeur } }
+  const [erreursProduit, setErreursProduit] = useState({}); // { productId: message }
   const [moi, setMoi] = useState(null); // parent connecté, ou null
   const [accessToken, setAccessToken] = useState(null);
   const [buyer, setBuyer] = useState({ firstName: "", lastName: "", email: "", phone: "" });
@@ -104,23 +109,77 @@ export default function BoutiquePage() {
     return Array.from(groupes.entries());
   }, [produits, boutiqueActiveId]);
 
+  // Supplément d'une ligne (affichage seulement : le serveur recalcule tout).
+  function supplement(produit, choix) {
+    let extra = 0;
+    for (const opt of produit.options || []) {
+      const v = (choix?.[opt.id] || "").trim();
+      if (!v) continue;
+      if (opt.type === "texte") extra += opt.extraCents || 0;
+      else extra += (opt.choices || []).find((c) => c.label === v)?.extraCents || 0;
+    }
+    return extra;
+  }
+
   const lignesPanier = useMemo(() => {
-    return Object.entries(panier)
-      .filter(([, qty]) => qty > 0)
-      .map(([productId, qty]) => {
-        const produit = produits.find((p) => p.id === productId);
-        return produit ? { produit, qty } : null;
+    return panier
+      .filter((l) => l.qty > 0)
+      .map((l) => {
+        const produit = produits.find((p) => p.id === l.productId);
+        if (!produit) return null;
+        return { ...l, produit, prixUnitaire: produit.price_cents + supplement(produit, l.choix) };
       })
       .filter(Boolean);
   }, [panier, produits]);
 
-  const totalCents = lignesPanier.reduce((sum, l) => sum + l.produit.price_cents * l.qty, 0);
+  const totalCents = lignesPanier.reduce((sum, l) => sum + l.prixUnitaire * l.qty, 0);
 
-  function ajouter(id, delta) {
-    setPanier((p) => {
-      const qty = Math.max(0, Math.min(20, (p[id] || 0) + delta));
-      return { ...p, [id]: qty };
+  // Quantité déjà au panier pour un produit (toutes personnalisations confondues).
+  const qtyProduit = (id) => panier.filter((l) => l.productId === id).reduce((n, l) => n + l.qty, 0);
+
+  function plafond(produit) {
+    const stock = produit.remaining != null ? produit.remaining : 20;
+    return Math.min(20, stock);
+  }
+
+  function libelleChoix(produit, choix) {
+    return (produit.options || [])
+      .map((o) => (choix?.[o.id] ? `${o.label} : ${choix[o.id]}` : null))
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  // Ajoute (ou retire, delta < 0) un exemplaire d'une ligne du panier.
+  function ajouter(produit, delta, choix = {}) {
+    const cle = `${produit.id}|${JSON.stringify(
+      Object.fromEntries(Object.entries(choix).filter(([, v]) => v && String(v).trim()).sort())
+    )}`;
+    setPanier((courant) => {
+      const existante = courant.find((l) => l.cle === cle);
+      if (delta > 0 && courant.filter((l) => l.productId === produit.id).reduce((n, l) => n + l.qty, 0) >= plafond(produit)) {
+        return courant;
+      }
+      if (existante) {
+        return courant
+          .map((l) => (l.cle === cle ? { ...l, qty: Math.max(0, l.qty + delta) } : l))
+          .filter((l) => l.qty > 0);
+      }
+      if (delta <= 0) return courant;
+      return [...courant, { cle, productId: produit.id, qty: 1, choix }];
     });
+  }
+
+  // Produit avec personnalisations : on valide la saisie avant d'ajouter.
+  function ajouterAvecChoix(produit) {
+    const choix = saisies[produit.id] || {};
+    for (const opt of produit.options || []) {
+      if (opt.required && !(choix[opt.id] || "").trim()) {
+        setErreursProduit((e) => ({ ...e, [produit.id]: `Merci de renseigner « ${opt.label} ».` }));
+        return;
+      }
+    }
+    setErreursProduit((e) => ({ ...e, [produit.id]: "" }));
+    ajouter(produit, 1, choix);
   }
 
   async function commander(e) {
@@ -139,7 +198,7 @@ export default function BoutiquePage() {
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
         body: JSON.stringify({
-          items: lignesPanier.map((l) => ({ productId: l.produit.id, qty: l.qty })),
+          items: lignesPanier.map((l) => ({ productId: l.produit.id, qty: l.qty, choix: l.choix })),
           buyer,
         }),
       });
@@ -210,23 +269,98 @@ export default function BoutiquePage() {
                         )}
                         <p className="font-semibold text-slate-800">{p.name}</p>
                         {p.description && <p className="text-sm text-slate-500 mt-1 flex-1">{p.description}</p>}
-                        <div className="flex items-center justify-between mt-3">
-                          <span className="font-semibold text-sou-blue">{euros(p.price_cents)}</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => ajouter(p.id, -1)}
-                              className="w-7 h-7 rounded-full bg-slate-100 text-slate-600 font-bold"
-                            >
-                              −
-                            </button>
-                            <span className="w-5 text-center text-sm">{panier[p.id] || 0}</span>
-                            <button
-                              onClick={() => ajouter(p.id, 1)}
-                              className="w-7 h-7 rounded-full bg-sou-blue text-white font-bold"
-                            >
-                              +
-                            </button>
+                        {(p.options || []).length > 0 && p.remaining !== 0 && (
+                          <div className="mt-3 space-y-2">
+                            {p.options.map((o) => (
+                              <div key={o.id}>
+                                <label className="block text-xs font-semibold text-slate-500 mb-1">
+                                  {o.label}
+                                  {o.required ? " *" : ""}
+                                  {o.type === "texte" && o.extraCents > 0
+                                    ? ` (+ ${euros(o.extraCents)})`
+                                    : ""}
+                                </label>
+                                {o.type === "texte" ? (
+                                  <input
+                                    value={saisies[p.id]?.[o.id] || ""}
+                                    maxLength={120}
+                                    onChange={(e) =>
+                                      setSaisies((st) => ({
+                                        ...st,
+                                        [p.id]: { ...(st[p.id] || {}), [o.id]: e.target.value },
+                                      }))
+                                    }
+                                    className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm"
+                                  />
+                                ) : (
+                                  <select
+                                    value={saisies[p.id]?.[o.id] || ""}
+                                    onChange={(e) =>
+                                      setSaisies((st) => ({
+                                        ...st,
+                                        [p.id]: { ...(st[p.id] || {}), [o.id]: e.target.value },
+                                      }))
+                                    }
+                                    className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm"
+                                  >
+                                    <option value="">{o.required ? "Choisir..." : "Aucun"}</option>
+                                    {o.choices.map((c) => (
+                                      <option key={c.label} value={c.label}>
+                                        {c.label}
+                                        {c.extraCents > 0 ? ` (+ ${euros(c.extraCents)})` : ""}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                              </div>
+                            ))}
+                            {erreursProduit[p.id] && (
+                              <p className="text-xs text-red-600">{erreursProduit[p.id]}</p>
+                            )}
                           </div>
+                        )}
+                        {p.remaining !== null && p.remaining !== undefined && (
+                          <p className={`text-xs font-medium mt-2 ${p.remaining === 0 ? "text-red-600" : "text-amber-600"}`}>
+                            {p.remaining === 0
+                              ? "Épuisé"
+                              : `Plus que ${p.remaining} exemplaire${p.remaining > 1 ? "s" : ""}`}
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between mt-3">
+                          <span className="font-semibold text-sou-blue">
+                            {(p.options || []).some((o) => (o.type === "texte" ? o.extraCents > 0 : o.choices.some((c) => c.extraCents > 0)))
+                              ? "dès "
+                              : ""}
+                            {euros(p.price_cents)}
+                          </span>
+                          {p.remaining === 0 ? (
+                            <span className="text-sm text-slate-400">Indisponible</span>
+                          ) : (p.options || []).length > 0 ? (
+                            <button
+                              onClick={() => ajouterAvecChoix(p)}
+                              disabled={qtyProduit(p.id) >= plafond(p)}
+                              className="bg-sou-blue text-white text-sm font-semibold px-4 py-1.5 rounded-full disabled:opacity-40"
+                            >
+                              Ajouter au panier
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => ajouter(p, -1)}
+                                className="w-7 h-7 rounded-full bg-slate-100 text-slate-600 font-bold"
+                              >
+                                −
+                              </button>
+                              <span className="w-5 text-center text-sm">{qtyProduit(p.id)}</span>
+                              <button
+                                onClick={() => ajouter(p, 1)}
+                                disabled={qtyProduit(p.id) >= plafond(p)}
+                                className="w-7 h-7 rounded-full bg-sou-blue text-white font-bold disabled:opacity-40"
+                              >
+                                +
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -244,11 +378,35 @@ export default function BoutiquePage() {
                 ) : (
                   <div className="space-y-2 mb-4">
                     {lignesPanier.map((l) => (
-                      <div key={l.produit.id} className="flex justify-between text-sm">
+                      <div key={l.cle} className="flex justify-between gap-2 text-sm">
                         <span>
                           {l.qty} × {l.produit.name}
+                          {libelleChoix(l.produit, l.choix) && (
+                            <span className="block text-xs text-slate-500">
+                              {libelleChoix(l.produit, l.choix)}
+                            </span>
+                          )}
+                          <span className="inline-flex items-center gap-1 mt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => ajouter(l.produit, -1, l.choix)}
+                              className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-xs font-bold"
+                              aria-label="Retirer un exemplaire"
+                            >
+                              −
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => ajouter(l.produit, 1, l.choix)}
+                              disabled={qtyProduit(l.produit.id) >= plafond(l.produit)}
+                              className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-xs font-bold disabled:opacity-40"
+                              aria-label="Ajouter un exemplaire"
+                            >
+                              +
+                            </button>
+                          </span>
                         </span>
-                        <span>{euros(l.produit.price_cents * l.qty)}</span>
+                        <span className="whitespace-nowrap">{euros(l.prixUnitaire * l.qty)}</span>
                       </div>
                     ))}
                     <div className="border-t border-slate-200 pt-2 flex justify-between font-semibold">

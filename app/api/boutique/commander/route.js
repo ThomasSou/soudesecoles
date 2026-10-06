@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "../../../lib/supabaseServerAdmin";
 import { createCheckoutIntent, isHelloAssoConfigured } from "../../../lib/helloasso";
 import { SITE_URL } from "../../../lib/emailBlocks";
+import { appliquerChoix, quantitesVendues } from "../../../lib/boutiqueOptions";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -58,7 +59,7 @@ export async function POST(request) {
   const productIds = items.map((it) => it.productId).filter(Boolean);
   const { data: products, error: productsError } = await admin
     .from("shop_products")
-    .select("id, name, price_cents, active, boutiques(active, date_fermeture)")
+    .select("*, boutiques(active, date_fermeture)")
     .in("id", productIds);
 
   if (productsError) {
@@ -70,6 +71,32 @@ export async function POST(request) {
   let totalCents = 0;
   const maintenant = new Date();
 
+  // Quantité demandée par produit (toutes personnalisations confondues), pour
+  // contrôler les produits à quantité limitée.
+  const demandeParProduit = {};
+  for (const it of items) {
+    const q = Math.max(1, Math.min(50, Number(it.qty) || 0));
+    demandeParProduit[it.productId] = (demandeParProduit[it.productId] || 0) + q;
+  }
+  const vendues = (products || []).some((p) => p.max_quantity != null)
+    ? await quantitesVendues(admin)
+    : {};
+  for (const p of products || []) {
+    if (p.max_quantity == null) continue;
+    const restant = Math.max(0, p.max_quantity - (vendues[p.id] || 0));
+    if ((demandeParProduit[p.id] || 0) > restant) {
+      return NextResponse.json(
+        {
+          error:
+            restant === 0
+              ? `« ${p.name} » est épuisé.`
+              : `Il ne reste que ${restant} exemplaire${restant > 1 ? "s" : ""} de « ${p.name} ».`,
+        },
+        { status: 409 }
+      );
+    }
+  }
+
   for (const it of items) {
     const product = productById.get(it.productId);
     const qty = Math.max(1, Math.min(50, Number(it.qty) || 0));
@@ -79,8 +106,17 @@ export async function POST(request) {
     if (!product || !product.active || !boutiqueOuverte || qty <= 0) {
       return NextResponse.json({ error: "Un des articles du panier n'est plus disponible." }, { status: 400 });
     }
-    orderItems.push({ productId: product.id, name: product.name, unitPriceCents: product.price_cents, qty });
-    totalCents += product.price_cents * qty;
+    // Personnalisations : validées et chiffrées côté serveur (supplément
+    // éventuel), jamais prises telles quelles depuis le client.
+    const perso = appliquerChoix(product.options, it.choix);
+    if (perso.error) {
+      return NextResponse.json({ error: `${product.name} : ${perso.error}` }, { status: 400 });
+    }
+    const unitPriceCents = product.price_cents + perso.extraCents;
+    const ligne = { productId: product.id, name: product.name, unitPriceCents, qty };
+    if (perso.details.length > 0) ligne.options = perso.details;
+    orderItems.push(ligne);
+    totalCents += unitPriceCents * qty;
   }
 
   if (totalCents <= 0) {
@@ -107,7 +143,13 @@ export async function POST(request) {
     return NextResponse.json({ error: orderError.message }, { status: 500 });
   }
 
-  const itemName = orderItems.map((it) => `${it.qty}x ${it.name}`).join(", ") || "Boutique Sou des Écoles";
+  const itemName =
+    orderItems
+      .map(
+        (it) =>
+          `${it.qty}x ${it.name}${it.options ? ` (${it.options.map((o) => o.value).join(", ")})` : ""}`
+      )
+      .join(", ") || "Boutique Sou des Écoles";
 
   let intent;
   try {

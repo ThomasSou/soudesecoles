@@ -3,7 +3,142 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import AdminShell from "../admin-shell";
 
-const VIDE_PRODUIT = { name: "", description: "", priceEuros: "", category: "", boutiqueId: "", active: true };
+const VIDE_PRODUIT = {
+  name: "",
+  description: "",
+  priceEuros: "",
+  category: "",
+  boutiqueId: "",
+  active: true,
+  maxQuantity: "",
+  options: [],
+};
+
+const centsEnEuros = (c) => (c ? (c / 100).toString() : "");
+const eurosEnCents = (v) => {
+  const n = Math.round(Number(String(v).replace(",", ".")) * 100);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+
+// Éditeur des personnalisations d'un produit : choix dans une liste (taille,
+// couleur...) avec supplément éventuel, ou texte libre (ex. à graver).
+function EditeurOptions({ options, onChange }) {
+  const maj = (i, patch) => onChange(options.map((o, k) => (k === i ? { ...o, ...patch } : o)));
+  const majChoix = (i, j, patch) =>
+    maj(i, { choices: options[i].choices.map((c, k) => (k === j ? { ...c, ...patch } : c)) });
+
+  return (
+    <div className="border border-slate-200 rounded-lg p-3 space-y-3 bg-slate-50">
+      <div>
+        <p className="text-xs font-semibold text-slate-500">Personnalisations (facultatif)</p>
+        <p className="text-xs text-slate-400">
+          Ex. Taille (S, M, L), Couleur, ou un texte à ajouter. Chaque choix peut avoir un supplément de prix.
+        </p>
+      </div>
+      {options.map((o, i) => (
+        <div key={o.id || i} className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              placeholder="Nom (ex. Taille)"
+              value={o.label || ""}
+              onChange={(e) => maj(i, { label: e.target.value })}
+              className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1 min-w-[140px]"
+            />
+            <select
+              value={o.type || "choix"}
+              onChange={(e) =>
+                maj(i, e.target.value === "texte"
+                  ? { type: "texte", extraCents: 0 }
+                  : { type: "choix", choices: o.choices?.length ? o.choices : [{ label: "", extraCents: 0 }] })
+              }
+              className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm"
+            >
+              <option value="choix">Choix dans une liste</option>
+              <option value="texte">Texte libre</option>
+            </select>
+            <label className="flex items-center gap-1 text-xs text-slate-600">
+              <input
+                type="checkbox"
+                checked={Boolean(o.required)}
+                onChange={(e) => maj(i, { required: e.target.checked })}
+              />
+              Obligatoire
+            </label>
+            <button
+              type="button"
+              onClick={() => onChange(options.filter((_, k) => k !== i))}
+              className="text-xs text-red-600"
+            >
+              Supprimer
+            </button>
+          </div>
+
+          {o.type === "texte" ? (
+            <label className="flex items-center gap-2 text-xs text-slate-600">
+              Supplément si rempli (€) :
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={centsEnEuros(o.extraCents)}
+                onChange={(e) => maj(i, { extraCents: eurosEnCents(e.target.value) })}
+                className="border border-slate-300 rounded-lg px-2 py-1 text-sm w-24"
+              />
+            </label>
+          ) : (
+            <div className="space-y-1.5">
+              {(o.choices || []).map((c, j) => (
+                <div key={j} className="flex items-center gap-2">
+                  <input
+                    placeholder="Choix (ex. M)"
+                    value={c.label || ""}
+                    onChange={(e) => majChoix(i, j, { label: e.target.value })}
+                    className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1"
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="+ €"
+                    value={centsEnEuros(c.extraCents)}
+                    onChange={(e) => majChoix(i, j, { extraCents: eurosEnCents(e.target.value) })}
+                    className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm w-24"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => maj(i, { choices: o.choices.filter((_, k) => k !== j) })}
+                    className="text-xs text-slate-400 hover:text-red-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => maj(i, { choices: [...(o.choices || []), { label: "", extraCents: 0 }] })}
+                className="text-xs font-semibold text-sou-blue"
+              >
+                + Ajouter un choix
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() =>
+          onChange([
+            ...options,
+            { id: `o${Date.now().toString(36)}`, label: "", type: "choix", required: false, choices: [{ label: "", extraCents: 0 }] },
+          ])
+        }
+        className="text-sm font-semibold text-sou-blue"
+      >
+        + Ajouter une personnalisation
+      </button>
+    </div>
+  );
+}
 
 function euros(cents) {
   return (cents / 100).toFixed(2).replace(".", ",") + " €";
@@ -120,6 +255,29 @@ function ProduitForm({ initial, boutiques, boutiqueParDefaut, onSubmit, onCancel
           <input ref={fileRef} type="file" accept="image/*" className="w-full text-sm" />
         </div>
       </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-semibold text-slate-500">
+            Quantité limite (facultatif)
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            placeholder="Illimité"
+            value={form.maxQuantity ?? ""}
+            onChange={(e) => setForm({ ...form, maxQuantity: e.target.value })}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            Nombre total d&apos;exemplaires vendables. Une fois atteint, le produit s&apos;affiche « épuisé ».
+          </p>
+        </div>
+      </div>
+      <EditeurOptions
+        options={form.options || []}
+        onChange={(options) => setForm({ ...form, options })}
+      />
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"
@@ -546,6 +704,8 @@ function BoutiqueAdmin({ accessToken }) {
                         boutiqueId: p.boutique_id,
                         active: p.active,
                         imageUrl: p.image_url,
+                        maxQuantity: p.max_quantity ?? "",
+                        options: Array.isArray(p.options) ? p.options : [],
                       }}
                       onSubmit={(form) => modifier(p.id, form)}
                       onCancel={() => setEnEdition(null)}
@@ -600,6 +760,10 @@ function BoutiqueAdmin({ accessToken }) {
                         </p>
                         <p className="text-xs text-slate-500">
                           {p.category || "Sans sous-catégorie"} · {euros(p.price_cents)}
+                          {p.max_quantity != null ? ` · limité à ${p.max_quantity}` : ""}
+                          {Array.isArray(p.options) && p.options.length > 0
+                            ? ` · ${p.options.map((o) => o.label).join(", ")}`
+                            : ""}
                         </p>
                       </div>
                       <button
@@ -669,9 +833,19 @@ function BoutiqueAdmin({ accessToken }) {
                       {c.buyer_phone ? ` — ${c.buyer_phone}` : ""})
                     </span>
                   </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {(c.items || []).map((it) => `${it.qty}x ${it.name}`).join(", ")}
-                  </p>
+                  <ul className="text-xs text-slate-500 mt-1 space-y-0.5">
+                    {(c.items || []).map((it, k) => (
+                      <li key={k}>
+                        {it.qty}x {it.name}
+                        {Array.isArray(it.options) && it.options.length > 0 && (
+                          <span className="text-slate-700 font-medium">
+                            {" — "}
+                            {it.options.map((o) => `${o.label} : ${o.value}`).join(" · ")}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
                 <div className="text-right">
                   <p className="font-semibold text-sou-blue">{euros(c.total_cents)}</p>

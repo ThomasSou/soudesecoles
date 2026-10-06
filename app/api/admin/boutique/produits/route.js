@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
+import { nettoyerOptions, nettoyerQuantiteMax } from "../../../../lib/boutiqueOptions";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -53,9 +54,20 @@ export async function POST(request) {
     return NextResponse.json({ error: "Le prix est invalide." }, { status: 400 });
   }
 
+  const { options, error: optionsError } = nettoyerOptions(body?.options);
+  if (optionsError) return NextResponse.json({ error: optionsError }, { status: 400 });
+
+  // Colonnes ajoutées par la migration 0052 : écrites seulement si utilisées,
+  // pour que la création d'un produit simple marche même avant la migration.
+  const extras = {};
+  const maxQuantity = nettoyerQuantiteMax(body?.maxQuantity);
+  if (maxQuantity !== undefined && maxQuantity !== null) extras.max_quantity = maxQuantity;
+  if (options.length > 0) extras.options = options;
+
   const { data, error } = await auth.admin
     .from("shop_products")
     .insert({
+      ...extras,
       name,
       slug: `${slugify(name)}-${Date.now().toString(36)}`,
       description: body?.description?.trim() || null,

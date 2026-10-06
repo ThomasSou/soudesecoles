@@ -43,7 +43,14 @@ export async function confirmOrderIfPaid(orderId) {
 
   if (updated?.family_id) {
     const label = (updated.items || [])
-      .map((it) => `${it.qty}x ${it.name}`)
+      .map(
+        (it) =>
+          `${it.qty}x ${it.name}${
+            Array.isArray(it.options) && it.options.length > 0
+              ? ` (${it.options.map((o) => o.value).join(", ")})`
+              : ""
+          }`
+      )
       .join(", ");
     await admin.from("purchases").insert({
       family_id: updated.family_id,

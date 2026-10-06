@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../../lib/adminAuth";
+import { nettoyerOptions, nettoyerQuantiteMax } from "../../../../../lib/boutiqueOptions";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -24,13 +25,34 @@ export async function PATCH(request, { params }) {
   if (body?.boutiqueId !== undefined) patch.boutique_id = body.boutiqueId || null;
   if (body?.active !== undefined) patch.active = Boolean(body.active);
   if (body?.position !== undefined) patch.position = Number(body.position) || 0;
+  // Colonnes de la migration 0052 : touchées seulement si le formulaire les
+  // envoie (la modification d'un produit reste possible avant la migration).
+  if (body?.maxQuantity !== undefined) patch.max_quantity = nettoyerQuantiteMax(body.maxQuantity);
+  if (body?.options !== undefined) {
+    const { options, error: optionsError } = nettoyerOptions(body.options);
+    if (optionsError) return NextResponse.json({ error: optionsError }, { status: 400 });
+    patch.options = options;
+  }
 
-  const { data, error } = await auth.admin
+  let { data, error } = await auth.admin
     .from("shop_products")
     .update(patch)
     .eq("id", params.id)
     .select()
     .single();
+
+  // Migration 0052 pas encore passée : les colonnes max_quantity / options
+  // n'existent pas. On réessaie sans elles pour ne pas bloquer toute
+  // modification de produit en attendant.
+  if (error && /max_quantity|options/.test(error.message || "")) {
+    const { max_quantity, options, ...sansNouveautes } = patch;
+    ({ data, error } = await auth.admin
+      .from("shop_products")
+      .update(sansNouveautes)
+      .eq("id", params.id)
+      .select()
+      .single());
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, product: data });
