@@ -1,10 +1,14 @@
 import Link from "next/link";
 import Image from "next/image";
-import { EVENTS, formatEventDates, sortEvents } from "./evenements/data";
+import { formatEventDates, sortEvents } from "./evenements/data";
+import { chargerEvenements } from "./lib/evenementsSite";
 
-const EVENTS_PREVIEW = sortEvents(EVENTS).slice(0, 5);
+// Les prochains temps forts viennent du calendrier géré dans le back-office.
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const EVENTS_PREVIEW = sortEvents(await chargerEvenements()).slice(0, 5);
   return (
     <>
       <section className="bg-gradient-to-b from-slate-50 to-white">

@@ -16,6 +16,7 @@ export const PERMISSIONS = [
   { key: "remboursements", label: "Demandes de remboursement des parents" },
   { key: "comptabilite", label: "Comptabilité (dépenses, recettes, rapprochement bancaire)" },
   { key: "benevoles", label: "Créneaux bénévoles" },
+  { key: "evenements", label: "Calendrier des événements du site (créer, modifier)" },
   { key: "statistiques", label: "Statistiques de fréquentation" },
   { key: "acces", label: "Gestion des accès et permissions du bureau" },
 ];

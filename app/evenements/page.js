@@ -1,10 +1,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { PageHeader } from "../components";
-import { EVENTS, formatEventDates, isUpcoming, sortEvents } from "./data";
+import { formatEventDates, isUpcoming, sortEvents } from "./data";
+import { chargerEvenements } from "../lib/evenementsSite";
 
-export default function EvenementsPage() {
-  const events = sortEvents(EVENTS);
+// Calendrier géré depuis le back-office : toujours lu à jour.
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
+export default async function EvenementsPage() {
+  const events = sortEvents(await chargerEvenements());
 
   return (
     <>

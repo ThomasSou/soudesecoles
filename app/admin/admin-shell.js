@@ -21,6 +21,7 @@ const ONGLETS = [
   { href: "/admin/comptabilite", label: "Comptabilité", perm: "comptabilite" },
   { href: "/admin/compta-evenement", label: "Compta de mon événement", perm: "compta_evenements" },
   { href: "/admin/benevoles", label: "Bénévoles", perm: "benevoles" },
+  { href: "/admin/evenements", label: "Événements", perm: "evenements" },
   { href: "/admin/messages", label: "Messages reçus", perm: "messages" },
   { href: "/admin/statistiques", label: "Statistiques", perm: "statistiques" },
   { href: "/admin/acces", label: "Accès", perm: "acces" },
