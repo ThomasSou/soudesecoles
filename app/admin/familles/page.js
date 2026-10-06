@@ -36,10 +36,12 @@ function statutInvitation(p) {
 }
 
 function nomFamille(f) {
-  return f.parents.length > 0
-    ? f.parents
-        .map((p) => `${p.first_name || ""} ${p.last_name || ""}`.trim())
-        .join(" & ")
+  // Un parent sans nom (fiche vidée) ne doit pas laisser un « & » orphelin.
+  const noms = f.parents
+    .map((p) => `${p.first_name || ""} ${p.last_name || ""}`.trim())
+    .filter(Boolean);
+  return noms.length > 0
+    ? noms.join(" & ")
     : f.children.length > 0
     ? `Famille ${f.children[0].last_name}`
     : "Famille sans nom";
@@ -325,6 +327,43 @@ function ModifierParent({ parent, token, onDone }) {
       </button>
       {error && <span className="text-xs text-red-600 w-full">{error}</span>}
     </form>
+  );
+}
+
+// Retire un parent de la famille (ex. parent qui n'a pas la garde des enfants).
+function RetirerParent({ parent, token, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const nom = `${parent.first_name || ""} ${parent.last_name || ""}`.trim() || "ce parent";
+
+  async function retirer() {
+    const compte = parent.authActivated
+      ? " Son compte de connexion est conservé, mais il ne verra plus rien de cette famille."
+      : "";
+    if (!confirm(`Retirer ${nom} de cette famille ?${compte}`)) return;
+    setBusy(true);
+    const res = await fetch("/api/admin/familles", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ type: "retirer_parent", parentId: parent.id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      alert(data.error || "Impossible de retirer ce parent.");
+      return;
+    }
+    onDone();
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={retirer}
+      disabled={busy}
+      className="text-xs text-slate-400 hover:text-red-600 ml-1 disabled:opacity-60"
+    >
+      retirer
+    </button>
   );
 }
 
@@ -663,6 +702,7 @@ function ListeFamilles({ token }) {
                         <li key={p.id}>
                           {p.first_name} {p.last_name}
                           <ModifierParent parent={p} token={token} onDone={charger} />
+                          <RetirerParent parent={p} token={token} onDone={charger} />
                           {p.email && <span className="text-slate-400"> — {p.email}</span>}
                           {p.email_opt_out && (
                             <span className="text-red-600 text-xs ml-1">

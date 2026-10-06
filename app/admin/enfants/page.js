@@ -50,11 +50,12 @@ function ListeEnfants({ token }) {
     return familles.flatMap((f) => {
       const adhesion = f.memberships.find((m) => m.school_year === annee);
       const aJour = isMembershipValid(adhesion);
+      const nomsParents = f.parents
+        .map((p) => `${p.first_name || ""} ${p.last_name || ""}`.trim())
+        .filter(Boolean);
       const familyName =
-        f.parents.length > 0
-          ? f.parents
-              .map((p) => `${p.first_name || ""} ${p.last_name || ""}`.trim())
-              .join(" & ")
+        nomsParents.length > 0
+          ? nomsParents.join(" & ")
           : f.children.length > 0
           ? `Famille ${f.children[0].last_name}`
           : "Famille sans nom";

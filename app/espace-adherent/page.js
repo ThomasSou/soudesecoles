@@ -1083,7 +1083,7 @@ function CarteAdhesion({ membership, family, parents, anneeEnCours }) {
 
   const nomFamille =
     parents && parents.length > 0
-      ? parents.map((p) => `${p.first_name || ""} ${p.last_name || ""}`.trim()).join(" & ")
+      ? parents.map((p) => `${p.first_name || ""} ${p.last_name || ""}`.trim()).filter(Boolean).join(" & ") || "Famille adhérente"
       : "Famille adhérente";
 
   return (

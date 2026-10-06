@@ -286,6 +286,35 @@ export async function PATCH(request) {
     return NextResponse.json({ ok: true });
   }
 
+  // Retire un parent d'une famille (ex. parent qui n'a pas la garde). Une
+  // fiche sans compte de connexion ni accès bureau est supprimée ; sinon on
+  // la détache seulement de la famille (le compte est conservé mais ne voit
+  // plus rien de cette famille : l'accès se fait via family_id).
+  if (type === "retirer_parent") {
+    const { parentId } = body;
+    if (!parentId) {
+      return NextResponse.json({ error: "parentId manquant." }, { status: 400 });
+    }
+    const { data: p } = await auth.admin
+      .from("parents")
+      .select("id, auth_user_id, is_admin")
+      .eq("id", parentId)
+      .maybeSingle();
+    if (!p) return NextResponse.json({ error: "Parent introuvable." }, { status: 404 });
+    if (p.id === auth.parent.id) {
+      return NextResponse.json({ error: "Vous ne pouvez pas vous retirer vous-même d'une famille." }, { status: 400 });
+    }
+
+    if (!p.auth_user_id && !p.is_admin) {
+      const { error: eDel } = await auth.admin.from("parents").delete().eq("id", parentId);
+      if (!eDel) return NextResponse.json({ ok: true, supprime: true });
+      // Fiche encore référencée ailleurs (invitation, demande...) : on détache.
+    }
+    const { error } = await auth.admin.from("parents").update({ family_id: null }).eq("id", parentId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, supprime: false });
+  }
+
   if (type === "enfant") {
     const { childId, firstName, lastName } = body;
     if (!childId) {

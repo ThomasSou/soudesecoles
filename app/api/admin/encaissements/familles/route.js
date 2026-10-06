@@ -30,7 +30,7 @@ export async function GET(request) {
 
   const familles = Array.from(parFamille.entries()).map(([id, parents]) => ({
     id,
-    label: parents.map((p) => `${p.firstName} ${p.lastName}`.trim()).join(" & "),
+    label: parents.map((p) => `${p.firstName || ""} ${p.lastName || ""}`.trim()).filter(Boolean).join(" & "),
     parents,
   }));
 
