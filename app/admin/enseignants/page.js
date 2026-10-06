@@ -658,8 +658,9 @@ function OngletBilan({ token }) {
 
       <h3 className="font-semibold text-slate-700 mb-1">Financement par classe</h3>
       <p className="text-xs text-slate-400 mb-3">
-        Le montant entier d&apos;un devis ou d&apos;une facture est compté pour chaque classe
-        concernée : les lignes peuvent se recouper (un car partagé compte pour chaque classe).
+        Le montant d&apos;un devis ou d&apos;une facture est réparti à parts égales entre les classes
+        concernées (500 € pour 2 classes = 250 € chacune). Le budget réellement utilisé par
+        classe, au fur et à mesure, correspond aux factures.
       </p>
       {bilan.classes.length === 0 ? (
         <p className="text-slate-500 text-sm">
@@ -671,9 +672,8 @@ function OngletBilan({ token }) {
             <thead>
               <tr className="text-left text-slate-500 border-b border-slate-200">
                 <th className="py-2 pr-4">Classe</th>
-                <th className="py-2 pr-4">Devis validés</th>
-                <th className="py-2 pr-4">Factures</th>
-                <th className="py-2">Total classe</th>
+                <th className="py-2 pr-4">Devis validés (part)</th>
+                <th className="py-2">Facturé : budget utilisé</th>
               </tr>
             </thead>
             <tbody>
@@ -684,15 +684,21 @@ function OngletBilan({ token }) {
                     {euros(c.devis_valides_cents)}{" "}
                     <span className="text-slate-400 text-xs">({c.devis_valides_count})</span>
                   </td>
-                  <td className="py-2 pr-4">
-                    {euros(c.factures_cents)}{" "}
-                    <span className="text-slate-400 text-xs">({c.factures_count})</span>
-                  </td>
                   <td className="py-2 font-semibold text-slate-800">
-                    {euros(c.devis_valides_cents + c.factures_cents)}
+                    {euros(c.factures_cents)}{" "}
+                    <span className="text-slate-400 text-xs font-normal">({c.factures_count})</span>
                   </td>
                 </tr>
               ))}
+              <tr className="border-t border-slate-300 font-semibold text-slate-800">
+                <td className="py-2 pr-4">Total</td>
+                <td className="py-2 pr-4">
+                  {euros(bilan.classes.reduce((s, c) => s + c.devis_valides_cents, 0))}
+                </td>
+                <td className="py-2">
+                  {euros(bilan.classes.reduce((s, c) => s + c.factures_cents, 0))}
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>

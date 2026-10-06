@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 import { currentSchoolYear } from "../../../../lib/anneeScolaire";
 import { comparerClasses } from "../../../../lib/classes";
+import { repartirEgal } from "../../../../lib/comptaRepartition";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -11,11 +12,10 @@ export const fetchCache = "force-no-store";
 //   - détail par statut
 //   - récap PAR CLASSE : combien le Sou a financé pour chaque classe
 //
-// Attribution par classe : le montant ENTIER d'un devis / d'une facture est
-// compté pour CHAQUE classe qu'il concerne (un car partagé par 3 classes
-// « bénéficie » aux 3). Les colonnes par classe peuvent donc se recouper et
-// leur somme dépasser le total réel — c'est voulu, la question posée est
-// « combien pour la classe X ».
+// Attribution par classe : le montant d'un devis / d'une facture est RÉPARTI
+// à parts égales entre les classes qu'il concerne (un devis de 500 € pour 2
+// classes = 250 € chacune ; le reste en centimes va aux premières classes).
+// La somme des classes redonne donc exactement le total réel.
 //
 // Filtre : ?annee=YYYY-YYYY (année scolaire en cours par défaut).
 export async function GET(request) {
@@ -98,16 +98,25 @@ export async function GET(request) {
       factures_count: 0,
     });
 
-  for (const l of qClassesRes.data || []) {
-    const r = ligne(l.class_label);
-    r.devis_valides_cents += montantDevis[l.quote_id] || 0;
-    r.devis_valides_count += 1;
-  }
-  for (const l of iClassesRes.data || []) {
-    const r = ligne(l.class_label);
-    r.factures_cents += montantFacture[l.invoice_id] || 0;
-    r.factures_count += 1;
-  }
+  // Regroupe les classes de chaque devis / facture, puis répartit le montant.
+  const classesParDocument = (lignes, cle) => {
+    const out = {};
+    for (const l of lignes || []) (out[l[cle]] ||= []).push(l.class_label);
+    return out;
+  };
+  const repartir = (classesParDoc, montants, champCents, champCount) => {
+    for (const [id, labels] of Object.entries(classesParDoc)) {
+      const classes = [...new Set(labels)].sort(comparerClasses);
+      const parts = repartirEgal(montants[id] || 0, classes.length);
+      classes.forEach((c, i) => {
+        const r = ligne(c);
+        r[champCents] += parts[i];
+        r[champCount] += 1;
+      });
+    }
+  };
+  repartir(classesParDocument(qClassesRes.data, "quote_id"), montantDevis, "devis_valides_cents", "devis_valides_count");
+  repartir(classesParDocument(iClassesRes.data, "invoice_id"), montantFacture, "factures_cents", "factures_count");
 
   const classes = Object.values(parClasse).sort((a, b) => comparerClasses(a.classe, b.classe));
 
