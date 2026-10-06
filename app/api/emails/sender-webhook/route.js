@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "../../../lib/supabaseServerAdmin";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Reçoit les évènements du prestataire Sender (livré, ouvert, cliqué,
 // rebond...) pour les invitations envoyées via app/lib/invitations.js.

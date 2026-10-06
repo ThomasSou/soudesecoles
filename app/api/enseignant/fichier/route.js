@@ -3,6 +3,7 @@ import { requireEnseignant } from "../../../lib/enseignantAuth";
 import { urlSignee } from "../../../lib/enseignantFichiers";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Décision D6 : un enseignant peut re-consulter SES propres pièces (devis,
 // facture, RIB). Vérification stricte de propriété (la ligne doit appartenir

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "../../lib/supabaseServerAdmin";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 // Route temporaire, protegee par le meme jeton que les autres routes admin.
 // Genere directement un lien d'action (recovery) sans passer par l'envoi
 // d'e-mail Supabase, pour contourner un souci de lien grille avant que

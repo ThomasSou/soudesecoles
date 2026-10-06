@@ -4,6 +4,7 @@ import { televerserFichier } from "../../../lib/enseignantFichiers";
 import { currentSchoolYear } from "../../../lib/anneeScolaire";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Liste des devis de l'enseignant connecté, le plus récent d'abord, avec les
 // classes concernées.

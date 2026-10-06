@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { confirmEncaissementIfPaid } from "../../../lib/encaissementsLibres";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Statut public d'un encaissement libre, consulté depuis la page de retour
 // HelloAsso (paiement fait par un membre du bureau, ou par un parent depuis

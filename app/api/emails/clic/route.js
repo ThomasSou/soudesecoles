@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { incrementerStat } from "../../../lib/stats";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Redirection comptabilisée : les liens des e-mails passent par ici, on
 // enregistre le clic puis on renvoie immédiatement le lecteur vers sa

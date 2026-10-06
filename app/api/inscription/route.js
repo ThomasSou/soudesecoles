@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "../../lib/supabaseServerAdmin";
 import { CONTACT_EMAIL, sendMail } from "../../lib/mail";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 // Enregistre une demande d'inscription (parent d'élève de l'école Mick
 // Micheyl). La demande n'ouvre aucun compte : elle attend une validation
 // manuelle du bureau depuis le back-office (/admin/demandes).

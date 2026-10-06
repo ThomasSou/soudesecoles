@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "../../lib/supabaseServerAdmin";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Définit le mot de passe d'un compte à partir du jeton d'invitation envoyé
 // par e-mail (circuit maison utilisé quand Sender gère l'envoi — voir

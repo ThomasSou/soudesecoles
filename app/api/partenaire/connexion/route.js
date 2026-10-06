@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "../../../lib/supabaseServerAdmin";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Vérifie le code PIN d'un partenaire et renvoie son identité si le compte
 // est actif. Aucune connexion n'est requise : le PIN est le seul rempart,

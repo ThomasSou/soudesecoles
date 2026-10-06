@@ -3,6 +3,7 @@ import { createAdminClient } from "../../lib/supabaseServerAdmin";
 import { CONTACT_EMAIL, sendMail } from "../../lib/mail";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Reçoit un message du formulaire de contact (page publique ou espace
 // adhérent). Le message est TOUJOURS enregistré en base : c'est la source de

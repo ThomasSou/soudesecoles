@@ -3,6 +3,7 @@ import { createAdminClient } from "../../../../lib/supabaseServerAdmin";
 import { resolvePartenaire } from "../../../../lib/avantages";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Permet à un partenaire connecté de modifier un avantage qui lui
 // appartient (jamais celui d'un autre partenaire, ni un avantage interne).

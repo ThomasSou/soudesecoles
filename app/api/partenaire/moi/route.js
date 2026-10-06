@@ -6,6 +6,7 @@ import {
 } from "../../../lib/partenaires";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Tout ce dont l'espace partenaire connecté a besoin, en un seul appel
 // (comme /espace-adherent charge sa famille d'un coup) : profil, période

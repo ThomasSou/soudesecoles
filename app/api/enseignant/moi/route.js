@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireEnseignant } from "../../../lib/enseignantAuth";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Permet au front de savoir si l'utilisateur connecté est un enseignant / la
 // direction (et de récupérer son identité pour l'affichage). Même rôle que

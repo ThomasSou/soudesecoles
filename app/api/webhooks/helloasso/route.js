@@ -4,6 +4,7 @@ import { confirmMembershipIfPaid } from "../../../lib/adhesionPaiement";
 import { HELLOASSO_NOTIFICATION_IPS } from "../../../lib/helloasso";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Notification HelloAsso (à configurer côté HelloAsso : Organisation >
 // Paramètres > Notifications, une fois que Thomas y a accès). Tant que ce

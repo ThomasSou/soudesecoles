@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "../../../lib/supabaseServerAdmin";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Planning public des créneaux bénévoles — ouvert à tout visiteur, aucune
 // inscription requise pour consulter.

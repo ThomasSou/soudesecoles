@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "../../../lib/supabaseServerAdmin";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Identifie (facultativement) le visiteur s'il est connecté à son espace
 // adhérent, pour préremplir le formulaire d'inscription bénévole. Ne bloque

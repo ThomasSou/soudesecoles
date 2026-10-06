@@ -12,6 +12,7 @@ function formatCreneau(debut, fin) {
 }
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Inscrit un bénévole sur un ou plusieurs créneaux en une fois. Aucun
 // compte requis. La place restante est revérifiée ici, jamais fiée à ce

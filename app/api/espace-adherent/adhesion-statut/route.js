@@ -3,6 +3,9 @@ import { createAdminClient } from "../../../lib/supabaseServerAdmin";
 import { confirmMembershipIfPaid } from "../../../lib/adhesionPaiement";
 import { currentSchoolYear } from "../../../lib/anneeScolaire";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 // Vérifie si la cotisation en cours de paiement pour la famille du parent
 // connecté a bien été réglée. Revérifie systématiquement auprès de
 // HelloAsso (voir confirmMembershipIfPaid).

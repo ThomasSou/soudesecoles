@@ -3,6 +3,9 @@ import { createAdminClient } from "../../../lib/supabaseServerAdmin";
 import { createCheckoutIntent, isHelloAssoConfigured } from "../../../lib/helloasso";
 import { SITE_URL } from "../../../lib/emailBlocks";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 // Crée une commande boutique + une intention de paiement HelloAsso.
 // Ouvert à tout visiteur (pas d'authentification requise) : si un jeton de
 // session est fourni, on l'utilise UNIQUEMENT pour retrouver le parent

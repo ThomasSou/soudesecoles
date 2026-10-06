@@ -4,6 +4,7 @@ import { listerClassesAnnee } from "../../../lib/classes";
 import { currentSchoolYear } from "../../../lib/anneeScolaire";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Liste des classes de l'année scolaire en cours, dérivée des fiches enfants
 // (cf. app/lib/classes.js). Recalculée à chaque appel : elle se corrige

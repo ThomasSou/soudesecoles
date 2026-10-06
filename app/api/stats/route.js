@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { incrementerStat } from "../../lib/stats";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Collecte de statistiques SANS cookie et SANS donnée personnelle.
 // On n'enregistre ni adresse IP, ni identifiant de visiteur : uniquement un

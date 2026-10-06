@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "../../../../lib/supabaseServerAdmin";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Permet à un parent connecté de se désinscrire d'un créneau qu'il avait
 // pris. Ne supprime que ses propres inscriptions (vérifié via le jeton,

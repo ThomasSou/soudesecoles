@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "../../lib/supabaseServerAdmin";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8 Mo (factures scannées, RIB)
 const CATEGORIES = ["manifestation", "investissement", "fonctionnement", "autre"];

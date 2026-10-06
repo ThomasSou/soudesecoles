@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { confirmOrderIfPaid } from "../../../../lib/boutiqueOrders";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 // Statut d'une commande, consulté depuis la page de retour /boutique.
 // Revérifie systématiquement auprès de HelloAsso (voir confirmOrderIfPaid)
 // plutôt que de faire confiance au seul webhook, qui n'est pas encore

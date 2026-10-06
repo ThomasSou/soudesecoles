@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolvePartenaireSession } from "../../../../lib/partenaires";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // URL signée (5 min) vers un document déposé par le bureau, réservée au
 // partenaire concerné (on vérifie que le document lui appartient bien).

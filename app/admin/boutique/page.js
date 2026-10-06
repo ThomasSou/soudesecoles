@@ -220,6 +220,21 @@ function BoutiqueForm({ initial, onSubmit, onCancel }) {
   );
 }
 
+// Boutique affichée par défaut : celle qui est en cours (active et pas encore
+// fermée) ; s'il y en a plusieurs, celle qui ferme le plus tôt (sans date de
+// fermeture = en dernier). À défaut, la première de la liste.
+function boutiqueParDefaut(liste) {
+  const maintenant = Date.now();
+  const enCours = liste
+    .filter((b) => b.active && (!b.date_fermeture || new Date(b.date_fermeture).getTime() > maintenant))
+    .sort((a, b) => {
+      const da = a.date_fermeture ? new Date(a.date_fermeture).getTime() : Infinity;
+      const db = b.date_fermeture ? new Date(b.date_fermeture).getTime() : Infinity;
+      return da - db;
+    });
+  return (enCours[0] || liste[0])?.id || null;
+}
+
 function BoutiqueAdmin({ accessToken }) {
   const [boutiques, setBoutiques] = useState([]);
   const [boutiqueFiltre, setBoutiqueFiltre] = useState(null);
@@ -239,7 +254,7 @@ function BoutiqueAdmin({ accessToken }) {
     const data = await res.json();
     const liste = data.boutiques || [];
     setBoutiques(liste);
-    setBoutiqueFiltre((courant) => courant || liste[0]?.id || null);
+    setBoutiqueFiltre((courant) => courant || boutiqueParDefaut(liste));
     if (liste.length === 0) setChargement(false);
   }, [accessToken]);
 

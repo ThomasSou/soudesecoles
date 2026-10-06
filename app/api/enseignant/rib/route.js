@@ -3,6 +3,7 @@ import { requireEnseignant } from "../../../lib/enseignantAuth";
 import { televerserFichier } from "../../../lib/enseignantFichiers";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Liste des RIB déposés par l'enseignant connecté. On ne renvoie jamais le
 // contenu du fichier ni d'URL : juste le libellé et la date. La consultation

@@ -2,6 +2,7 @@ import { incrementerStat } from "../../../lib/stats";
 import { createAdminClient } from "../../../lib/supabaseServerAdmin";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Image transparente de 1x1 pixel, insérée en bas des e-mails. Son chargement
 // signale une ouverture. AUCUNE donnée personnelle : on incrémente seulement

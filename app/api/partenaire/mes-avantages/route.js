@@ -6,6 +6,7 @@ import {
 } from "../../../lib/partenaires";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Le partenaire connecté crée lui-même un avantage. Il part EN LIGNE
 // DIRECTEMENT (active: true), sans validation du bureau — c'est le choix de

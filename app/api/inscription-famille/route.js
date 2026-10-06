@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "../../lib/supabaseServerAdmin";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 // Route de secours : utilisee uniquement quand une personne est deja
 // authentifiee (compte cree via invitation admin ou demande approuvee) mais
 // que sa fiche famille n'existe pas encore cote base (ex. compte cree

@@ -3,6 +3,7 @@ import { requireEnseignant } from "../../../lib/enseignantAuth";
 import { CONTACT_EMAIL, sendMail } from "../../../lib/mail";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Message d'un enseignant / de la direction au bureau. Enregistré dans
 // `contact_messages` — la MÊME table que « Messages reçus » du back-office —

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "../../../lib/supabaseServerAdmin";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Catalogue public de la boutique — ouvert à tout visiteur, pas seulement
 // aux familles adhérentes. Chaque produit est rattaché à une boutique

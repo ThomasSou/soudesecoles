@@ -3,6 +3,7 @@ import { CONTACT_EMAIL, sendMail } from "../../../lib/mail";
 import { resolvePartenaireSession } from "../../../lib/partenaires";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Formulaire de contact de l'espace partenaire. Le message atterrit dans le
 // MÊME "Messages reçus" du back-office (table contact_messages), mais avec

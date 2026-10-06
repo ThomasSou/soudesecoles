@@ -3,6 +3,7 @@ import { createAdminClient } from "../../../lib/supabaseServerAdmin";
 import { resolveFamilleParToken, resolvePartenaire } from "../../../lib/avantages";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Liste tous les avantages actifs du partenaire connecté et indique, pour
 // la famille scannée, lesquels ont déjà été utilisés. Sert au panneau

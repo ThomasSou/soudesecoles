@@ -4,6 +4,7 @@ import { televerserFichier } from "../../../lib/enseignantFichiers";
 import { currentSchoolYear } from "../../../lib/anneeScolaire";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Liste des factures de l'enseignant connecté, avec les classes concernées.
 export async function GET(request) {

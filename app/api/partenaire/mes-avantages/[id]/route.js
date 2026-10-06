@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolvePartenaireSession, tracerEvenementAvantage } from "../../../../lib/partenaires";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Le partenaire connecté modifie un de SES avantages (jamais celui d'un
 // autre partenaire ni un avantage interne). Toute modification part en ligne

@@ -3,6 +3,7 @@ import { createAdminClient } from "../../../../lib/supabaseServerAdmin";
 import { resolvePartenaire } from "../../../../lib/avantages";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Permet à un partenaire connecté de créer lui-même un nouvel avantage,
 // sans passer par le back-office du Sou des Écoles.

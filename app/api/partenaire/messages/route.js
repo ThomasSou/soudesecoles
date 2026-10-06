@@ -7,6 +7,7 @@ import {
 } from "../../../lib/partenaires";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 

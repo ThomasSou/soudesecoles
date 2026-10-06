@@ -6,6 +6,7 @@ import { envoyerInvitationPartenaire } from "../../lib/partenaires";
 import { sendMail } from "../../lib/mail";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://sou-montmerle.fr";
 

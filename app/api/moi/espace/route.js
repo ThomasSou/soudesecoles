@@ -3,6 +3,7 @@ import { createAdminClient } from "../../../lib/supabaseServerAdmin";
 import { resoudreEspace } from "../../../lib/redirectionRole";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Renvoie l'espace d'accueil du compte connecté, pour qu'UNE SEULE page de
 // connexion redirige chacun vers le bon endroit après login :

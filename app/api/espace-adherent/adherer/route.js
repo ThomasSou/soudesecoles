@@ -4,6 +4,9 @@ import { createCheckoutIntent, isHelloAssoConfigured } from "../../../lib/helloa
 import { SITE_URL } from "../../../lib/emailBlocks";
 import { currentSchoolYear } from "../../../lib/anneeScolaire";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 const MONTANT_MIN = 17;
 
 // Démarre le paiement en ligne de la cotisation pour la famille du parent
