@@ -246,6 +246,9 @@ function BoutiqueAdmin({ accessToken }) {
   const [nouvelleBoutique, setNouvelleBoutique] = useState(false);
   const [boutiqueEnEdition, setBoutiqueEnEdition] = useState(null);
   const [chargement, setChargement] = useState(true);
+  // Produits cochés pour une action groupée (visibilité).
+  const [selection, setSelection] = useState([]);
+  const [majEnCours, setMajEnCours] = useState(false);
 
   const chargerBoutiques = useCallback(async () => {
     const res = await fetch("/api/admin/boutique/boutiques", {
@@ -281,6 +284,30 @@ function BoutiqueAdmin({ accessToken }) {
   useEffect(() => {
     charger();
   }, [charger]);
+
+  useEffect(() => {
+    setSelection([]);
+  }, [boutiqueFiltre]);
+
+  // Rend visibles ou masque plusieurs produits d'un coup (un PATCH par
+  // produit, en parallèle), sans passer par « Modifier » ligne par ligne.
+  async function changerVisibilite(ids, active) {
+    if (ids.length === 0) return;
+    setMajEnCours(true);
+    const resultats = await Promise.all(
+      ids.map((id) =>
+        fetch(`/api/admin/boutique/produits/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+          body: JSON.stringify({ active }),
+        }).then((r) => r.ok)
+      )
+    );
+    setMajEnCours(false);
+    if (resultats.some((ok) => !ok)) alert("Certains produits n'ont pas pu être modifiés. Réessayez.");
+    setSelection([]);
+    charger();
+  }
 
   async function creer(form) {
     const res = await fetch("/api/admin/boutique/produits", {
@@ -468,6 +495,42 @@ function BoutiqueAdmin({ accessToken }) {
                 />
               )}
 
+              {produits.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm">
+                  <label className="flex items-center gap-2 font-medium text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={selection.length === produits.length}
+                      onChange={(e) => setSelection(e.target.checked ? produits.map((p) => p.id) : [])}
+                    />
+                    Tout sélectionner
+                  </label>
+                  <span className="text-slate-400">
+                    {selection.length > 0
+                      ? `${selection.length} produit${selection.length > 1 ? "s" : ""} sélectionné${selection.length > 1 ? "s" : ""}`
+                      : "Cochez des produits pour les afficher ou les masquer en une fois"}
+                  </span>
+                  {selection.length > 0 && (
+                    <>
+                      <button
+                        onClick={() => changerVisibilite(selection, true)}
+                        disabled={majEnCours}
+                        className="bg-green-600 text-white font-semibold px-3 py-1.5 rounded-full disabled:opacity-50"
+                      >
+                        Rendre visibles
+                      </button>
+                      <button
+                        onClick={() => changerVisibilite(selection, false)}
+                        disabled={majEnCours}
+                        className="bg-slate-600 text-white font-semibold px-3 py-1.5 rounded-full disabled:opacity-50"
+                      >
+                        Masquer
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-3">
                 {produits.map((p, index) =>
                   enEdition === p.id ? (
@@ -492,6 +555,16 @@ function BoutiqueAdmin({ accessToken }) {
                       key={p.id}
                       className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-4"
                     >
+                      <input
+                        type="checkbox"
+                        aria-label={`Sélectionner ${p.name}`}
+                        checked={selection.includes(p.id)}
+                        onChange={(e) =>
+                          setSelection((courant) =>
+                            e.target.checked ? [...courant, p.id] : courant.filter((id) => id !== p.id)
+                          )
+                        }
+                      />
                       <div className="flex flex-col gap-1">
                         <button
                           type="button"
@@ -529,6 +602,17 @@ function BoutiqueAdmin({ accessToken }) {
                           {p.category || "Sans sous-catégorie"} · {euros(p.price_cents)}
                         </p>
                       </div>
+                      <button
+                        onClick={() => changerVisibilite([p.id], !p.active)}
+                        disabled={majEnCours}
+                        className={`text-xs font-semibold px-3 py-1 rounded-full border disabled:opacity-50 ${
+                          p.active
+                            ? "border-green-300 bg-green-50 text-green-700"
+                            : "border-slate-300 bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {p.active ? "Visible" : "Masqué"}
+                      </button>
                       <button
                         onClick={() => setEnEdition(p.id)}
                         className="text-sm text-sou-blue font-semibold"
