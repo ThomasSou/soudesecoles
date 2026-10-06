@@ -14,6 +14,15 @@ export default function AdminAccueilPage() {
 
 function TableauDeBord({ token, perms }) {
   const [stats, setStats] = useState(null);
+  const [alertes, setAlertes] = useState(null);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch("/api/admin/alertes", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setAlertes(d?.alertes || null))
+      .catch(() => {});
+  }, [token]);
 
   useEffect(() => {
     if (!token) return;
@@ -46,16 +55,18 @@ function TableauDeBord({ token, perms }) {
   }, [token, perms.demandes, perms.messages, perms.familles]);
 
   const cartes = [];
+  const urgent = (n) => (n > 0 ? "border-red-300 bg-red-50 hover:border-red-400" : "border-slate-200 hover:border-sou-blue");
+  const chiffre = (n) => (n > 0 ? "text-red-600" : "text-sou-blue");
 
   if (perms.demandes) {
     cartes.push(
       <Link
         key="demandes"
         href="/admin/demandes"
-        className="border border-slate-200 rounded-xl p-6 hover:border-sou-blue transition-colors"
+        className={`border rounded-xl p-6 transition-colors ${urgent(stats?.demandesEnAttente)}`}
       >
         <p className="text-sm text-slate-500">Demandes d&apos;inscription</p>
-        <p className="text-3xl font-bold text-sou-blue mt-1">
+        <p className={`text-3xl font-bold mt-1 ${chiffre(stats?.demandesEnAttente)}`}>
           {stats ? stats.demandesEnAttente : "—"}
         </p>
         <p className="text-sm text-slate-500 mt-1">en attente de validation</p>
@@ -68,13 +79,47 @@ function TableauDeBord({ token, perms }) {
       <Link
         key="messages"
         href="/admin/messages"
-        className="border border-slate-200 rounded-xl p-6 hover:border-sou-blue transition-colors"
+        className={`border rounded-xl p-6 transition-colors ${urgent(stats?.messagesNonTraites)}`}
       >
         <p className="text-sm text-slate-500">Messages reçus</p>
-        <p className="text-3xl font-bold text-sou-blue mt-1">
+        <p className={`text-3xl font-bold mt-1 ${chiffre(stats?.messagesNonTraites)}`}>
           {stats ? stats.messagesNonTraites : "—"}
         </p>
         <p className="text-sm text-slate-500 mt-1">non traités</p>
+      </Link>
+    );
+  }
+
+  if (perms.enseignants) {
+    const nb = alertes?.enseignants;
+    cartes.push(
+      <Link
+        key="enseignants"
+        href="/admin/enseignants"
+        className={`border rounded-xl p-6 transition-colors ${urgent(nb)}`}
+      >
+        <p className="text-sm text-slate-500">Enseignants</p>
+        <p className={`text-3xl font-bold mt-1 ${chiffre(nb)}`}>{alertes ? nb : "—"}</p>
+        <p className="text-sm text-slate-500 mt-1">
+          {alertes
+            ? `${alertes.devis} devis à valider, ${alertes.factures} facture(s) à rembourser`
+            : "devis et factures à traiter"}
+        </p>
+      </Link>
+    );
+  }
+
+  if (perms.remboursements) {
+    const nb = alertes?.remboursements;
+    cartes.push(
+      <Link
+        key="remboursements"
+        href="/admin/remboursements"
+        className={`border rounded-xl p-6 transition-colors ${urgent(nb)}`}
+      >
+        <p className="text-sm text-slate-500">Remboursements</p>
+        <p className={`text-3xl font-bold mt-1 ${chiffre(nb)}`}>{alertes ? nb : "—"}</p>
+        <p className="text-sm text-slate-500 mt-1">demandes de parents à traiter</p>
       </Link>
     );
   }

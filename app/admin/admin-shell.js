@@ -26,6 +26,14 @@ const ONGLETS = [
   { href: "/admin/acces", label: "Accès", perm: "acces" },
 ];
 
+// Quelle alerte (cf. app/lib/alertes.js) met en avant quelle entrée du menu.
+const CLE_ALERTE = {
+  "/admin/demandes": "demandes",
+  "/admin/messages": "messages",
+  "/admin/enseignants": "enseignants",
+  "/admin/remboursements": "remboursements",
+};
+
 // Enveloppe commune au back-office : vérifie que l'utilisateur connecté fait
 // partie du bureau, puis affiche la navigation (filtrée selon ses droits) et
 // le contenu. `children` est une fonction qui reçoit le jeton d'accès et le
@@ -36,6 +44,7 @@ export default function AdminShell({ title, children }) {
   const [state, setState] = useState("chargement");
   const [accessToken, setAccessToken] = useState(null);
   const [parent, setParent] = useState(null);
+  const [alertes, setAlertes] = useState(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -67,6 +76,16 @@ export default function AdminShell({ title, children }) {
 
     check();
   }, [router]);
+
+  // Ce qui attend un traitement : les entrées concernées du menu passent en
+  // gras rouge avec le nombre d'éléments, pour attirer l'œil.
+  useEffect(() => {
+    if (!accessToken) return;
+    fetch("/api/admin/alertes", { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setAlertes(d?.alertes || null))
+      .catch(() => {});
+  }, [accessToken, pathname]);
 
   if (state === "chargement") {
     return (
@@ -112,17 +131,27 @@ export default function AdminShell({ title, children }) {
       <nav className="flex flex-wrap gap-1 border-b border-slate-200 mb-8">
         {onglets.map((o) => {
           const actif = pathname === o.href;
+          const aTraiter = alertes ? alertes[CLE_ALERTE[o.href]] || 0 : 0;
           return (
             <Link
               key={o.href}
               href={o.href}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-                actif
-                  ? "border-sou-blue text-sou-blue"
-                  : "border-transparent text-slate-500 hover:text-sou-blue"
+              className={`px-4 py-2 text-sm border-b-2 -mb-px ${
+                actif ? "border-sou-blue" : "border-transparent hover:text-sou-blue"
+              } ${
+                aTraiter > 0
+                  ? "font-bold text-red-600"
+                  : actif
+                  ? "font-medium text-sou-blue"
+                  : "font-medium text-slate-500"
               }`}
             >
               {o.label}
+              {aTraiter > 0 && (
+                <span className="ml-1.5 inline-block min-w-[1.25rem] rounded-full bg-red-600 px-1.5 text-center text-xs font-bold text-white">
+                  {aTraiter}
+                </span>
+              )}
             </Link>
           );
         })}
