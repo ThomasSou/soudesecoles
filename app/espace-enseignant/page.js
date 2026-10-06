@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../lib/supabaseClient";
+import { comparerClasses } from "../lib/classes";
 
 // ÉCHAFAUDAGE — espace enseignant / direction.
 // Squelette fonctionnel : mes devis, mes factures, mes RIB, contact bureau.
@@ -90,7 +91,28 @@ function SelecteurClasses({ classesConnues, valeur, onChange }) {
     );
   }
 
+  // Raccourcis « tous les enfants d'un niveau » : coche la classe de ce niveau
+  // ET les classes à double niveau qui le contiennent (ex. CM2 → CM2 et
+  // CM1-CM2). Le niveau individuel des élèves d'une classe double n'est pas
+  // enregistré en élémentaire : la classe double est retenue en entier.
+  const niveaux = [];
+  for (const classe of classesConnues) {
+    for (const n of classe.split("-")) if (!niveaux.includes(n)) niveaux.push(n);
+  }
+  niveaux.sort(comparerClasses);
+  const classesDuNiveau = (n) => classesConnues.filter((c) => c.split("-").includes(n));
+  function basculeNiveau(n) {
+    const cibles = classesDuNiveau(n);
+    const toutes = cibles.every((c) => valeur.includes(c));
+    onChange(
+      toutes
+        ? valeur.filter((c) => !cibles.includes(c))
+        : [...new Set([...valeur, ...cibles])]
+    );
+  }
+
   return (
+    <div>
     <div className="flex flex-wrap gap-2">
       {classesConnues.map((classe) => {
         const actif = valeur.includes(classe);
@@ -107,6 +129,28 @@ function SelecteurClasses({ classesConnues, valeur, onChange }) {
           </button>
         );
       })}
+    </div>
+    <p className="text-xs text-slate-400 mt-3 mb-1">
+      Ou tous les élèves d&apos;un niveau (inclut aussi les classes à double niveau qui le contiennent) :
+    </p>
+    <div className="flex flex-wrap gap-2">
+      {niveaux.map((n) => {
+        const cibles = classesDuNiveau(n);
+        const actif = cibles.every((c) => valeur.includes(c));
+        return (
+          <button
+            key={n}
+            type="button"
+            onClick={() => basculeNiveau(n)}
+            className={`text-xs font-medium px-3 py-1.5 rounded-full border border-dashed ${
+              actif ? "border-sou-blue bg-sou-blue text-white" : "border-slate-300 text-slate-600"
+            }`}
+          >
+            Tous les {n}
+          </button>
+        );
+      })}
+    </div>
     </div>
   );
 }

@@ -445,6 +445,22 @@ function OngletComptes({ token }) {
     recharger();
   }
 
+  async function supprimer(c) {
+    const nom = `${c.firstName || ""} ${c.lastName || ""}`.trim() || c.email;
+    if (!confirm(`Supprimer définitivement l'accès de ${nom} ?`)) return;
+    const res = await fetch("/api/admin/enseignants/comptes", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ id: c.id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(data.error || "Suppression impossible.");
+      return;
+    }
+    recharger();
+  }
+
   return (
     <div>
       <form onSubmit={inviter} className="border border-slate-200 rounded-xl p-4 mb-6 space-y-3">
@@ -528,6 +544,12 @@ function OngletComptes({ token }) {
                   className="border border-slate-300 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full"
                 >
                   {c.active ? "Désactiver" : "Réactiver"}
+                </button>
+                <button
+                  onClick={() => supprimer(c)}
+                  className="border border-red-200 text-red-600 text-xs font-semibold px-3 py-1.5 rounded-full"
+                >
+                  Supprimer
                 </button>
               </div>
             </li>

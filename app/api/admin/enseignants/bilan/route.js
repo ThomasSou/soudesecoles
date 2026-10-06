@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 import { currentSchoolYear } from "../../../../lib/anneeScolaire";
+import { comparerClasses } from "../../../../lib/classes";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -108,9 +109,7 @@ export async function GET(request) {
     r.factures_count += 1;
   }
 
-  const classes = Object.values(parClasse).sort((a, b) =>
-    a.classe.localeCompare(b.classe, "fr")
-  );
+  const classes = Object.values(parClasse).sort((a, b) => comparerClasses(a.classe, b.classe));
 
   return NextResponse.json({
     ok: true,

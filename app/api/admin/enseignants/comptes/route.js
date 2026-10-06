@@ -8,17 +8,25 @@ export const fetchCache = "force-no-store";
 const ROLES = ["enseignant", "direction"];
 
 // Liste des comptes enseignants, avec l'état d'activation du compte de
-// connexion (auth_user_id présent = invitation activée).
+// connexion. auth_user_id est posé dès l'ENVOI de l'invitation (le compte est
+// créé à ce moment-là) : il ne prouve pas que la personne a activé son
+// compte. Seule une première connexion (last_sign_in_at) le prouve.
 export async function GET(request) {
   const auth = await requirePermission(request, "enseignants");
   if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const { data, error } = await auth.admin
-    .from("teachers")
-    .select("id, first_name, last_name, email, role, active, auth_user_id, invited_at, created_at")
-    .order("last_name");
+  const [{ data, error }, usersRes] = await Promise.all([
+    auth.admin
+      .from("teachers")
+      .select("id, first_name, last_name, email, role, active, auth_user_id, invited_at, created_at")
+      .order("last_name"),
+    auth.admin.auth.admin.listUsers({ perPage: 1000 }),
+  ]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const dernierConnexionParUser = new Map(
+    (usersRes?.data?.users || []).map((u) => [u.id, u.last_sign_in_at || null])
+  );
 
   const comptes = (data || []).map((t) => ({
     id: t.id,
@@ -27,7 +35,7 @@ export async function GET(request) {
     email: t.email,
     role: t.role,
     active: t.active,
-    compteActive: Boolean(t.auth_user_id),
+    compteActive: Boolean(t.auth_user_id && dernierConnexionParUser.get(t.auth_user_id)),
     invitedAt: t.invited_at,
     createdAt: t.created_at,
   }));
@@ -121,5 +129,63 @@ export async function PATCH(request) {
 
   const { error } = await auth.admin.from("teachers").update(update).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
+// Supprime définitivement un accès enseignant. Refusé dès que la personne a
+// des devis, factures ou RIB enregistrés : ils partiraient avec elle
+// (suppression en cascade) et la comptabilité perdrait son historique — il
+// faut alors se contenter de désactiver le compte. Le compte de connexion
+// n'est supprimé que s'il n'a jamais servi et n'appartient à aucun parent.
+export async function DELETE(request) {
+  const auth = await requirePermission(request, "enseignants");
+  if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  const body = await request.json().catch(() => null);
+  const id = body?.id;
+  if (!id) return NextResponse.json({ error: "Identifiant manquant." }, { status: 400 });
+
+  const { data: teacher } = await auth.admin
+    .from("teachers")
+    .select("id, auth_user_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!teacher) return NextResponse.json({ error: "Compte introuvable." }, { status: 404 });
+
+  const compter = async (table) => {
+    const { count } = await auth.admin
+      .from(table)
+      .select("id", { count: "exact", head: true })
+      .eq("teacher_id", id);
+    return count || 0;
+  };
+  const [devis, factures, ribs] = await Promise.all([
+    compter("teacher_quotes"),
+    compter("teacher_invoices"),
+    compter("teacher_ribs"),
+  ]);
+  if (devis + factures + ribs > 0) {
+    return NextResponse.json(
+      {
+        error:
+          "Ce compte a déjà des devis, factures ou RIB enregistrés : le supprimer les effacerait de la comptabilité. Désactivez-le plutôt.",
+      },
+      { status: 409 }
+    );
+  }
+
+  const { error } = await auth.admin.from("teachers").delete().eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (teacher.auth_user_id) {
+    const [{ data: user }, { data: parentLie }] = await Promise.all([
+      auth.admin.auth.admin.getUserById(teacher.auth_user_id),
+      auth.admin.from("parents").select("id").eq("auth_user_id", teacher.auth_user_id).maybeSingle(),
+    ]);
+    if (user?.user && !user.user.last_sign_in_at && !parentLie) {
+      await auth.admin.auth.admin.deleteUser(teacher.auth_user_id);
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }
