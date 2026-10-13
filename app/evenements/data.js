@@ -20,7 +20,9 @@ export const EVENTS = [
     name: "Marché de Noël",
     date: "2026-11-28",
     place: "Place du marché",
-    desc: "Marché artisanal et animations pour les familles, de 10h30 à 20h30.",
+    desc: "Marché artisanal et animations pour les familles, de 11h à 20h : 37 artisans, Père Noël, calèche et spectacle de feu.",
+    image: "/evenements/marche-de-noel-affiche.jpg",
+    hasPage: true,
   },
   {
     slug: "loto",
