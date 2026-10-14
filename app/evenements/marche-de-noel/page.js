@@ -62,7 +62,7 @@ export default function MarcheDeNoelPage() {
               ← Tous les événements
             </Link>
             <p className="mt-6 inline-block rounded-full bg-sou-gold/90 text-[#12392b] text-xs font-bold uppercase tracking-wider px-3 py-1">
-              3<sup>e</sup> édition
+              37 artisans
             </p>
             <h1 className="mt-4 text-4xl sm:text-6xl font-bold leading-[1.05]">
               Marché de Noël <span className="text-[#f2c879]">artisanal</span>

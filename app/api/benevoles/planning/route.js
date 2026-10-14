@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "../../../lib/supabaseServerAdmin";
+import { chargerEvenements } from "../../../lib/evenementsSite";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -76,10 +77,45 @@ export async function GET() {
   // données périmées à cause d'une mise en cache intermédiaire — on interdit
   // donc tout cache (CDN ou navigateur), pas seulement le "force-dynamic" de
   // Next.js qui ne l'empêche pas toujours pour un GET.
+  // Ordre d'affichage : la prochaine manifestation en premier (c'est elle qui
+  // s'ouvre par défaut sur la page publique), puis les suivantes par date,
+  // puis celles sans date connue, puis les manifestations passées. La date
+  // vient du calendrier des événements (rapprochement par nom) ; à défaut, du
+  // premier créneau à venir de la manifestation.
+  const norm = (t) =>
+    (t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+  const calendrier = await chargerEvenements();
+  const dateParNom = new Map(calendrier.map((e) => [norm(e.name), e.endDate || e.date]));
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+
+  const liste = evenements.map((e) => {
+    const ateliersE = ateliersParEvenement[e.id] || [];
+    let dateRef = dateParNom.get(norm(e.nom)) || null;
+    if (!dateRef) {
+      const futurs = ateliersE
+        .flatMap((a) => a.creneaux)
+        .map((c) => (c.debut || "").slice(0, 10))
+        .filter((d) => d >= aujourdhui)
+        .sort();
+      dateRef = futurs[0] || null;
+    }
+    return { ...e, ateliers: ateliersE, dateReference: dateRef };
+  });
+
+  const rang = (e) => (!e.dateReference ? 1 : e.dateReference >= aujourdhui ? 0 : 2);
+  liste.sort(
+    (a, b) =>
+      rang(a) - rang(b) ||
+      (rang(a) === 2
+        ? b.dateReference.localeCompare(a.dateReference)
+        : (a.dateReference || "").localeCompare(b.dateReference || "")) ||
+      a.nom.localeCompare(b.nom, "fr")
+  );
+
   return NextResponse.json(
     {
       ok: true,
-      evenements: evenements.map((e) => ({ ...e, ateliers: ateliersParEvenement[e.id] || [] })),
+      evenements: liste,
     },
     { headers: { "Cache-Control": "no-store, must-revalidate" } }
   );
