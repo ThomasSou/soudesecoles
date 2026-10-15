@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { analyserReleve, decoderFichier, tiersProbable } from "../../lib/releveCA";
+import { analyserReleve, decoderFichier, moyenDepuisType, tiersProbable } from "../../lib/releveCA";
 import { currentSchoolYear } from "../../lib/anneeScolaire";
 
 const euros = (cents) =>
@@ -437,6 +437,13 @@ function Operation({
               date_operation: op.date_operation,
               compte: op.compte,
               statut: "a_verifier",
+              // L'opération sort de notre compte : c'est le Sou qui a payé, et
+              // la nature de l'opération (virement, prélèvement, chèque…) donne
+              // le moyen de paiement.
+              paye_par: "sou",
+              paiement_statut: estDepense ? "paye" : undefined,
+              moyen_paiement: estDepense ? moyenDepuisType(op.type_operation) : undefined,
+              paiement_le: estDepense ? op.date_operation : undefined,
             }}
             onCancel={() => setCreation(false)}
             onDone={async (resultat) => {
