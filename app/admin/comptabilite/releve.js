@@ -558,6 +558,7 @@ function Operation({
       {op.statut === "a_pointer" && mode === "repartition" && (
         <RepartitionRapide
           op={op}
+          accessToken={accessToken}
           evenements={evenements}
           occupe={occupe}
           erreur={erreur}
@@ -575,7 +576,7 @@ function Operation({
 // Répartition rapide : une opération (par exemple le virement global de
 // HelloAsso) ventilée en plusieurs lignes de compta — manifestation,
 // investissement ou fonctionnement —, créées d'un coup et pointées.
-function RepartitionRapide({ op, evenements, occupe, erreur, onAnnuler, onValider }) {
+function RepartitionRapide({ op, accessToken, evenements, occupe, erreur, onAnnuler, onValider }) {
   const exercices = exercicesProposes();
   const exerciceDefaut = currentSchoolYear();
   const estDepense = op.sens === "depense";
@@ -593,6 +594,56 @@ function RepartitionRapide({ op, evenements, occupe, erreur, onAnnuler, onValide
   const [parts, setParts] = useState([vide(), vide()]);
   const [fournisseur, setFournisseur] = useState(tiersProbable(op));
   const [localErr, setLocalErr] = useState("");
+  const [lecture, setLecture] = useState(false);
+  const [info, setInfo] = useState("");
+  const [texteColle, setTexteColle] = useState("");
+  const [afficheTexte, setAfficheTexte] = useState(false);
+  const estHelloAsso = !estDepense && /helloasso/i.test(op.libelle);
+
+  // Attestation de versement HelloAsso : préremplit une part par campagne.
+  async function lireAttestation(corps) {
+    setLecture(true);
+    setLocalErr("");
+    setInfo("");
+    const res = await fetch("/api/admin/comptabilite/releve/helloasso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ operationId: op.id, ...corps }),
+    });
+    const d = await res.json().catch(() => ({}));
+    setLecture(false);
+    if (!res.ok) return setLocalErr(d.error || "Lecture impossible.");
+    setFournisseur("HelloAsso");
+    setParts(
+      d.parts.map((p) => ({
+        rubrique: p.rubrique,
+        evenementId: p.evenementId || "",
+        libelle: p.libelle,
+        montant: (p.montantCents / 100).toFixed(2),
+        annee: p.annee,
+      }))
+    );
+    setInfo(
+      `Attestation lue${d.numero ? ` (versement n°${d.numero})` : ""} : ${d.parts.length} part${d.parts.length > 1 ? "s" : ""} proposée${d.parts.length > 1 ? "s" : ""}. Vérifiez la rubrique de chacune (celles sans manifestation reconnue sont en « fonctionnement »).`
+    );
+  }
+
+  async function choisirPdf(e) {
+    const fichier = e.target.files?.[0];
+    e.target.value = "";
+    if (!fichier) return;
+    try {
+      const pdf = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(fr.result);
+        fr.onerror = () => reject(fr.error);
+        fr.readAsDataURL(fichier);
+      });
+      await lireAttestation({ pdf });
+    } catch {
+      setLocalErr("Lecture du fichier impossible.");
+    }
+  }
 
   const somme = parts.reduce((s, p) => s + centimes(p.montant), 0);
   const restant = op.reste_cents - somme;
@@ -639,6 +690,44 @@ function RepartitionRapide({ op, evenements, occupe, erreur, onAnnuler, onValide
         Répartissez les <strong>{euros(op.reste_cents)}</strong> de cette {estDepense ? "dépense" : "recette"} sur
         plusieurs lignes (par exemple une par manifestation). Chaque ligne est créée et pointée d&apos;un coup.
       </p>
+
+      {estHelloAsso && (
+        <div className="bg-white border border-slate-200 rounded-lg p-2 text-xs space-y-1.5">
+          <p>
+            <strong>Virement HelloAsso :</strong> importez l&apos;attestation de versement (le PDF reçu de
+            HelloAsso) pour répartir automatiquement par campagne.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="inline-block bg-sou-blue text-white font-semibold px-3 py-1.5 rounded-full cursor-pointer">
+              {lecture ? "Lecture…" : "Importer l'attestation (PDF)"}
+              <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={choisirPdf} disabled={lecture} />
+            </label>
+            <button type="button" onClick={() => setAfficheTexte((v) => !v)} className="text-slate-500 underline">
+              {afficheTexte ? "Masquer" : "ou coller le texte du PDF"}
+            </button>
+          </div>
+          {afficheTexte && (
+            <div className="space-y-1">
+              <textarea
+                value={texteColle}
+                onChange={(e) => setTexteColle(e.target.value)}
+                rows={4}
+                placeholder="Ouvrez le PDF, Ctrl+A puis Ctrl+C, et collez ici"
+                className="w-full border border-slate-200 rounded-lg p-2"
+              />
+              <button
+                type="button"
+                onClick={() => lireAttestation({ texte: texteColle })}
+                disabled={lecture || !texteColle.trim()}
+                className="border border-sou-blue text-sou-blue font-semibold px-3 py-1 rounded-full disabled:opacity-50"
+              >
+                Lire ce texte
+              </button>
+            </div>
+          )}
+          {info && <p className="text-green-700">{info}</p>}
+        </div>
+      )}
 
       <label className="block text-xs">
         {estDepense ? "Fournisseur" : "Origine"} (commun aux lignes)
