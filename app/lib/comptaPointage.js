@@ -225,10 +225,209 @@ export async function detacher(admin, op, ligneId = null) {
   }
   const { error: eOp } = await admin
     .from("compta_operations")
-    .update({ statut: "a_pointer", mode_pointage: null, note: null, pointee_le: null, pointee_par: null })
+    .update({ statut: "a_pointer", mode_pointage: null, note: "reouverte", pointee_le: null, pointee_par: null })
     .eq("id", op.id);
   if (eOp) return { error: eOp.message };
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// APPRENTISSAGE : une opération qui revient (frais bancaires, abonnement,
+// prélèvement mensuel…) est classée comme la fois précédente.
+//
+// Le « modèle » d'une opération vient de l'historique : les opérations déjà
+// pointées avec UNE seule ligne (ou écartées) qui portent la même signature
+// (nature de l'opération + nom du tiers, sans les numéros de facture ni les
+// références qui changent à chaque fois). Le modèle n'existe que si toutes les
+// fois précédentes ont été classées pareil : au moindre désaccord, on ne
+// devine rien.
+//
+// - Opérations « automatiques » de la banque (prélèvement, abonnement, frais,
+//   commission…) : la ligne est créée et pointée toute seule.
+// - Toutes les autres (virements, etc.) : le modèle est seulement PROPOSÉ,
+//   d'un clic. Jamais pour les espèces ni les chèques (le libellé ne dit rien
+//   de leur destination).
+// ---------------------------------------------------------------------------
+
+const TYPES_AUTOMATIQUES = ["prelevement", "abonnement", "retro", "frais", "commission", "agios", "interets", "cotisation"];
+const TYPES_NON_APPRIS = ["especes", "cheque"];
+
+export function signatureOperation(op) {
+  const type = normaliser(op.type_operation || "");
+  if (TYPES_NON_APPRIS.some((t) => type.includes(t))) return null;
+  const premier = String(op.detail || "").split(" · ")[0];
+  const mots = normaliser(premier)
+    .split(" ")
+    .filter((m) => m && !/\d/.test(m));
+  if (mots.length < 2) return null;
+  return `${op.sens}|${type}|${mots.join(" ")}`.slice(0, 200);
+}
+
+export const estOperationAutomatique = (op) => {
+  const type = normaliser(op.type_operation || "");
+  return TYPES_AUTOMATIQUES.some((t) => type.startsWith(t));
+};
+
+// Libellé proposé par défaut pour une ligne créée depuis une opération (le
+// même que celui pré-rempli dans le formulaire du bureau).
+export const libelleParDefaut = (op) => (op.detail || op.libelle || "").split(" · ")[0];
+
+// Exercice d'une date : du 1er septembre au 31 août.
+export function exerciceDeLaDate(dateIso) {
+  const y = Number(String(dateIso).slice(0, 4));
+  const m = Number(String(dateIso).slice(5, 7));
+  const debut = m >= 9 ? y : y - 1;
+  return `${debut}-${debut + 1}`;
+}
+
+// Historique des classements : Map signature -> modèle.
+//   { kind: "ligne", rubrique, evenements, classes, libelle, fournisseur, fois }
+//   { kind: "ignorer", note, fois }
+export async function chargerModeles(admin) {
+  const { data: ops } = await admin
+    .from("compta_operations")
+    .select("*")
+    .in("statut", ["pointee", "ignoree"])
+    .order("date_operation", { ascending: false })
+    .limit(3000);
+  if (!ops || ops.length === 0) return new Map();
+
+  const liens = await chargerLiens(admin);
+  if (liens.absente) return new Map();
+
+  // Une seule ligne par opération pointée.
+  const pointees = ops.filter(
+    (o) => o.statut === "pointee" && (liens.parOperation[o.id] || []).length === 1
+  );
+  const idsLignes = pointees.map((o) => liens.parOperation[o.id][0].ligne_id);
+  const lignes = {};
+  const evenements = {};
+  const classes = {};
+  for (let i = 0; i < idsLignes.length; i += 150) {
+    const lot = idsLignes.slice(i, i + 150);
+    const [{ data: ls }, { data: es }, { data: cs }] = await Promise.all([
+      admin.from("compta_lignes").select("*").in("id", lot),
+      admin.from("compta_ligne_evenements").select("ligne_id, evenement_id").in("ligne_id", lot),
+      admin.from("compta_ligne_classes").select("ligne_id, class_label").in("ligne_id", lot),
+    ]);
+    for (const l of ls || []) lignes[l.id] = l;
+    for (const e of es || []) (evenements[e.ligne_id] ||= []).push(e.evenement_id);
+    for (const c of cs || []) (classes[c.ligne_id] ||= []).push(c.class_label);
+  }
+
+  const parSignature = new Map();
+  for (const o of ops) {
+    const sig = signatureOperation(o);
+    if (!sig) continue;
+    let entree;
+    if (o.statut === "ignoree") {
+      entree = { cle: "ignorer", kind: "ignorer", note: o.note || null };
+    } else {
+      if (!liens.parOperation[o.id] || liens.parOperation[o.id].length !== 1) {
+        entree = { cle: "autre", kind: "autre" }; // répartie : on n'apprend pas
+      } else {
+        const l = lignes[liens.parOperation[o.id][0].ligne_id];
+        if (!l || (l.paye_par || "sou") !== "sou" || l.source !== "manuel") {
+          entree = { cle: "autre", kind: "autre" };
+        } else {
+          const evts = [...new Set(evenements[l.id] || (l.evenement_id ? [l.evenement_id] : []))].sort();
+          const cls = [...new Set(classes[l.id] || [])].sort();
+          const incomplet = (l.rubrique === "evenement" && evts.length === 0) || (l.rubrique === "classe" && cls.length === 0);
+          entree = incomplet
+            ? { cle: "autre", kind: "autre" }
+            : {
+                cle: `${l.rubrique}|${evts.join(",")}|${cls.join(",")}`,
+                kind: "ligne",
+                rubrique: l.rubrique,
+                evenements: evts,
+                classes: cls,
+                // Libellé repris tel quel seulement s'il a été retouché à la
+                // main ; sinon on repart du libellé de la nouvelle opération.
+                libelle: normaliser(l.libelle) === normaliser(libelleParDefaut(o)) ? null : l.libelle,
+                fournisseur: l.fournisseur,
+              };
+        }
+      }
+    }
+    (parSignature.get(sig) || parSignature.set(sig, []).get(sig)).push(entree);
+  }
+
+  const modeles = new Map();
+  for (const [sig, entrees] of parSignature) {
+    const [premiere] = entrees; // la plus récente
+    if (premiere.kind === "autre") continue;
+    if (!entrees.every((e) => e.cle === premiere.cle)) continue; // désaccord : on ne devine pas
+    modeles.set(sig, { ...premiere, fois: entrees.length });
+  }
+  return modeles;
+}
+
+// Crée la ligne décrite par le modèle et la pointe avec l'opération (ou
+// écarte l'opération si le modèle dit « écartée »).
+export async function appliquerModele(admin, op, modele, parentId, mode) {
+  if (modele.kind === "ignorer") {
+    const { error } = await admin
+      .from("compta_operations")
+      .update({
+        statut: "ignoree",
+        note: modele.note || "Écartée comme la fois précédente",
+        mode_pointage: null,
+        pointee_le: new Date().toISOString(),
+        pointee_par: parentId,
+      })
+      .eq("id", op.id);
+    return error ? { error: error.message } : { ok: true, ecartee: true };
+  }
+
+  const { data: ligne, error } = await admin
+    .from("compta_lignes")
+    .insert({
+      sens: op.sens,
+      rubrique: modele.rubrique,
+      evenement_id: modele.rubrique === "evenement" ? modele.evenements[0] : null,
+      libelle: (modele.libelle || libelleParDefaut(op)).slice(0, 200),
+      fournisseur: modele.fournisseur || "Divers",
+      montant_cents: op.montant_cents,
+      date_operation: op.date_operation,
+      statut: "a_verifier",
+      source: "manuel",
+      compte: op.compte,
+      school_year: exerciceDeLaDate(op.date_operation),
+      note: mode === "auto" ? "Créée automatiquement : classée comme la fois précédente." : null,
+      created_by: parentId,
+    })
+    .select("*")
+    .single();
+  if (error) return { error: error.message };
+
+  const annuler = async () => {
+    await admin.from("compta_operation_lignes").delete().eq("ligne_id", ligne.id);
+    await admin.from("compta_lignes").delete().eq("id", ligne.id);
+  };
+  if (modele.rubrique === "evenement" && modele.evenements.length) {
+    const { error: eEv } = await admin
+      .from("compta_ligne_evenements")
+      .insert(modele.evenements.map((evenement_id) => ({ ligne_id: ligne.id, evenement_id })));
+    if (eEv) {
+      await annuler();
+      return { error: eEv.message };
+    }
+  }
+  if (modele.rubrique === "classe" && modele.classes.length) {
+    const { error: eCl } = await admin
+      .from("compta_ligne_classes")
+      .insert(modele.classes.map((class_label) => ({ ligne_id: ligne.id, class_label })));
+    if (eCl) {
+      await annuler();
+      return { error: eCl.message };
+    }
+  }
+  const r = await appliquerPointage(admin, op, ligne, parentId, mode);
+  if (r.error) {
+    await annuler();
+    return r;
+  }
+  return { ok: true, ligneId: ligne.id };
 }
 
 // Pointage automatique de toutes les opérations « à pointer » sans aucune
@@ -243,7 +442,9 @@ export async function pointerAutomatiquement(admin, parentId) {
 
   const liens = await chargerLiens(admin);
   if (liens.absente) return { pointees: 0, migrationManquante: true };
-  const aTraiter = ops.filter((o) => !(liens.parOperation[o.id] || []).length);
+  // Une opération rouverte à la main (note « reouverte ») n'est plus traitée
+  // automatiquement : le bureau a voulu la refaire lui-même.
+  const aTraiter = ops.filter((o) => !(liens.parOperation[o.id] || []).length && o.note !== "reouverte");
 
   const { data: lignes } = await admin
     .from("compta_lignes")
@@ -271,12 +472,29 @@ export async function pointerAutomatiquement(admin, parentId) {
   const parLigne = {};
   for (const e of envies) (parLigne[e.choix.ligne.id] ||= []).push(e);
   let pointees = 0;
+  const dejaTraitees = new Set();
   for (const groupe of Object.values(parLigne)) {
     groupe.sort((x, y) => y.choix.score - x.choix.score);
     if (groupe.length > 1 && groupe[0].choix.score === groupe[1].choix.score) continue;
     const { op, choix } = groupe[0];
     const r = await appliquerPointage(admin, op, choix.ligne, parentId, "auto");
-    if (r.ok) pointees++;
+    if (r.ok) {
+      pointees++;
+      dejaTraitees.add(op.id);
+    }
   }
-  return { pointees };
+
+  // 2e passe : ce qui reste et qui revient régulièrement (frais bancaires,
+  // prélèvements…) est classé comme la fois précédente.
+  let apprises = 0;
+  const modeles = await chargerModeles(admin);
+  for (const op of aTraiter) {
+    if (dejaTraitees.has(op.id) || !estOperationAutomatique(op)) continue;
+    const sig = signatureOperation(op);
+    const modele = sig ? modeles.get(sig) : null;
+    if (!modele) continue;
+    const r = await appliquerModele(admin, op, modele, parentId, "auto");
+    if (r.ok) apprises++;
+  }
+  return { pointees, apprises };
 }

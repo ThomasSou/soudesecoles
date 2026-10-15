@@ -3,7 +3,9 @@ import { requirePermission } from "../../../../lib/adminAuth";
 import {
   candidatsPourOperation,
   chargerLiens,
+  chargerModeles,
   pointerAutomatiquement,
+  signatureOperation,
   sommeLiens,
 } from "../../../../lib/comptaPointage";
 
@@ -106,8 +108,27 @@ export async function GET(request) {
     : { data: [] };
   const ligneParId = Object.fromEntries((lignesLiees || []).map((l) => [l.id, resume(l)]));
 
-  const resultat = visibles.map((o) => ({
+  // Modèles appris : ce que le bureau a fait la dernière fois pour la même opération.
+  const modeles = await chargerModeles(auth.admin);
+
+  const resultat = visibles.map((o) => {
+    const sig = o.statut === "a_pointer" && !o.a_des_liens ? signatureOperation(o) : null;
+    const m = sig ? modeles.get(sig) : null;
+    return {
     ...o,
+    modele: m
+      ? m.kind === "ignorer"
+        ? { kind: "ignorer", note: m.note, fois: m.fois }
+        : {
+            kind: "ligne",
+            rubrique: m.rubrique,
+            evenements: m.evenements,
+            classes: m.classes,
+            libelle: m.libelle,
+            fournisseur: m.fournisseur,
+            fois: m.fois,
+          }
+      : null,
     lignes: (liens.parOperation[o.id] || []).map((l) => ligneParId[l.ligne_id]).filter(Boolean),
     suggestions:
       o.statut === "a_pointer"
@@ -115,7 +136,8 @@ export async function GET(request) {
             .slice(0, 5)
             .map((c) => ({ ...resume(c.ligne), score: c.score, raisons: c.raisons }))
         : [],
-  }));
+    };
+  });
 
   return NextResponse.json({
     operations: resultat,
@@ -192,6 +214,6 @@ export async function POST(request) {
     nouvelles = aInserer.length;
   }
 
-  const { pointees } = await pointerAutomatiquement(auth.admin, auth.parent.id);
-  return NextResponse.json({ ok: true, nouvelles, connues, pointeesAuto: pointees });
+  const { pointees, apprises = 0 } = await pointerAutomatiquement(auth.admin, auth.parent.id);
+  return NextResponse.json({ ok: true, nouvelles, connues, pointeesAuto: pointees, apprises });
 }

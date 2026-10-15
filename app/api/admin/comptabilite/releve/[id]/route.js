@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../../lib/adminAuth";
 import { currentSchoolYear } from "../../../../../lib/anneeScolaire";
 import { tiersProbable } from "../../../../../lib/releveCA";
-import { appliquerPointage, detacher, sommeLiens } from "../../../../../lib/comptaPointage";
+import {
+  appliquerModele,
+  appliquerPointage,
+  chargerModeles,
+  detacher,
+  signatureOperation,
+  sommeLiens,
+} from "../../../../../lib/comptaPointage";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -180,6 +187,21 @@ export async function PATCH(request, { params }) {
       }
     }
     return NextResponse.json({ ok: true, creees: creees.length, reste: reste - total });
+  }
+
+  // Classer comme la fois précédente (modèle appris de l'historique).
+  if (body.action === "modele") {
+    if (op.statut === "ignoree" || liens.length > 0) {
+      return NextResponse.json({ error: "Cette opération est déjà traitée." }, { status: 400 });
+    }
+    const sig = signatureOperation(op);
+    const modele = sig ? (await chargerModeles(auth.admin)).get(sig) : null;
+    if (!modele) {
+      return NextResponse.json({ error: "Aucun classement précédent identique pour cette opération." }, { status: 404 });
+    }
+    const r = await appliquerModele(auth.admin, op, modele, auth.parent.id, "manuel");
+    if (r.error) return NextResponse.json({ error: r.error }, { status: 500 });
+    return NextResponse.json({ ok: true });
   }
 
   if (body.action === "detacher") {

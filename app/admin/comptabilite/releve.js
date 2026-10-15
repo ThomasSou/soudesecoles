@@ -101,7 +101,9 @@ export default function ReleveBancaire({
     setMessage(
       `${d.nouvelles} nouvelle${d.nouvelles > 1 ? "s" : ""} opération${d.nouvelles > 1 ? "s" : ""} importée${d.nouvelles > 1 ? "s" : ""}` +
         (d.connues ? `, ${d.connues} déjà connue${d.connues > 1 ? "s" : ""} (ignorée${d.connues > 1 ? "s" : ""})` : "") +
-        `. Pointage automatique : ${d.pointeesAuto} rapprochement${d.pointeesAuto > 1 ? "s" : ""}.`
+        `. Pointage automatique : ${d.pointeesAuto} rapprochement${d.pointeesAuto > 1 ? "s" : ""}` +
+        (d.apprises ? `, ${d.apprises} classée${d.apprises > 1 ? "s" : ""} comme la fois précédente` : "") +
+        "."
     );
     recharger();
     onChangeCompta?.();
@@ -118,7 +120,11 @@ export default function ReleveBancaire({
     const d = await res.json().catch(() => ({}));
     setOccupe(false);
     if (!res.ok) return setErreur(d.error || "Impossible de relancer le pointage.");
-    setMessage(`Pointage automatique : ${d.pointeesAuto} rapprochement${d.pointeesAuto > 1 ? "s" : ""}.`);
+    setMessage(
+      `Pointage automatique : ${d.pointeesAuto} rapprochement${d.pointeesAuto > 1 ? "s" : ""}` +
+        (d.apprises ? `, ${d.apprises} classée${d.apprises > 1 ? "s" : ""} comme la fois précédente` : "") +
+        "."
+    );
     recharger();
     onChangeCompta?.();
   }
@@ -410,6 +416,32 @@ function Operation({
 
       {op.statut === "a_pointer" && mode === null && (
         <div className="mt-3 space-y-2">
+          {op.modele && (
+            <button
+              onClick={() => agir({ action: "modele" })}
+              disabled={occupe}
+              className="block w-full text-left border border-sou-blue/40 bg-sou-blue/5 hover:bg-sou-blue/10 rounded-lg px-3 py-1.5 text-xs disabled:opacity-50"
+            >
+              <span className="font-semibold">Classer comme la dernière fois : </span>
+              {op.modele.kind === "ignorer"
+                ? "écartée de la comptabilité"
+                : [
+                    RUBRIQUES[op.modele.rubrique],
+                    op.modele.rubrique === "evenement"
+                      ? op.modele.evenements.map((id) => evenements.find((e) => e.id === id)?.nom).filter(Boolean).join(" + ")
+                      : op.modele.rubrique === "classe"
+                        ? op.modele.classes.join(" + ")
+                        : null,
+                    op.modele.libelle || op.modele.fournisseur,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+              <span className="text-slate-500">
+                {" "}
+                (vu {op.modele.fois} fois)
+              </span>
+            </button>
+          )}
           {(op.suggestions || []).length > 0 && (
             <div className="space-y-1">
               <p className="text-xs text-slate-500">Lignes déjà saisies qui pourraient correspondre :</p>
