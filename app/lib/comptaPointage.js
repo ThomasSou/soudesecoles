@@ -3,11 +3,15 @@ import { normaliser, moyenDepuisType } from "./releveCA";
 // Rapprochement entre les opérations du relevé bancaire (`compta_operations`)
 // et les lignes de comptabilité saisies (`compta_lignes`).
 //
-// Principe : une opération n'est rapprochée AUTOMATIQUEMENT que lorsque la
-// concordance est sûre (même sens, même montant à l'euro près ET un seul
-// candidat crédible). Dans tous les autres cas, les candidats sont proposés
-// au bureau, qui tranche. Mieux vaut un pointage manuel de trop qu'un pointage
-// automatique faux qui fausse les comptes en silence.
+// Une opération peut être répartie sur PLUSIEURS lignes (table de liaison
+// `compta_operation_lignes`) : elle est « pointée » quand la somme de ses
+// lignes égale son montant, « à pointer » tant qu'il reste une part.
+//
+// Pointage AUTOMATIQUE : seulement quand la concordance est sûre (même sens,
+// même montant ET un seul candidat crédible). Dans tous les autres cas, les
+// candidats sont proposés au bureau, qui tranche. Mieux vaut un pointage
+// manuel de trop qu'un pointage automatique faux qui fausse les comptes en
+// silence.
 
 // Mots trop fréquents pour prouver qu'un libellé de banque parle du même
 // fournisseur qu'une ligne saisie.
@@ -28,8 +32,9 @@ function motsCles(texte) {
     .filter((m) => m.length >= 4 && !MOTS_BANALS.has(m) && !/^\d+$/.test(m));
 }
 
-// Candidats pour une opération : lignes de même sens et de même montant, avec
-// un score et les raisons affichées au bureau.
+// Candidats pour une opération : lignes de même sens et de même montant que
+// la part RESTANT à répartir (op.montant_cents), avec un score et les raisons
+// affichées au bureau.
 //   noms : { [parentId]: "prénom nom" } pour reconnaître le bénévole remboursé.
 export function candidatsPourOperation(op, lignes, noms = {}) {
   const texteOp = normaliser(`${op.libelle || ""} ${op.detail || ""}`);
@@ -87,10 +92,59 @@ export function candidatAutomatique(candidats) {
   return null;
 }
 
+// Liens opération <-> lignes : { parOperation: { [opId]: [{ligne_id, montant_cents}] }, prises: Set }.
+// `absente` = true tant que la migration 0055 n'est pas passée.
+export async function chargerLiens(admin) {
+  const { data, error } = await admin
+    .from("compta_operation_lignes")
+    .select("operation_id, ligne_id, montant_cents");
+  if (error) {
+    const absente =
+      /compta_operation_lignes/.test(error.message || "") &&
+      /(does not exist|schema cache|could not find)/i.test(error.message || "");
+    return { absente, erreur: error.message, parOperation: {}, prises: new Set() };
+  }
+  const parOperation = {};
+  const prises = new Set();
+  for (const l of data || []) {
+    (parOperation[l.operation_id] ||= []).push(l);
+    prises.add(l.ligne_id);
+  }
+  return { absente: false, parOperation, prises };
+}
+
+export const sommeLiens = (liens) => (liens || []).reduce((s, l) => s + l.montant_cents, 0);
+
 const COLONNES_PAIEMENT = ["paiement_statut", "moyen_paiement", "paiement_le"];
 
-// Applique le pointage d'une opération sur une ligne, des deux côtés.
+// Rapproche une opération d'une ligne de compta, des deux côtés. La ligne
+// peut ne couvrir qu'une PART de l'opération (tant que la somme ne dépasse
+// pas le montant). Renvoie { ok, complete } ou { error }.
 export async function appliquerPointage(admin, op, ligne, parentId, mode) {
+  const { data: liensExistants, error: eLiens } = await admin
+    .from("compta_operation_lignes")
+    .select("ligne_id, montant_cents")
+    .eq("operation_id", op.id);
+  if (eLiens) return { error: eLiens.message };
+  const deja = sommeLiens(liensExistants);
+  const reste = op.montant_cents - deja;
+  if (ligne.montant_cents > reste) {
+    return {
+      error: `Cette ligne (${(ligne.montant_cents / 100).toFixed(2)} €) dépasse ce qui reste à répartir sur l'opération (${(reste / 100).toFixed(2)} €).`,
+    };
+  }
+
+  const { error: eLien } = await admin
+    .from("compta_operation_lignes")
+    .insert({ operation_id: op.id, ligne_id: ligne.id, montant_cents: ligne.montant_cents });
+  if (eLien) {
+    return {
+      error: /duplicate|unique/i.test(eLien.message || "")
+        ? "Cette ligne est déjà pointée avec une autre opération."
+        : eLien.message,
+    };
+  }
+
   const maintenant = new Date().toISOString();
   const maj = {
     statut: "pointe",
@@ -119,7 +173,10 @@ export async function appliquerPointage(admin, op, ligne, parentId, mode) {
   if (error && concernePaiement && COLONNES_PAIEMENT.some((c) => error.message?.includes(c))) {
     ({ error } = await admin.from("compta_lignes").update(maj).eq("id", ligne.id));
   }
-  if (error) return { error: error.message };
+  if (error) {
+    await admin.from("compta_operation_lignes").delete().eq("operation_id", op.id).eq("ligne_id", ligne.id);
+    return { error: error.message };
+  }
 
   // Avance d'un bénévole : le virement du Sou vers lui vaut remboursement.
   if (ligne.paye_par === "benevole" && ligne.sens === "depense" && !ligne.rembourse_le) {
@@ -135,22 +192,47 @@ export async function appliquerPointage(admin, op, ligne, parentId, mode) {
     }
   }
 
+  const complete = deja + ligne.montant_cents === op.montant_cents;
+  if (complete) {
+    const { error: eOp } = await admin
+      .from("compta_operations")
+      .update({ statut: "pointee", mode_pointage: mode, pointee_le: maintenant, pointee_par: parentId })
+      .eq("id", op.id);
+    if (eOp) return { error: eOp.message };
+  }
+  return { ok: true, complete };
+}
+
+// Remet une ligne de compta « à pointer » (utilisé quand on détache).
+async function liberLigne(admin, ligneId) {
+  await admin
+    .from("compta_lignes")
+    .update({ statut: "a_verifier", pointe_le: null, pointe_par: null, ref_bancaire: null })
+    .eq("id", ligneId);
+}
+
+// Détache UNE ligne d'une opération (ou toutes si ligneId est omis). Les
+// lignes redeviennent « à pointer » ; l'état « payée » posé au pointage reste
+// (à corriger à la main sur la ligne si besoin). L'opération repasse « à pointer ».
+export async function detacher(admin, op, ligneId = null) {
+  let requete = admin.from("compta_operation_lignes").select("ligne_id").eq("operation_id", op.id);
+  if (ligneId) requete = requete.eq("ligne_id", ligneId);
+  const { data: liens, error } = await requete;
+  if (error) return { error: error.message };
+  for (const l of liens || []) {
+    await admin.from("compta_operation_lignes").delete().eq("operation_id", op.id).eq("ligne_id", l.ligne_id);
+    await liberLigne(admin, l.ligne_id);
+  }
   const { error: eOp } = await admin
     .from("compta_operations")
-    .update({
-      statut: "pointee",
-      ligne_id: ligne.id,
-      mode_pointage: mode,
-      pointee_le: maintenant,
-      pointee_par: parentId,
-    })
+    .update({ statut: "a_pointer", mode_pointage: null, note: null, pointee_le: null, pointee_par: null })
     .eq("id", op.id);
   if (eOp) return { error: eOp.message };
   return { ok: true };
 }
 
-// Pointage automatique de toutes les opérations « à pointer » (ou d'une
-// liste). Renvoie le nombre de rapprochements faits.
+// Pointage automatique de toutes les opérations « à pointer » sans aucune
+// ligne déjà liée. Renvoie le nombre de rapprochements faits.
 export async function pointerAutomatiquement(admin, parentId) {
   const { data: ops } = await admin
     .from("compta_operations")
@@ -159,15 +241,15 @@ export async function pointerAutomatiquement(admin, parentId) {
     .order("date_operation", { ascending: true });
   if (!ops || ops.length === 0) return { pointees: 0 };
 
-  const [{ data: lignes }, { data: dejaLiees }] = await Promise.all([
-    admin
-      .from("compta_lignes")
-      .select("*")
-      .in("statut", ["a_verifier", "prevu", "a_valider"]),
-    admin.from("compta_operations").select("ligne_id").not("ligne_id", "is", null),
-  ]);
-  const prises = new Set((dejaLiees || []).map((o) => o.ligne_id));
-  const libres = (lignes || []).filter((l) => !prises.has(l.id));
+  const liens = await chargerLiens(admin);
+  if (liens.absente) return { pointees: 0, migrationManquante: true };
+  const aTraiter = ops.filter((o) => !(liens.parOperation[o.id] || []).length);
+
+  const { data: lignes } = await admin
+    .from("compta_lignes")
+    .select("*")
+    .in("statut", ["a_verifier", "prevu", "a_valider"]);
+  const libres = (lignes || []).filter((l) => !liens.prises.has(l.id));
 
   const idsParents = [...new Set(libres.map((l) => l.paye_par_parent_id).filter(Boolean))];
   const noms = {};
@@ -178,7 +260,7 @@ export async function pointerAutomatiquement(admin, parentId) {
 
   // 1re passe : le choix automatique de chaque opération.
   const envies = [];
-  for (const op of ops) {
+  for (const op of aTraiter) {
     const choix = candidatAutomatique(candidatsPourOperation(op, libres, noms));
     if (choix) envies.push({ op, choix });
   }

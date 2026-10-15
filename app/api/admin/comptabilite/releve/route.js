@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
-import { candidatsPourOperation, pointerAutomatiquement } from "../../../../lib/comptaPointage";
+import {
+  candidatsPourOperation,
+  chargerLiens,
+  pointerAutomatiquement,
+  sommeLiens,
+} from "../../../../lib/comptaPointage";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -25,7 +30,9 @@ const resume = (l) => ({
 });
 
 // Opérations du relevé, avec pour chacune à pointer les lignes de compta
-// candidates (même sens, même montant), et pour chacune pointée la ligne liée.
+// candidates (même sens, même montant que la part restante), et pour chacune
+// déjà répartie les lignes liées. Une opération est « pointée » quand la somme
+// de ses lignes égale son montant (table compta_operation_lignes).
 export async function GET(request) {
   const auth = await requirePermission(request, "comptabilite");
   if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -44,19 +51,28 @@ export async function GET(request) {
   if (depuis) requete = requete.gte("date_operation", depuis);
   const { data: toutes, error } = await requete;
   if (error) {
-    if (tableAbsente(error.message)) return NextResponse.json({ migrationManquante: true });
+    if (tableAbsente(error.message)) return NextResponse.json({ migrationManquante: "0054" });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Une opération « pointée » dont la ligne a été supprimée redevient à pointer.
-  const operations = (toutes || []).map((o) =>
-    o.statut === "pointee" && !o.ligne_id ? { ...o, statut: "a_pointer", mode_pointage: null } : o
-  );
+  const liens = await chargerLiens(auth.admin);
+  if (liens.absente) return NextResponse.json({ migrationManquante: "0055" });
+  if (liens.erreur) return NextResponse.json({ error: liens.erreur }, { status: 500 });
+
+  // Statut effectif : « écartée » est un choix ; sinon, « pointée » seulement
+  // si les lignes liées couvrent tout le montant (une ligne supprimée ou
+  // détachée ramène l'opération à pointer).
+  const operations = (toutes || []).map((o) => {
+    const l = liens.parOperation[o.id] || [];
+    const somme = sommeLiens(l);
+    const effectif = o.statut === "ignoree" ? "ignoree" : somme >= o.montant_cents ? "pointee" : "a_pointer";
+    return { ...o, statut: effectif, reste_cents: Math.max(0, o.montant_cents - somme), a_des_liens: l.length > 0 };
+  });
 
   const compteurs = { a_pointer: 0, pointee: 0, ignoree: 0, a_pointer_cents: 0 };
   for (const o of operations) {
     compteurs[o.statut]++;
-    if (o.statut === "a_pointer") compteurs.a_pointer_cents += o.montant_cents;
+    if (o.statut === "a_pointer") compteurs.a_pointer_cents += o.reste_cents;
   }
 
   let visibles = operations;
@@ -65,12 +81,11 @@ export async function GET(request) {
 
   // Lignes de compta disponibles au rapprochement : non pointées, pas déjà
   // liées à une opération.
-  const [{ data: lignesOuvertes }, { data: liees }] = await Promise.all([
-    auth.admin.from("compta_lignes").select("*").in("statut", ["a_verifier", "prevu", "a_valider"]),
-    auth.admin.from("compta_operations").select("ligne_id").not("ligne_id", "is", null),
-  ]);
-  const prises = new Set((liees || []).map((o) => o.ligne_id));
-  const libres = (lignesOuvertes || []).filter((l) => !prises.has(l.id));
+  const { data: lignesOuvertes } = await auth.admin
+    .from("compta_lignes")
+    .select("*")
+    .in("statut", ["a_verifier", "prevu", "a_valider"]);
+  const libres = (lignesOuvertes || []).filter((l) => !liens.prises.has(l.id));
 
   const idsParents = [...new Set(libres.map((l) => l.paye_par_parent_id).filter(Boolean))];
   const noms = {};
@@ -82,8 +97,10 @@ export async function GET(request) {
     for (const p of ps || []) noms[p.id] = `${p.first_name || ""} ${p.last_name || ""}`;
   }
 
-  // Lignes liées aux opérations pointées affichées.
-  const idsLignes = [...new Set(visibles.map((o) => o.ligne_id).filter(Boolean))];
+  // Lignes liées aux opérations affichées.
+  const idsLignes = [
+    ...new Set(visibles.flatMap((o) => (liens.parOperation[o.id] || []).map((l) => l.ligne_id))),
+  ];
   const { data: lignesLiees } = idsLignes.length
     ? await auth.admin.from("compta_lignes").select("*").in("id", idsLignes)
     : { data: [] };
@@ -91,10 +108,10 @@ export async function GET(request) {
 
   const resultat = visibles.map((o) => ({
     ...o,
-    ligne: o.ligne_id ? ligneParId[o.ligne_id] || null : null,
+    lignes: (liens.parOperation[o.id] || []).map((l) => ligneParId[l.ligne_id]).filter(Boolean),
     suggestions:
       o.statut === "a_pointer"
-        ? candidatsPourOperation(o, libres, noms)
+        ? candidatsPourOperation({ ...o, montant_cents: o.reste_cents }, libres, noms)
             .slice(0, 5)
             .map((c) => ({ ...resume(c.ligne), score: c.score, raisons: c.raisons }))
         : [],
