@@ -9,6 +9,7 @@ import {
 } from "../../lib/classesReference";
 import { repartirEgal } from "../../lib/comptaRepartition";
 import { currentSchoolYear } from "../../lib/anneeScolaire";
+import ReleveBancaire from "./releve";
 
 // Groupes de classes pour le sélecteur, construits directement depuis la
 // référence (jamais dépendants de la réponse de l'API — le sélecteur ne
@@ -524,10 +525,13 @@ function LigneForm({
   parents,
   fournisseurs = [],
   ligne,
+  creation = false,
   onDone,
   onCancel,
 }) {
-  const edition = Boolean(ligne);
+  // `creation` : `ligne` ne sert qu'à pré-remplir le formulaire (par exemple
+  // depuis une opération du relevé bancaire), la ligne n'existe pas encore.
+  const edition = Boolean(ligne) && !creation;
   // Ligne venue d'une demande de remboursement bénévole : le bureau peut la
   // compléter (date, fournisseur, libellé, note, classement) mais pas
   // toucher au montant ni à « qui a avancé » — ça reste ce que le bénévole
@@ -763,7 +767,7 @@ function LigneForm({
       setErreur(data.error || "Enregistrement impossible.");
       return;
     }
-    onDone();
+    onDone(data);
   }
 
   const champ = "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm";
@@ -1704,6 +1708,7 @@ function ComptaAdmin({ accessToken }) {
   const [sens, setSens] = useState("");
   const [ajout, setAjout] = useState(false);
   const [tri, setTri] = useState({ cle: "date", sens: "desc" });
+  const [onglet, setOnglet] = useState("lignes");
   const estLarge = useEstLarge();
 
   const recharger = useCallback(() => {
@@ -1792,8 +1797,9 @@ function ComptaAdmin({ accessToken }) {
         prévisionnelle. Si une ligne au même fournisseur et au même montant
         existe déjà, un message d&apos;alerte demande confirmation. La liste
         s&apos;affiche en tableau : cliquez sur un en-tête pour trier, sur une
-        ligne pour la dérouler. Import des relevés Crédit Agricole et pointage
-        automatique : à venir.
+        ligne pour la dérouler. Le relevé du Crédit Agricole s'importe dans
+        l'onglet « Relevé bancaire », qui pointe automatiquement ce qui
+        correspond à une ligne déjà saisie.
       </p>
 
       {data?.error && (
@@ -1802,6 +1808,39 @@ function ComptaAdmin({ accessToken }) {
         </p>
       )}
 
+      <div className="flex gap-2 mb-5">
+        <button
+          onClick={() => setOnglet("lignes")}
+          className={`px-4 py-2 rounded-full text-sm font-semibold ${
+            onglet === "lignes" ? "bg-sou-blue text-white" : "bg-white border border-slate-300 text-slate-600"
+          }`}
+        >
+          Dépenses et recettes
+        </button>
+        <button
+          onClick={() => setOnglet("releve")}
+          className={`px-4 py-2 rounded-full text-sm font-semibold ${
+            onglet === "releve" ? "bg-sou-blue text-white" : "bg-white border border-slate-300 text-slate-600"
+          }`}
+        >
+          Relevé bancaire
+        </button>
+      </div>
+
+      {onglet === "releve" && (
+        <ReleveBancaire
+          accessToken={accessToken}
+          LigneForm={LigneForm}
+          evenements={data?.evenements || []}
+          annees={data?.annees || []}
+          parents={data?.parents || []}
+          fournisseurs={data?.fournisseurs || []}
+          onChangeCompta={recharger}
+        />
+      )}
+
+      {onglet === "lignes" && (
+      <>
       {/* Filtres */}
       <div className="space-y-2 mb-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -2068,6 +2107,8 @@ function ComptaAdmin({ accessToken }) {
             />
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   );
