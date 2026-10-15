@@ -506,6 +506,17 @@ function RepartitionEditor({ mode, setMode, items, montants, setMontants, totalC
 
 // Lit le fichier choisi et le renvoie en data URL base64, pour l'envoyer
 // dans le corps JSON de la requête.
+// « 2026-2027 » -> « 2025-2026 » / « 2027-2028 » : l'exercice d'une dépense
+// peut être celui d'avant (facture de la Foire payée en juillet) ou d'après.
+function anneeAvant(annee) {
+  const d = Number(annee.split("-")[0]);
+  return `${d - 1}-${d}`;
+}
+function anneeApres(annee) {
+  const d = Number(annee.split("-")[0]);
+  return `${d + 1}-${d + 2}`;
+}
+
 function lireFichier(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -541,6 +552,8 @@ function LigneForm({
   const anneesOptions = [
     ...new Set([
       currentSchoolYear(),
+      anneeAvant(currentSchoolYear()),
+      anneeApres(currentSchoolYear()),
       ...(annees || []),
       ...(ligne?.school_year ? [ligne.school_year] : []),
     ]),
@@ -1015,8 +1028,10 @@ function LigneForm({
           </select>
         </label>
         <label className="text-sm">
-          Année scolaire{" "}
-          <span className="text-slate-400">(pré-remplie sur l&apos;année en cours)</span>
+          Exercice{" "}
+          <span className="text-slate-400">
+            (année du bilan, du 1er septembre au 31 août — celui en cours par défaut)
+          </span>
           <select
             value={anneeLigne}
             onChange={(e) => setAnneeLigne(e.target.value)}
@@ -1844,7 +1859,7 @@ function ComptaAdmin({ accessToken }) {
       {/* Filtres */}
       <div className="space-y-2 mb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <label className="text-sm text-slate-500">Année</label>
+          <label className="text-sm text-slate-500">Exercice</label>
           <select
             value={annee}
             onChange={(e) => setAnnee(e.target.value)}
