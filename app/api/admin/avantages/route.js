@@ -58,7 +58,7 @@ export async function POST(request) {
     label,
     type,
     partenaire_id: type === "partenaire" ? body.partenaireId : null,
-    requiert_adhesion: body?.requiresMembership !== false,
+    requiert_adhesion: true, // règle du Sou : toujours réservé aux familles à jour
     limite,
     active: true,
   };

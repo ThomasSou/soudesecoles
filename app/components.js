@@ -37,10 +37,10 @@ export function Header() {
           ))}
         </nav>
         <Link
-          href="/espace-adherent"
+          href="/connexion"
           className="hidden sm:inline-block bg-sou-blue text-white text-sm font-semibold px-4 py-2 rounded-full hover:bg-sou-gold transition-colors"
         >
-          Espace parent
+          Connexion
         </Link>
       </div>
       <nav className="md:hidden flex overflow-x-auto gap-4 px-4 pb-3 text-sm font-medium text-slate-700">
@@ -52,10 +52,10 @@ export function Header() {
       </nav>
       <div className="md:hidden px-4 pb-3">
         <Link
-          href="/espace-adherent"
+          href="/connexion"
           className="block text-center bg-sou-blue text-white text-sm font-semibold px-4 py-2 rounded-full hover:bg-sou-gold transition-colors"
         >
-          Espace parent
+          Connexion
         </Link>
       </div>
     </header>
@@ -75,20 +75,30 @@ export function Footer() {
             <p className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400 mb-4">
               Merci à nos partenaires
             </p>
-            <div className="flex flex-wrap items-end justify-center gap-x-10 gap-y-5">
-              {PARTNERS.map((p) => (
-                <div
-                  key={p.slug}
-                  className={`relative ${BANNER_SIZES[p.tier] || BANNER_SIZES.Bronze}`}
-                >
-                  <Image
-                    src={`/partenaires/${p.file}`}
-                    alt={`Logo ${p.name}`}
-                    fill
-                    className="object-contain"
-                  />
-                </div>
-              ))}
+            {/* Première ligne : or et argent ; les bronzes passent dessous. */}
+            <div className="space-y-5">
+              {[
+                PARTNERS.filter((p) => p.tier === "Gold" || p.tier === "Silver"),
+                PARTNERS.filter((p) => p.tier !== "Gold" && p.tier !== "Silver"),
+              ].map((ligne, i) =>
+                ligne.length === 0 ? null : (
+                  <div key={i} className="flex flex-wrap items-end justify-center gap-x-10 gap-y-5">
+                    {ligne.map((p) => (
+                      <div
+                        key={p.slug}
+                        className={`relative ${BANNER_SIZES[p.tier] || BANNER_SIZES.Bronze}`}
+                      >
+                        <Image
+                          src={`/partenaires/${p.file}`}
+                          alt={`Logo ${p.name}`}
+                          fill
+                          className="object-contain"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
             </div>
           </Link>
           <div className="hidden sm:block w-px self-stretch bg-slate-200" aria-hidden="true" />
@@ -136,19 +146,11 @@ export function Footer() {
             Contact
           </Link>
         </div>
-        {/* Accès discrets aux espaces connectés : la redirection par rôle de
-            /connexion suffit fonctionnellement, ces liens sont un confort. */}
+        {/* Un seul point d'entrée : la page de connexion aiguille selon le
+            profil (bureau, enseignant, partenaire, parent). */}
         <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
-          <Link href="/espace-adherent" className="hover:text-white transition-colors">
-            Espace parent
-          </Link>
-          <span aria-hidden="true">·</span>
-          <Link href="/partenaire" className="hover:text-white transition-colors">
-            Espace partenaire
-          </Link>
-          <span aria-hidden="true">·</span>
-          <Link href="/espace-enseignant" className="hover:text-white transition-colors">
-            Espace enseignant
+          <Link href="/connexion" className="hover:text-white transition-colors">
+            Connexion (parents, enseignants, partenaires)
           </Link>
         </div>
         <p>© {new Date().getFullYear()} Sou des Écoles Montmerle-Lurcy — site en construction</p>

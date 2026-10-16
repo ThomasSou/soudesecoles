@@ -26,7 +26,6 @@ export async function PATCH(request, { params }) {
   const update = {};
   if (typeof body?.label === "string" && body.label.trim()) update.label = body.label.trim();
   if (typeof body?.description === "string") update.description = body.description.trim() || null;
-  if (typeof body?.requiresMembership === "boolean") update.requiert_adhesion = body.requiresMembership;
   if (typeof body?.active === "boolean") update.active = body.active;
   if (body?.quantiteParFamille !== undefined || body?.limite !== undefined) {
     const q = Number(body?.quantiteParFamille ?? body?.limite);

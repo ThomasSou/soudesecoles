@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../lib/adminAuth";
+import { createAdminClient } from "../../../lib/supabaseServerAdmin";
 import { isMailConfigured } from "../../../lib/mail";
 import { currentSchoolYear, isMembershipValid } from "../../../lib/anneeScolaire";
 import { renderBlocksToHtml, renderBlocksToText } from "../../../lib/emailBlocks";
@@ -337,7 +338,13 @@ export async function GET(request) {
 // nom) et bandeau d'adhésion personnalisés, logo et logos partenaires
 // ajoutés automatiquement (cf. app/lib/emailBlocks.js).
 export async function POST(request) {
-  const auth = await requirePermission(request, "emails");
+  // Création de campagne par une tâche planifiée (e-mail mensuel « nouveautés
+  // des partenaires ») : jeton de service, comme /api/admin/emails/continuer.
+  const jetonService = process.env.ADMIN_IMPORT_TOKEN;
+  const parJeton = Boolean(jetonService) && request.headers.get("x-admin-token") === jetonService;
+  const auth = parJeton
+    ? { admin: createAdminClient(), parent: { id: null } }
+    : await requirePermission(request, "emails");
   if (auth.error) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }

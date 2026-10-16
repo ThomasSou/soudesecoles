@@ -3,13 +3,13 @@ import {
   resolvePartenaireSession,
   niveauActifPartenaire,
   compterMessagesMois,
-  moisCourant,
 } from "../../../../lib/partenaires";
+import { moisParution } from "../../../../lib/datesParis";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_BYTES = 4 * 1024 * 1024; // même limite que les images de l'éditeur d'e-mails
 
 function decodeImage(dataUrl) {
   const m = /^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/.exec(dataUrl || "");
@@ -80,7 +80,7 @@ export async function PATCH(request, { params }) {
     update.image_chemin = null;
   } else if (body?.imageDataUrl) {
     const img = decodeImage(body.imageDataUrl);
-    if (!img) return NextResponse.json({ error: "Image invalide ou trop lourde (10 Mo max)." }, { status: 400 });
+    if (!img) return NextResponse.json({ error: "Image invalide ou trop lourde (4 Mo max)." }, { status: 400 });
     const chemin = `${partenaire.id}/${Date.now()}-${Math.round(Math.random() * 1e6)}.${img.ext}`;
     const { error: upErr } = await admin.storage
       .from("partenaire-messages")
@@ -94,7 +94,7 @@ export async function PATCH(request, { params }) {
 
   if (body?.soumettre === true) {
     const type = message.type;
-    const moisCible = update.mois_cible || message.mois_cible || moisCourant();
+    const moisCible = update.mois_cible || message.mois_cible || moisParution();
     const { data: periodes } = await admin
       .from("partenaire_periodes")
       .select("*")

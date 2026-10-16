@@ -61,7 +61,7 @@ export async function POST(request) {
         utilise: !illimite && fois >= a.limite,
         usedAt: usages[0]?.used_at || null,
         usedBy: usages[0]?.used_by || null,
-        bloque: a.requiert_adhesion && !adhesionValide,
+        bloque: !adhesionValide,
       };
     }),
   });

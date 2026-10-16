@@ -174,7 +174,6 @@ function NouvelAvantageForm({ accessToken, partenaires, onCree }) {
   const [label, setLabel] = useState("");
   const [type, setType] = useState("interne");
   const [partenaireId, setPartenaireId] = useState("");
-  const [requiresMembership, setRequiresMembership] = useState(true);
   const [limite, setLimite] = useState("1");
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState("");
@@ -188,14 +187,13 @@ function NouvelAvantageForm({ accessToken, partenaires, onCree }) {
       const res = await fetch("/api/admin/avantages", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ label, type, partenaireId, requiresMembership, limite }),
+        body: JSON.stringify({ label, type, partenaireId, limite }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
       setLabel("");
       setPartenaireId("");
       setType("interne");
-      setRequiresMembership(true);
       setLimite("1");
       setOuvert(false);
       onCree(data.avantage);
@@ -266,14 +264,9 @@ function NouvelAvantageForm({ accessToken, partenaires, onCree }) {
           )}
         </div>
       )}
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={requiresMembership}
-          onChange={(e) => setRequiresMembership(e.target.checked)}
-        />
-        Réservé aux familles à jour de cotisation
-      </label>
+      <p className="text-sm text-slate-600">
+        <span aria-hidden="true">🔒</span> Réservé aux familles à jour de cotisation (règle du Sou, non modifiable).
+      </p>
       <div>
         <label className="text-xs font-semibold text-slate-500">
           Nombre d&apos;utilisations autorisées par famille
@@ -378,7 +371,7 @@ function LigneAvantage({ avantage, accessToken, onMaj }) {
           <p className="text-xs text-slate-500 mt-0.5">
             {avantage.type === "partenaire" ? `Partenaire${avantage.partenaireNom ? " — " + avantage.partenaireNom : ""}` : "Interne"}
             {" — "}
-            {avantage.requiert_adhesion ? "réservé aux adhérents à jour" : "ouvert à tous"}
+            réservé aux adhérents à jour
             {" — "}
             <button onClick={() => setDetailOuvert((v) => !v)} className="underline">
               {avantage.utilisations} utilisation{avantage.utilisations > 1 ? "s" : ""}

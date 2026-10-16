@@ -110,6 +110,113 @@ function CarteMessage({ accessToken, message, onChange }) {
   );
 }
 
+// Les trois e-mails automatiques : aperçus, brouillon pour les familles,
+// simulation de la tâche du jour.
+function EmailsAutomatiques({ accessToken }) {
+  const [apercu, setApercu] = useState(null);
+  const [etat, setEtat] = useState(null);
+  const [message, setMessage] = useState("");
+  const [occupe, setOccupe] = useState(false);
+  const entetes = { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` };
+
+  useEffect(() => {
+    fetch("/api/admin/partenaires-auto", { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then((r) => r.json())
+      .then(setEtat)
+      .catch(() => {});
+  }, [accessToken]);
+
+  async function voir(type) {
+    setOccupe(true);
+    setMessage("");
+    const res = await fetch(`/api/admin/partenaires-auto?apercu=${type}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const d = await res.json().catch(() => ({}));
+    setOccupe(false);
+    if (!res.ok) return setMessage(d.error || "Aperçu impossible.");
+    setApercu({ type, ...d });
+  }
+
+  async function brouillon() {
+    setOccupe(true);
+    setMessage("");
+    const res = await fetch("/api/admin/partenaires-auto", { method: "POST", headers: entetes, body: JSON.stringify({ action: "brouillon" }) });
+    const d = await res.json().catch(() => ({}));
+    setOccupe(false);
+    setMessage(
+      res.ok
+        ? "Brouillon créé : retrouvez-le dans E-mails (envoyez-vous un test pour le voir dans votre messagerie)."
+        : d.error || "Création impossible."
+    );
+  }
+
+  async function simuler() {
+    setOccupe(true);
+    setMessage("");
+    const res = await fetch("/api/admin/partenaires-auto", { method: "POST", headers: entetes, body: JSON.stringify({ action: "simuler" }) });
+    const d = await res.json().catch(() => ({}));
+    setOccupe(false);
+    if (!res.ok) return setMessage(d.error || "Simulation impossible.");
+    setMessage(
+      `Aujourd'hui (${d.jour}), la tâche enverrait : ${d.rappelsMensuels} rappel(s) mensuel(s), ${d.rappelsEvenements} rappel(s) d'événement` +
+        (d.newsletter ? ` ; e-mail aux familles : ${d.newsletter}` : "") + "."
+    );
+  }
+
+  const bouton = "border border-sou-blue text-sou-blue text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-50";
+  const dateFr2 = (iso) => (iso ? iso.split("-").reverse().join("/") : "");
+
+  return (
+    <div className="border border-slate-200 rounded-xl p-4 mb-6 bg-slate-50 space-y-3">
+      <h2 className="font-semibold text-sou-blue">E-mails automatiques</h2>
+      <ul className="text-sm text-slate-600 list-disc pl-5 space-y-1">
+        <li>
+          <strong>Le 22 de chaque mois</strong> (dès le {dateFr2(etat?.debutRappels) || "22/10/2026"}) : rappel aux partenaires
+          qui n&apos;ont pas encore envoyé leur message — il leur reste une semaine (limite : le 28). Pas de rappel à ceux
+          qui ont déjà envoyé.
+        </li>
+        <li>
+          <strong>15 jours avant chaque événement</strong> : rappel aux partenaires — la table pour leurs prospectus, à nous
+          remettre 48 h avant.
+        </li>
+        <li>
+          <strong>Le 1er de chaque mois</strong> (dès le {dateFr2(etat?.debutNewsletter) || "01/11/2026"}) : e-mail « Les
+          nouveautés de nos partenaires » aux familles, anciens parents et contacts, <strong>seulement si au moins un
+          message est validé</strong>. Les messages non validés à temps passent au mois suivant.
+        </li>
+      </ul>
+      <div className="flex flex-wrap gap-2">
+        <button className={bouton} disabled={occupe} onClick={() => voir("newsletter")}>Aperçu : e-mail aux familles</button>
+        <button className={bouton} disabled={occupe} onClick={() => voir("rappel_mensuel")}>Aperçu : rappel du 22</button>
+        <button className={bouton} disabled={occupe} onClick={() => voir("rappel_evenement")}>Aperçu : table d&apos;événement</button>
+        <button className={bouton} disabled={occupe} onClick={brouillon}>Créer le brouillon (familles)</button>
+        <button className={bouton} disabled={occupe} onClick={simuler}>Que ferait la tâche aujourd&apos;hui ?</button>
+      </div>
+      {message && <p className="text-sm text-slate-700">{message}</p>}
+      {apercu && (
+        <div>
+          <p className="text-xs text-slate-500 mb-1">
+            Objet : <strong>{apercu.sujet}</strong>
+            {apercu.exemple ? " — messages d'exemple (aucun message validé pour l'instant)" : ""}
+          </p>
+          <iframe title="Aperçu" srcDoc={apercu.html} className="w-full h-[560px] bg-white border border-slate-200 rounded-lg" />
+        </div>
+      )}
+      {etat?.journal?.length > 0 && (
+        <details className="text-xs text-slate-500">
+          <summary className="cursor-pointer">Derniers envois automatiques ({etat.journal.length})</summary>
+          <ul className="mt-1 space-y-0.5">
+            {etat.journal.map((j, i) => (
+              <li key={i}>
+                {dateFr(j.envoye_le)} — {j.type} — {j.cle.split("|").slice(0, 2).join(" · ")}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
 function MessagesAdmin({ accessToken }) {
   const [messages, setMessages] = useState([]);
   const [chargement, setChargement] = useState(true);
@@ -142,9 +249,11 @@ function MessagesAdmin({ accessToken }) {
       <Link href="/admin/partenaires" className="text-sm text-slate-500 underline">← Partenaires</Link>
       <h1 className="text-2xl font-bold text-sou-blue mt-3 mb-1">Messages « nouveautés » des partenaires</h1>
       <p className="text-slate-500 text-sm mb-4">
-        Les messages validés d&apos;un mois alimenteront l&apos;e-mailing mensuel « Les nouveautés de
-        nos partenaires » (chantier à venir). La publication effective n&apos;est pas faite ici.
+        Validez ici les messages des partenaires : ceux validés pour un mois paraissent dans l&apos;e-mail du 1er
+        de ce mois. Les partenaires doivent envoyer leur message avant le 28 du mois précédent.
       </p>
+
+      <EmailsAutomatiques accessToken={accessToken} />
 
       <div className="flex gap-1 border-b border-slate-200 mb-4">
         {filtres.map(([key, label]) => (

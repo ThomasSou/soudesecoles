@@ -32,7 +32,7 @@ export async function POST(request) {
       label: libelle,
       type: "partenaire",
       partenaire_id: partenaireId,
-      requiert_adhesion: requiresMembership !== false,
+      requiert_adhesion: true, // règle du Sou : toujours réservé aux familles à jour
       limite: limiteNombre,
       active: true,
     })

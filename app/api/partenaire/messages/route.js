@@ -3,13 +3,13 @@ import {
   resolvePartenaireSession,
   niveauActifPartenaire,
   compterMessagesMois,
-  moisCourant,
 } from "../../../lib/partenaires";
+import { JOUR_LIMITE_MESSAGE, ajouterMois, moisLibelle, moisParution, nomDuMois } from "../../../lib/datesParis";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_BYTES = 4 * 1024 * 1024; // même limite que les images de l'éditeur d'e-mails
 
 function decodeImage(dataUrl) {
   const m = /^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/.exec(dataUrl || "");
@@ -33,7 +33,9 @@ export async function GET(request) {
   ]);
 
   const { niveau, config } = await niveauActifPartenaire(admin, periodes || []);
-  const mois = moisCourant();
+  // Mois de PARUTION visé : l'e-mail aux familles part le 1er de chaque mois ;
+  // un message reçu jusqu'au 28 paraît le 1er du mois suivant.
+  const mois = moisParution();
   const utilisesEmail = await compterMessagesMois(admin, partenaire.id, "email", mois);
 
   return NextResponse.json({
@@ -43,6 +45,9 @@ export async function GET(request) {
       niveau,
       libelleNiveau: config?.libelle || null,
       moisCible: mois,
+      moisCibleLibelle: moisLibelle(mois),
+      parutionLe: `1er ${nomDuMois(mois)}`,
+      limiteLe: `${JOUR_LIMITE_MESSAGE} ${nomDuMois(ajouterMois(mois, -1))}`,
       quotaEmail: config?.quota_email ?? 0,
       utilisesEmail,
       restantEmail: Math.max(0, (config?.quota_email ?? 0) - utilisesEmail),
@@ -65,7 +70,7 @@ export async function POST(request) {
     return NextResponse.json({ error: "Titre et texte sont obligatoires." }, { status: 400 });
   }
 
-  const moisCible = type === "email" ? (body?.moisCible?.trim() || moisCourant()) : null;
+  const moisCible = type === "email" ? (body?.moisCible?.trim() || moisParution()) : null;
   const soumettre = body?.soumettre === true;
 
   if (soumettre) {
@@ -94,7 +99,7 @@ export async function POST(request) {
   if (body?.imageDataUrl) {
     const img = decodeImage(body.imageDataUrl);
     if (!img) {
-      return NextResponse.json({ error: "Image invalide ou trop lourde (10 Mo max)." }, { status: 400 });
+      return NextResponse.json({ error: "Image invalide ou trop lourde (4 Mo max)." }, { status: 400 });
     }
     imageChemin = `${partenaire.id}/${Date.now()}-${Math.round(Math.random() * 1e6)}.${img.ext}`;
     const { error: upErr } = await admin.storage

@@ -67,7 +67,7 @@ export const PARTNERS = [
     slug: "emilejob",
     name: "Emile Job",
     file: "emilejob.jpg",
-    tier: "Bronze",
+    tier: "Silver",
     description:
       "Restaurant familial tenu par Eric et Isabelle Lépine depuis trois générations, au bord de la Saône. Cuisine traditionnelle (volaille de Bresse, grenouilles, poissons de rivière) et terrasse ombragée par des tilleuls centenaires.",
     address: "12 rue du Pont, 01090 Montmerle-sur-Saône",

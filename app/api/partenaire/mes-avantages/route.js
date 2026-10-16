@@ -61,7 +61,7 @@ export async function POST(request) {
       description: body?.description?.trim() || null,
       type: "partenaire",
       partenaire_id: partenaire.id,
-      requiert_adhesion: body?.requiresMembership !== false,
+      requiert_adhesion: true, // règle du Sou : toujours réservé aux familles à jour
       limite: quantiteParFamille,
       active: true,
     })

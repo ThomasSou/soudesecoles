@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "../lib/supabaseClient";
@@ -13,6 +13,15 @@ export default function ConnexionPage() {
   const [motDePasseVisible, setMotDePasseVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Déjà connecté : on envoie directement vers son espace.
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(async ({ data }) => {
+      const token = data?.session?.access_token;
+      if (token) router.replace(await espaceApresConnexion(token));
+    });
+  }, [router]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -38,7 +47,11 @@ export default function ConnexionPage() {
 
   return (
     <section className="max-w-md mx-auto px-4 sm:px-6 py-20">
-      <h1 className="text-3xl font-bold text-sou-blue mb-8">Espace parent</h1>
+      <h1 className="text-3xl font-bold text-sou-blue mb-2">Connexion</h1>
+      <p className="text-slate-500 text-sm mb-8">
+        Parents, enseignants, partenaires et membres du bureau : une seule porte d&apos;entrée, vous
+        arrivez directement dans votre espace.
+      </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <input

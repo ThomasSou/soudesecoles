@@ -33,7 +33,9 @@ export async function POST(request) {
   if (!familyId) {
     return NextResponse.json({ error: "Carte inconnue." }, { status: 404 });
   }
-  if (avantage.requiert_adhesion && !adhesionValide) {
+  // Règle du Sou : un avantage est toujours réservé aux familles à jour de
+  // cotisation, quelle que soit la valeur enregistrée.
+  if (!adhesionValide) {
     return NextResponse.json({ error: "Adhésion non à jour : avantage non applicable." }, { status: 403 });
   }
 

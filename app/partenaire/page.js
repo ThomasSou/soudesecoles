@@ -85,23 +85,39 @@ function MesMessagesNouveautes({ accessToken }) {
   if (!data) return <p className="text-slate-500 text-sm">Chargement...</p>;
 
   const q = data.quota || {};
-  const peutSoumettre = (q.restantEmail ?? 0) > 0;
+  const erreurChargement = data.error || null;
 
   return (
     <div>
-      <p className="text-sm text-slate-500 mb-4">
+      {erreurChargement && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
+          Impossible de charger vos messages : {erreurChargement}
+        </p>
+      )}
+      <p className="text-sm text-slate-500 mb-3">
         Proposez une actualité (promo, nouveauté, événement) : après validation par le bureau, elle
-        paraîtra dans l&apos;e-mail mensuel « Les nouveautés de nos partenaires » envoyé aux familles.
+        paraîtra dans l&apos;e-mail mensuel « Les nouveautés de nos partenaires » envoyé aux familles
+        le 1er de chaque mois.
+      </p>
+      <p className="text-sm font-semibold text-sou-blue bg-sou-blue/5 border border-sou-blue/20 rounded-lg px-3 py-2 mb-3">
+        ⏰ Votre message doit nous parvenir <u>avant le 28 de chaque mois</u>.
+        {q.parutionLe && q.limiteLe
+          ? ` Un message envoyé avant le ${q.limiteLe} paraît le ${q.parutionLe} ; après cette date, il paraîtra le mois suivant.`
+          : ""}
+      </p>
+      <p className="text-sm text-slate-500 mb-4">
         {q.libelleNiveau
-          ? ` Niveau ${q.libelleNiveau} : ${q.quotaEmail} message(s) / mois — ${q.restantEmail} restant(s) pour ${q.moisCible}.`
-          : " Aucune période de partenariat active : soumission indisponible."}
+          ? q.quotaEmail > 0
+            ? `Niveau ${q.libelleNiveau} : ${q.quotaEmail} message(s) par mois — ${q.restantEmail} restant(s) pour la parution de ${q.moisCibleLibelle || q.moisCible}.`
+            : `Le niveau ${q.libelleNiveau} ne comprend pas de message mensuel. Contactez le bureau si vous souhaitez en savoir plus.`
+          : "Aucune période de partenariat active pour le moment : contactez le bureau."}
+        {" "}Vous pouvez joindre une image (4 Mo maximum) ; chaque message est relu par le bureau avant parution.
       </p>
 
       {!ouvert ? (
         <button
           onClick={() => setOuvert(true)}
-          disabled={!peutSoumettre}
-          className="bg-sou-blue text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-sou-gold transition-colors disabled:opacity-50"
+          className="bg-sou-blue text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-sou-gold transition-colors"
         >
           + Rédiger un message
         </button>
@@ -124,7 +140,7 @@ function MesMessagesNouveautes({ accessToken }) {
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
           </label>
           <label className="block text-sm">
-            <span className="text-xs font-semibold text-slate-500">Image (facultatif, 10 Mo max)</span>
+            <span className="text-xs font-semibold text-slate-500">Image (facultative, 4 Mo max)</span>
             <input type="file" accept="image/*" onChange={(e) => setImage(e.target.files?.[0] || null)}
               className="block w-full text-sm" />
           </label>
@@ -168,7 +184,6 @@ function NouvelAvantage({ accessToken, onCree }) {
   const [label, setLabel] = useState("");
   const [description, setDescription] = useState("");
   const [quantite, setQuantite] = useState("1");
-  const [requiresMembership, setRequiresMembership] = useState(true);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState("");
 
@@ -184,12 +199,11 @@ function NouvelAvantage({ accessToken, onCree }) {
           label,
           description,
           quantiteParFamille: quantite,
-          requiresMembership,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
-      setLabel(""); setDescription(""); setQuantite("1"); setRequiresMembership(true);
+      setLabel(""); setDescription(""); setQuantite("1");
       setOuvert(false);
       onCree(data.avantage);
     } catch (err) {
@@ -229,11 +243,9 @@ function NouvelAvantage({ accessToken, onCree }) {
         <input required type="number" min="1" value={quantite} onChange={(e) => setQuantite(e.target.value)}
           className="w-24 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
       </label>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={requiresMembership}
-          onChange={(e) => setRequiresMembership(e.target.checked)} />
-        Réservé aux familles à jour de cotisation
-      </label>
+      <p className="text-sm text-slate-600">
+        <span aria-hidden="true">🔒</span> Réservé aux familles à jour de cotisation (règle du Sou, non modifiable).
+      </p>
       <div className="flex gap-2">
         <button type="submit" disabled={envoi}
           className="bg-sou-blue text-white text-sm font-semibold px-4 py-2 rounded-full disabled:opacity-50">
@@ -302,7 +314,7 @@ function LigneAvantage({ accessToken, avantage, onMaj }) {
               {avantage.description && <p className="text-xs text-slate-500">{avantage.description}</p>}
               <p className="text-xs text-slate-500 mt-1">
                 {avantage.limite} par famille ·{" "}
-                {avantage.requiert_adhesion ? "réservé aux adhérents à jour" : "ouvert à tous"} ·{" "}
+                réservé aux adhérents à jour ·{" "}
                 {avantage.utilisations} utilisation{avantage.utilisations > 1 ? "s" : ""}
               </p>
             </>
