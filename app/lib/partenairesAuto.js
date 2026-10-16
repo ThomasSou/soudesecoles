@@ -239,7 +239,7 @@ export async function construireNewsletter(admin, mois, { copierImages = false, 
 // Segment de l'e-mail aux familles : toute l'école, les anciens parents et
 // les contacts hors famille (cf. docs/conception-espace-partenaires.md §8).
 export const SEGMENT_FAMILLES = {
-  scope: "selection",
+  scope: "personnalise",
   classes: [],
   niveaux: ["maternelle", "elementaire", "anciens"],
   niveauEnfant: [],

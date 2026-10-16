@@ -72,6 +72,7 @@ function EnvoiEmails({ token, parent }) {
   // précédente (lit email_campaign_recipients). Utile pour envoyer une même
   // communication en plusieurs jours sans jamais écrire deux fois à quelqu'un.
   const [exclureDejaServis, setExclureDejaServis] = useState(false);
+  const [exclureToutPsMs, setExclureToutPsMs] = useState(false);
   const [subject, setSubject] = useState("");
   const [blocks, setBlocks] = useState(() => TEMPLATES[0].blocks());
   const [previewChoix, setPreviewChoix] = useState("generique-adherent");
@@ -237,6 +238,7 @@ function EnvoiEmails({ token, parent }) {
       adherents,
       inclureContacts,
       exclureDejaServis,
+      exclureToutPsMs,
     };
   }
 
@@ -473,6 +475,7 @@ function EnvoiEmails({ token, parent }) {
       setBenevolesEvenementId("");
       setInclureContacts(false);
       setExclureDejaServis(false);
+      setExclureToutPsMs(false);
       setScope("toute");
       setAdresses("");
       setBrouillonId(null);
@@ -615,6 +618,7 @@ function EnvoiEmails({ token, parent }) {
     );
     setInclureContacts(!!seg.inclureContacts);
     setExclureDejaServis(!!seg.exclureDejaServis);
+    setExclureToutPsMs(!!seg.exclureToutPsMs);
     setBrouillonId(c.status === "brouillon" ? c.id : null);
     setBrouillonMsg("");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -793,6 +797,23 @@ function EnvoiEmails({ token, parent }) {
                   Indisponible avec « Adhérents à jour uniquement » : ces contacts n&apos;ont pas d&apos;adhésion.
                 </span>
               )}
+            </span>
+          </label>
+        )}
+
+        {scope !== "liste" && (
+          <label className="flex items-start gap-2 text-sm mb-4">
+            <input
+              type="checkbox"
+              checked={exclureToutPsMs}
+              onChange={(e) => setExclureToutPsMs(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span className="text-slate-600">
+              Exclure les familles dont <strong>tous</strong> les enfants sont en PS ou MS{" "}
+              <span className="text-xs text-slate-400">
+                (une famille avec un enfant en PS/MS et un plus grand reste destinataire)
+              </span>
             </span>
           </label>
         )}

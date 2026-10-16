@@ -101,6 +101,84 @@ export const TEMPLATES = [
     ],
   },
   {
+    key: "noel-psms",
+    label: "Marché de Noël — parents de PS et MS (bénévoles + précommandes)",
+    blocks: () => [
+      { ...newBlock("heading"), text: "Bonjour {{prenom}}, le Marché de Noël a besoin de vous !" },
+      {
+        ...newBlock("image"),
+        url: `${SITE_URL}/evenements/marche-de-noel-affiche.jpg`,
+        alt: "Affiche du Marché de Noël artisanal, samedi 28 novembre 2026",
+        link: `${SITE_URL}/evenements/marche-de-noel`,
+      },
+      {
+        ...newBlock("paragraph"),
+        text: "Le Marché de Noël du Sou des Écoles aura lieu le samedi 28 novembre 2026, de 11h à 20h, place du Marché à Montmerle-sur-Saône. Cette année, son organisation est confiée en priorité aux parents des classes de petite et moyenne section : nous demandons à un parent de chaque famille de nous aider, même pour un court créneau.\n\nTous les bénéfices financent les projets scolaires de vos enfants.",
+      },
+      { ...newBlock("heading"), text: "Comment aider ?", size: "sm" },
+      {
+        ...newBlock("paragraph"),
+        text: "• Avant le marché : préparation, décoration et montage (le vendredi 27 novembre en soirée).\n• Pendant le marché : buvette, restauration, stands et animations (le samedi de 6h à minuit).\n• Après le marché : démontage, rangement et nettoyage.\n\nMême une heure de votre temps est précieuse ! Chacun aide selon ses disponibilités, sans compétence particulière, dans une ambiance conviviale.",
+      },
+      { ...newBlock("button"), text: "Je m'inscris comme bénévole", url: `${SITE_URL}/benevoles` },
+      { type: "divider", id: "d1" },
+      { ...newBlock("heading"), text: "Pensez aussi aux précommandes !", size: "sm" },
+      {
+        ...newBlock("paragraph"),
+        text: "Les précommandes du Marché de Noël sont ouvertes en ligne : beaux sapins du Morvan, panettones, pain d'épices, tartiflette, boules de Noël… De quoi préparer les fêtes tout en soutenant les projets des écoles.",
+      },
+      { ...newBlock("button"), text: "Précommander sapins et gourmandises", url: `${SITE_URL}/boutique` },
+      {
+        ...newBlock("paragraph"),
+        text: "Merci pour votre engagement !\nLa commission du marché de Noël et le bureau du Sou des Écoles",
+      },
+      {
+        ...newBlock("paragraph"),
+        text: "Tout le bureau vous souhaite de très bonnes vacances, à tous ceux qui ont la chance d'en avoir ! 🍂",
+      },
+    ],
+  },
+  {
+    key: "noel-sapins",
+    label: "Marché de Noël — sapins du Morvan et boutique (reste de l'école)",
+    blocks: () => [
+      { ...newBlock("heading"), text: "Bonjour {{prenom}}, vos sapins de Noël du Morvan se commandent dès maintenant !" },
+      {
+        ...newBlock("image"),
+        url: `${SITE_URL}/evenements/sapins-du-morvan.jpg`,
+        alt: "Affiche : sapins de Noël du Morvan, Marché de Noël du Sou des Écoles, samedi 28 novembre 2026",
+        link: `${SITE_URL}/boutique`,
+      },
+      {
+        ...newBlock("paragraph"),
+        text: "Cette année encore, le Sou des Écoles vous propose de beaux sapins du Morvan, fournis sur bûche.\n\n• Des sapins déballés pour mieux choisir : admirez leur forme et leur beauté, encore mieux qu'en magasin !\n• Une fois choisi, votre sapin est remballé pour un transport en toute tranquillité.\n• L'an dernier, les acheteurs ont été ravis de leur qualité !",
+      },
+      { ...newBlock("button"), text: "Commander mon sapin", url: `${SITE_URL}/boutique` },
+      { type: "divider", id: "d2" },
+      { ...newBlock("heading"), text: "Et pour les gourmands…", size: "sm" },
+      {
+        ...newBlock("paragraph"),
+        text: "La boutique du Marché de Noël propose aussi des panettones, du pain d'épices, de la tartiflette et des boules de Noël. Précommandez en quelques clics, le paiement est sécurisé, et toute la recette finance les projets des écoles de Montmerle-Lurcy.",
+      },
+      { ...newBlock("button"), text: "Voir toute la boutique", url: `${SITE_URL}/boutique` },
+      { type: "divider", id: "d3" },
+      { ...newBlock("heading"), text: "Rendez-vous au Marché de Noël", size: "sm" },
+      {
+        ...newBlock("paragraph"),
+        text: "Samedi 28 novembre 2026, de 11h à 20h, place du Marché à Montmerle-sur-Saône : 37 artisans, le Père Noël et sa calèche, un spectacle de feu et le défilé des lampions. Une journée de fête pour toute la famille !",
+      },
+      { ...newBlock("button"), text: "Voir le programme", url: `${SITE_URL}/evenements/marche-de-noel` },
+      {
+        ...newBlock("paragraph"),
+        text: "Merci pour votre soutien !\nLe bureau du Sou des Écoles",
+      },
+      {
+        ...newBlock("paragraph"),
+        text: "Tout le bureau vous souhaite de très bonnes vacances, à tous ceux qui ont la chance d'en avoir ! 🍂",
+      },
+    ],
+  },
+  {
     key: "cotisation",
     label: "Relance cotisation",
     blocks: () => [

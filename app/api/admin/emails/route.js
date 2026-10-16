@@ -35,6 +35,22 @@ function tokensDeClasse(classLevel) {
 // (qui pose le statut `status_current_year = 'ancien_parent'', jamais
 // automatique) — calculée ici à la volée pour rester juste sans dépendre de
 // ce script manuel.
+// Enfant en petite ou moyenne section : niveau individuel s'il est renseigné,
+// sinon classe à un seul niveau (« PS », « MS »).
+function enfantEstPsMs(c) {
+  if (c.niveau) return ["PS", "MS"].includes(c.niveau);
+  const tokens = tokensDeClasse(c.class_level);
+  return tokens.length > 0 && tokens.every((t) => ["PS", "MS"].includes(t));
+}
+
+// Famille dont tous les enfants de l'année sont en PS ou MS : c'est elle que
+// l'option « hors familles PS/MS » écarte (une fratrie avec un plus grand
+// reste, elle, destinataire).
+function familleToutePsMs(f, annee) {
+  const enfants = (f.children || []).filter((c) => c.school_year === annee);
+  return enfants.length > 0 && enfants.every(enfantEstPsMs);
+}
+
 function familleEstAncienne(f, annee) {
   return !(f.children || []).some((c) => c.school_year === annee);
 }
@@ -54,6 +70,7 @@ function famillesCorrespondantes(familles, segment) {
     })
     .filter((f) => {
       if (f.parents.length === 0) return false;
+      if (segment?.exclureToutPsMs && familleToutePsMs(f, annee)) return false;
 
       if (adherents !== "tous") {
         if (adherents === "adherents" && !f.aJour) return false;
@@ -132,6 +149,7 @@ function resumeSegment(segment) {
   if (adherents === "adherents") parts.push("Adhérents à jour uniquement");
   if (adherents === "non_adherents") parts.push("Non-adhérents uniquement");
   if (inclutContacts(segment)) parts.push("+ contacts hors familles");
+  if (segment?.exclureToutPsMs) parts.push("hors familles dont tous les enfants sont en PS/MS");
   if (segment?.exclureDejaServis) parts.push("hors déjà destinataires");
   return parts.join(" — ");
 }
