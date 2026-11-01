@@ -179,6 +179,47 @@ export const TEMPLATES = [
     ],
   },
   {
+    key: "noel-relance-boutique",
+    label: "Marché de Noël — relance de la boutique (tous les parents)",
+    blocks: () => [
+      { ...newBlock("heading"), text: "Bonjour {{prenom}}, le Marché de Noël approche : pensez à commander !" },
+      {
+        ...newBlock("image"),
+        url: `${SITE_URL}/evenements/sapins-du-morvan.jpg`,
+        alt: "Affiche : sapins de Noël du Morvan, Marché de Noël du Sou des Écoles, samedi 28 novembre 2026",
+        link: `${SITE_URL}/boutique`,
+      },
+      {
+        ...newBlock("paragraph"),
+        text: "Rendez-vous le samedi 28 novembre 2026, de 11h à 20h, place du Marché à Montmerle-sur-Saône, pour le Marché de Noël du Sou des Écoles !\n\nVous n'avez pas encore passé commande ? C'est le moment : la boutique en ligne est ouverte, et tout le bénéfice finance les projets scolaires de vos enfants.",
+      },
+      { ...newBlock("heading"), text: "🎄 Nos sapins du Morvan, à choisir dans notre forêt de sapins", size: "sm" },
+      {
+        ...newBlock("paragraph"),
+        text: "Ici, pas de sapin sous filet : nos sapins du Morvan sont déballés et présentés sur pied, dans une vraie forêt de sapins. Vous choisissez le vôtre, vous admirez sa forme et sa beauté — encore mieux qu'en magasin ! — puis il est remballé pour un transport en toute tranquillité.\n\nFournis sur bûche, ils ont ravi les acheteurs l'an dernier. Réservez le vôtre dès maintenant !",
+      },
+      { ...newBlock("button"), text: "Réserver mon sapin", url: `${SITE_URL}/boutique` },
+      { type: "divider", id: "r1" },
+      { ...newBlock("heading"), text: "😋 Et pour les tables de fêtes…", size: "sm" },
+      {
+        ...newBlock("paragraph"),
+        text: "• La tartiflette\n• Les panettones\n• Le pain d'épices\n• Les boules de Noël pour habiller votre sapin\n\nPrécommandez en quelques clics, le paiement est sécurisé.",
+      },
+      { ...newBlock("button"), text: "Voir toute la boutique", url: `${SITE_URL}/boutique` },
+      { type: "divider", id: "r2" },
+      { ...newBlock("heading"), text: "Une journée de fête pour toute la famille", size: "sm" },
+      {
+        ...newBlock("paragraph"),
+        text: "37 artisans, le Père Noël et sa calèche, un spectacle de feu, le défilé des lampions et bien d'autres animations vous attendent le 28 novembre.",
+      },
+      { ...newBlock("button"), text: "Voir le programme", url: `${SITE_URL}/evenements/marche-de-noel` },
+      {
+        ...newBlock("paragraph"),
+        text: "Merci pour votre soutien !\nLe bureau du Sou des Écoles",
+      },
+    ],
+  },
+  {
     key: "cotisation",
     label: "Relance cotisation",
     blocks: () => [
