@@ -11,20 +11,28 @@
 // aussi parent). L'ordre des tests ci-dessous EST la règle de priorité
 // retenue :
 //
-//     enseignant / direction (teachers.active)
+//     bureau (parents.is_admin)
+//   > enseignant / direction (teachers.active)
 //   > partenaire (partenaires.auth_user_id)
-//   > parent, y compris les membres du bureau (défaut)
+//   > parent (défaut)
 //
-// Un membre du bureau arrive sur son espace famille, qui porte le lien
-// « Back-office → » (choix de Thomas, nov. 2026 : à la connexion, le bureau
-// était envoyé directement sur /admin et ne retrouvait plus sa page parent).
-// Depuis /admin, un lien « Mon espace famille » permet de revenir.
+// Un compte qui coche plusieurs cases atterrit sur l'espace le plus « haut »
+// et rejoint ses autres espaces par les liens dédiés (bouton « Back-office »
+// dans /espace-adherent, liens de pied de page, etc.).
 
 // Détermine l'espace d'accueil d'un compte à partir de son user id auth.
-// Renvoie l'un de : "/espace-enseignant", "/partenaire",
+// Renvoie l'un de : "/admin", "/espace-enseignant", "/partenaire",
 // "/espace-adherent".
 export async function resoudreEspace(admin, authUserId) {
   if (!authUserId) return "/espace-adherent";
+
+  // 1. Bureau — priorité absolue.
+  const { data: parent } = await admin
+    .from("parents")
+    .select("is_admin")
+    .eq("auth_user_id", authUserId)
+    .maybeSingle();
+  if (parent?.is_admin) return "/admin";
 
   // 2. Enseignant / direction actif.
   const { data: teacher } = await admin
