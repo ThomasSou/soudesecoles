@@ -12,6 +12,7 @@ const TOUS_LES_DROITS = {
   messages: true,
   enseignants: true,
   remboursements: true,
+  partenaires: true,
 };
 
 // Récapitulatif quotidien : envoyé UNIQUEMENT s'il y a quelque chose à
@@ -34,6 +35,7 @@ export async function POST(request) {
     [a.devis, "devis d'enseignant à valider", "/admin/enseignants"],
     [a.factures, "facture(s) d'enseignant à rembourser", "/admin/enseignants"],
     [a.remboursements, "demande(s) de remboursement de parents", "/admin/remboursements"],
+    [a.pagesPartenaires, "page(s) de partenaire à valider", "/admin/partenaires/pages"],
   ].filter(([n]) => n > 0);
 
   if (lignes.length === 0) {

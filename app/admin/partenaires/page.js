@@ -157,6 +157,9 @@ function PartenairesListe({ accessToken }) {
         <Link href="/admin/partenaires/messages" className="text-sou-blue underline">
           Messages « nouveautés » à modérer →
         </Link>
+        <Link href="/admin/partenaires/pages" className="text-sou-blue underline">
+          Pages publiques à valider →
+        </Link>
         <Link href="/admin/partenaires/niveaux" className="text-sou-blue underline">
           Niveaux et quotas →
         </Link>
