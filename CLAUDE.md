@@ -162,6 +162,15 @@ des membres du bureau sont opérationnels et testés.
 - Segmentation plus fine des destinataires d'e-mails.
 - Intégration SumUp pour la buvette et le rapprochement des cotisations (reportée).
 
+## Préférence de Thomas : automatiser au maximum
+
+Thomas veut automatiser un maximum. Ne lui demande une action manuelle que si
+elle est vraiment impossible à faire autrement : pousse, ouvre et fusionne les
+demandes de fusion toi-même quand il te le demande, et donne-lui le texte prêt
+à coller pour sa session Cowork quand une console web est nécessaire. Les
+migrations SQL restent lancées par lui (ou par Cowork sur sa demande), jamais
+par toi.
+
 ## Deux points de méthode
 
 **Vérifier plutôt que supposer.** Plusieurs vrais défauts n'ont été trouvés qu'en
