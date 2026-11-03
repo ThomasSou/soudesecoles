@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../lib/supabaseClient";
+import EditeurPage from "./EditeurPage";
 
 function euros(cents) {
   if (cents == null) return "—";
@@ -575,6 +576,11 @@ export default function PartenairePage() {
               ))}
             </ul>
           )}
+        </div>
+
+        <div className="border border-slate-200 rounded-xl p-6">
+          <h2 className="font-semibold text-sou-blue mb-1">Ma page sur le site</h2>
+          <EditeurPage accessToken={accessToken} />
         </div>
 
         <div className="border border-slate-200 rounded-xl p-6">

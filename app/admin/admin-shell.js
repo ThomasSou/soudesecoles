@@ -33,6 +33,7 @@ const CLE_ALERTE = {
   "/admin/messages": "messages",
   "/admin/enseignants": "enseignants",
   "/admin/remboursements": "remboursements",
+  "/admin/partenaires": "pagesPartenaires",
 };
 
 // Enveloppe commune au back-office : vérifie que l'utilisateur connecté fait

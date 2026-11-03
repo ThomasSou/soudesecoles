@@ -2,14 +2,32 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PARTNERS } from "../data";
+import { RenduModules } from "../RenduModules";
+import { createAdminClient } from "../../lib/supabaseServerAdmin";
 
-export function generateStaticParams() {
-  return PARTNERS.map((p) => ({ slug: p.slug }));
+// Page rendue à chaque visite : elle peut afficher une version éditée par le
+// partenaire et validée par le bureau (table partenaire_pages).
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
+// Version publiée en base, ou null (alors : affichage codé en dur de data.js).
+// Toute erreur retombe sur l'affichage historique : la page ne doit jamais casser.
+async function pagePubliee(slug) {
+  try {
+    const admin = createAdminClient();
+    const { data: p } = await admin.from("partenaires").select("id, active").eq("slug", slug).maybeSingle();
+    if (!p || p.active === false) return null;
+    const { data: page } = await admin.from("partenaire_pages").select("publie").eq("partenaire_id", p.id).maybeSingle();
+    return page?.publie?.modules?.length ? page.publie : null;
+  } catch {
+    return null;
+  }
 }
 
-export default function PartnerPage({ params }) {
+export default async function PartnerPage({ params }) {
   const partner = PARTNERS.find((p) => p.slug === params.slug);
   if (!partner) return notFound();
+  const publiee = await pagePubliee(partner.slug);
 
   return (
     <section className="max-w-3xl mx-auto px-4 sm:px-6 py-14">
@@ -31,7 +49,9 @@ export default function PartnerPage({ params }) {
         </div>
         <h1 className="text-2xl font-bold text-sou-blue">{partner.name}</h1>
 
-        {partner.description ? (
+        {publiee ? (
+          <RenduModules contenu={publiee} />
+        ) : partner.description ? (
           <p className="text-slate-600 max-w-xl">{partner.description}</p>
         ) : (
           <p className="text-slate-500 text-sm max-w-md">
@@ -40,7 +60,7 @@ export default function PartnerPage({ params }) {
           </p>
         )}
 
-        {(partner.address || partner.phone || partner.email || partner.website) && (
+        {!publiee && (partner.address || partner.phone || partner.email || partner.website) && (
           <div className="w-full max-w-md border-t border-slate-100 pt-4 mt-2 space-y-1 text-sm text-slate-600 text-center">
             {partner.address && <p>{partner.address}</p>}
             {partner.phone && (

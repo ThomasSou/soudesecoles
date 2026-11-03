@@ -10,12 +10,13 @@ export async function compterAlertes(admin, droits) {
     return count || 0;
   };
 
-  const [demandes, messages, devis, factures, remboursements] = await Promise.all([
+  const [demandes, messages, devis, factures, remboursements, pagesPartenaires] = await Promise.all([
     droits.demandes ? compte("registration_requests", (q) => q.eq("status", "pending")) : null,
     droits.messages ? compte("contact_messages", (q) => q.eq("handled", false)) : null,
     droits.enseignants ? compte("teacher_quotes", (q) => q.eq("status", "soumis")) : null,
     droits.enseignants ? compte("teacher_invoices", (q) => q.eq("status", "soumise")) : null,
     droits.remboursements ? compte("reimbursement_requests", (q) => q.eq("status", "pending")) : null,
+    droits.partenaires ? compte("partenaire_pages", (q) => q.eq("statut", "soumis")) : null,
   ]);
 
   return {
@@ -25,5 +26,6 @@ export async function compterAlertes(admin, droits) {
     factures,
     enseignants: devis == null ? null : devis + factures,
     remboursements,
+    pagesPartenaires,
   };
 }
