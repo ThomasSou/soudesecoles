@@ -12,3 +12,6 @@ scripts/familles.json
 scripts/familles-rapport.txt
 scripts/familles-recap.csv
 scripts/derniers-parents-importes.json
+
+# Configuration locale de Claude Code (propre à chaque poste)
+.claude/
