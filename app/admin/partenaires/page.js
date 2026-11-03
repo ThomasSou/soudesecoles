@@ -136,6 +136,16 @@ function NouveauPartenaireForm({ accessToken, onCree }) {
 function PartenairesListe({ accessToken }) {
   const [partenaires, setPartenaires] = useState([]);
   const [chargement, setChargement] = useState(true);
+  const [nbPages, setNbPages] = useState(0);
+
+  // Pages publiques envoyées par les partenaires et en attente du bureau :
+  // c'est ce qui fait passer l'onglet « Partenaires » en rouge.
+  useEffect(() => {
+    fetch("/api/admin/alertes", { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setNbPages(d?.alertes?.pagesPartenaires || 0))
+      .catch(() => {});
+  }, [accessToken]);
 
   useEffect(() => {
     fetch("/api/admin/partenaires", { headers: { Authorization: `Bearer ${accessToken}` } })
@@ -153,12 +163,21 @@ function PartenairesListe({ accessToken }) {
         les avantages offerts aux familles et leur utilisation, et les documents partagés.
       </p>
 
+      {nbPages > 0 && (
+        <Link
+          href="/admin/partenaires/pages"
+          className="block mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 hover:bg-red-100"
+        >
+          {nbPages} page{nbPages > 1 ? "s" : ""} publique{nbPages > 1 ? "s" : ""} de partenaire à valider →
+        </Link>
+      )}
+
       <div className="flex flex-wrap gap-3 mb-6 text-sm">
         <Link href="/admin/partenaires/messages" className="text-sou-blue underline">
           Messages « nouveautés » à modérer →
         </Link>
-        <Link href="/admin/partenaires/pages" className="text-sou-blue underline">
-          Pages publiques à valider →
+        <Link href="/admin/partenaires/pages" className={nbPages > 0 ? "font-bold text-red-600 underline" : "text-sou-blue underline"}>
+          Pages publiques à valider{nbPages > 0 ? ` (${nbPages})` : ""} →
         </Link>
         <Link href="/admin/partenaires/niveaux" className="text-sou-blue underline">
           Niveaux et quotas →

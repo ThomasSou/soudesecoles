@@ -89,6 +89,11 @@ export default function AdminShell({ title, children }) {
       .catch(() => {});
   }, [accessToken, pathname]);
 
+  async function seDeconnecter() {
+    await createClient().auth.signOut();
+    router.replace("/connexion");
+  }
+
   if (state === "chargement") {
     return (
       <section className="max-w-5xl mx-auto px-4 sm:px-6 py-20 text-center text-slate-500">
@@ -124,10 +129,20 @@ export default function AdminShell({ title, children }) {
     <section className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
       <div className="flex flex-wrap items-baseline justify-between gap-2 mb-6">
         <h1 className="text-3xl font-bold text-sou-blue">{title}</h1>
-        <p className="text-sm text-slate-500">
-          Connecté en tant que {parent?.firstName} {parent?.lastName}
-          {parent?.title ? ` — ${parent.title}` : ""}
-        </p>
+        <div className="text-sm text-slate-500 text-right">
+          <p>
+            Connecté en tant que {parent?.firstName} {parent?.lastName}
+            {parent?.title ? ` — ${parent.title}` : ""}
+          </p>
+          <p className="mt-1 flex justify-end gap-4">
+            <Link href="/espace-adherent" className="text-sou-blue hover:underline">
+              Mon espace famille
+            </Link>
+            <button type="button" onClick={seDeconnecter} className="underline hover:text-sou-blue">
+              Se déconnecter
+            </button>
+          </p>
+        </div>
       </div>
 
       <nav className="flex flex-wrap gap-1 border-b border-slate-200 mb-8">
