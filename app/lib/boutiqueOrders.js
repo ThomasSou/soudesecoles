@@ -1,7 +1,8 @@
 // Logique partagée pour confirmer une commande boutique (appelée à la fois
 // par la page de retour /boutique et par le webhook HelloAsso).
 import { createAdminClient } from "./supabaseServerAdmin";
-import { getCheckoutIntent, checkoutIntentIsPaid } from "./helloasso";
+import { getCheckoutIntent, checkoutIntentIsPaid, createCheckoutIntent } from "./helloasso";
+import { SITE_URL } from "./emailBlocks";
 
 // Revérifie le statut réel auprès de HelloAsso (jamais de confiance
 // aveugle dans un webhook ou un paramètre d'URL) et met à jour la commande.
@@ -72,4 +73,40 @@ function currentSchoolYearFallback() {
   const year = date.getFullYear();
   const startYear = date.getMonth() >= 8 ? year : year - 1;
   return `${startYear}-${startYear + 1}`;
+}
+
+// Libellé d'une commande pour HelloAsso et pour les e-mails (« 2x Sapin (Taille : M) »).
+export function libelleCommande(items) {
+  return (
+    (items || [])
+      .map(
+        (it) =>
+          `${it.qty}x ${it.name}${
+            Array.isArray(it.options) && it.options.length > 0 ? ` (${it.options.map((o) => o.value).join(", ")})` : ""
+          }`
+      )
+      .join(", ") || "Boutique Sou des Écoles"
+  );
+}
+
+// Crée une NOUVELLE intention de paiement pour une commande déjà enregistrée
+// (le lien d'une intention HelloAsso n'est valable que peu de temps : pour une
+// relance ou une reprise, on en refait une à la demande) et la mémorise sur
+// la commande, pour que le retour et le webhook retrouvent la bonne commande.
+export async function creerIntentPourCommande(admin, order) {
+  const intent = await createCheckoutIntent({
+    totalCents: order.total_cents,
+    itemName: `Boutique Sou des Écoles — ${libelleCommande(order.items)}`,
+    backUrl: `${SITE_URL}/boutique`,
+    errorUrl: `${SITE_URL}/boutique?commande=${order.id}&statut=erreur`,
+    returnUrl: `${SITE_URL}/boutique?commande=${order.id}&statut=retour`,
+    payer: {
+      firstName: order.buyer_first_name,
+      lastName: order.buyer_last_name,
+      email: order.buyer_email,
+    },
+    metadata: { orderId: order.id },
+  });
+  await admin.from("shop_orders").update({ checkout_intent_id: intent.id }).eq("id", order.id);
+  return intent;
 }
