@@ -401,6 +401,7 @@ function BoutiqueAdmin({ accessToken }) {
   const [onglet, setOnglet] = useState("produits"); // produits | commandes | boutiques
   // Filtre de l'onglet Commandes : "" = toutes, "autres" = produit disparu.
   const [boutiqueCommandes, setBoutiqueCommandes] = useState("");
+  const [tri, setTri] = useState("commande"); // commande | produit | acheteur
   const [nouveau, setNouveau] = useState(false);
   const [enEdition, setEnEdition] = useState(null);
   const [nouvelleBoutique, setNouvelleBoutique] = useState(false);
@@ -593,6 +594,131 @@ function BoutiqueAdmin({ accessToken }) {
   const totalPayeCents = commandesPayees.reduce((s, c) => s + (c.total_cents || 0), 0);
   const commandesEnAttente = commandesAffichees.filter((c) => c.status === "pending");
   const totalAttenteCents = commandesEnAttente.reduce((s, c) => s + (c.total_cents || 0), 0);
+
+  // Trois façons de lire les commandes : une par une (par défaut), regroupées
+  // par produit, ou par acheteur (certains passent plusieurs commandes).
+  const groupesParProduit = (() => {
+    const map = new Map();
+    for (const c of commandesAffichees) {
+      for (const it of c.items || []) {
+        const g = map.get(it.name) || { nom: it.name, payes: 0, attente: 0, lignes: [] };
+        if (c.status === "paid") g.payes += it.qty;
+        if (c.status === "pending") g.attente += it.qty;
+        g.lignes.push({
+          qty: it.qty,
+          acheteur: `${c.buyer_first_name} ${c.buyer_last_name}`,
+          options: Array.isArray(it.options) ? it.options.map((o) => `${o.label} : ${o.value}`).join(" · ") : "",
+          status: c.status,
+        });
+        map.set(it.name, g);
+      }
+    }
+    return [...map.values()].sort((x, y) => x.nom.localeCompare(y.nom, "fr"));
+  })();
+
+  const groupesParAcheteur = (() => {
+    const map = new Map();
+    for (const c of commandesAffichees) {
+      const cle = (c.buyer_email || `${c.buyer_first_name} ${c.buyer_last_name}`).trim().toLowerCase();
+      const g = map.get(cle) || {
+        cle,
+        nom: `${c.buyer_first_name} ${c.buyer_last_name}`,
+        email: c.buyer_email,
+        commandes: [],
+        totalPaye: 0,
+        totalAttente: 0,
+      };
+      g.commandes.push(c);
+      if (c.status === "paid") g.totalPaye += c.total_cents || 0;
+      if (c.status === "pending") g.totalAttente += c.total_cents || 0;
+      map.set(cle, g);
+    }
+    return [...map.values()].sort((x, y) => x.nom.localeCompare(y.nom, "fr"));
+  })();
+
+  function badgeStatut(status) {
+    return (
+      <span
+        className={`text-xs px-2 py-0.5 rounded-full ${
+          status === "paid"
+            ? "bg-green-100 text-green-700"
+            : status === "failed" || status === "cancelled"
+            ? "bg-red-100 text-red-700"
+            : "bg-amber-100 text-amber-700"
+        }`}
+      >
+        {status === "paid" ? "Payée" : status === "pending" ? "En attente" : status}
+      </span>
+    );
+  }
+
+  async function supprimerCommande(c) {
+    if (
+      !confirm(
+        `Supprimer la commande en attente de ${c.buyer_first_name} ${c.buyer_last_name} (${euros(c.total_cents)}) ? Le paiement est revérifié auprès de HelloAsso avant suppression.`
+      )
+    )
+      return;
+    const res = await fetch(`/api/admin/boutique/commandes/${c.id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) alert(data.error || "Suppression impossible.");
+    charger();
+  }
+
+  function carteCommande(c) {
+    return (
+      <div key={c.id} className="bg-white border border-slate-200 rounded-xl p-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <p className="font-semibold text-slate-800">
+              {c.buyer_first_name} {c.buyer_last_name}{" "}
+              <span className="text-xs text-slate-400">
+                ({c.buyer_email}
+                {c.buyer_phone ? ` — ${c.buyer_phone}` : ""})
+              </span>
+            </p>
+            {(c.boutiqueIds || []).length > 0 && (
+              <p className="text-xs font-semibold text-sou-blue mt-0.5">
+                {c.boutiqueIds.map(nomBoutique).filter(Boolean).join(" · ")}
+              </p>
+            )}
+            <ul className="text-xs text-slate-500 mt-1 space-y-0.5">
+              {(c.items || []).map((it, k) => (
+                <li key={k}>
+                  {it.qty}x {it.name}
+                  {Array.isArray(it.options) && it.options.length > 0 && (
+                    <span className="text-slate-700 font-medium">
+                      {" — "}
+                      {it.options.map((o) => `${o.label} : ${o.value}`).join(" · ")}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="text-right space-y-1">
+            <p className="font-semibold text-sou-blue">{euros(c.total_cents)}</p>
+            {badgeStatut(c.status)}
+            {c.status === "pending" && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => supprimerCommande(c)}
+                  className="text-xs text-slate-400 hover:text-red-600 underline"
+                >
+                  supprimer
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   return (
     <div className="space-y-6">
@@ -822,6 +948,15 @@ function BoutiqueAdmin({ accessToken }) {
               ))}
               <option value="autres">Autres (produit supprimé)</option>
             </select>
+            <select
+              value={tri}
+              onChange={(e) => setTri(e.target.value)}
+              className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm"
+            >
+              <option value="commande">Trier : par commande</option>
+              <option value="produit">Trier : par produit</option>
+              <option value="acheteur">Trier : par acheteur</option>
+            </select>
             <span className="text-sm text-slate-500">
               {commandesAffichees.length} commande{commandesAffichees.length > 1 ? "s" : ""}
             </span>
@@ -848,53 +983,49 @@ function BoutiqueAdmin({ accessToken }) {
               </div>
             )}
           </div>
-          {commandesAffichees.map((c) => (
-            <div key={c.id} className="bg-white border border-slate-200 rounded-xl p-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-semibold text-slate-800">
-                    {c.buyer_first_name} {c.buyer_last_name}{" "}
-                    <span className="text-xs text-slate-400">
-                      ({c.buyer_email}
-                      {c.buyer_phone ? ` — ${c.buyer_phone}` : ""})
-                    </span>
-                  </p>
-                  {(c.boutiqueIds || []).length > 0 && (
-                    <p className="text-xs font-semibold text-sou-blue mt-0.5">
-                      {c.boutiqueIds.map(nomBoutique).filter(Boolean).join(" · ")}
-                    </p>
-                  )}
-                  <ul className="text-xs text-slate-500 mt-1 space-y-0.5">
-                    {(c.items || []).map((it, k) => (
-                      <li key={k}>
-                        {it.qty}x {it.name}
-                        {Array.isArray(it.options) && it.options.length > 0 && (
-                          <span className="text-slate-700 font-medium">
-                            {" — "}
-                            {it.options.map((o) => `${o.label} : ${o.value}`).join(" · ")}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-sou-blue">{euros(c.total_cents)}</p>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      c.status === "paid"
-                        ? "bg-green-100 text-green-700"
-                        : c.status === "failed" || c.status === "cancelled"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-amber-100 text-amber-700"
-                    }`}
-                  >
-                    {c.status === "paid" ? "Payée" : c.status === "pending" ? "En attente" : c.status}
+          {tri === "commande" && commandesAffichees.map((c) => carteCommande(c))}
+
+          {tri === "produit" &&
+            groupesParProduit.map((g) => (
+              <div key={g.nom} className="bg-white border border-slate-200 rounded-xl p-4">
+                <p className="font-semibold text-slate-800">
+                  {g.nom}{" "}
+                  <span className="text-sm font-normal text-slate-500">
+                    — {g.payes} vendu{g.payes > 1 ? "s" : ""}
+                    {g.attente > 0 ? ` · ${g.attente} en attente` : ""}
                   </span>
-                </div>
+                </p>
+                <table className="w-full text-sm mt-2">
+                  <tbody>
+                    {g.lignes.map((l, k) => (
+                      <tr key={k} className="border-t border-slate-100">
+                        <td className="py-1 pr-3 w-12 text-slate-700">{l.qty}x</td>
+                        <td className="py-1 pr-3">
+                          {l.acheteur}
+                          {l.options && <span className="text-slate-500"> — {l.options}</span>}
+                        </td>
+                        <td className="py-1 text-right">{badgeStatut(l.status)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          ))}
+            ))}
+
+          {tri === "acheteur" &&
+            groupesParAcheteur.map((g) => (
+              <div key={g.cle} className="space-y-2">
+                <p className="font-semibold text-slate-700 pt-2">
+                  {g.nom} <span className="text-xs font-normal text-slate-400">({g.email})</span>{" "}
+                  <span className="text-sm font-normal text-slate-500">
+                    — {g.commandes.length} commande{g.commandes.length > 1 ? "s" : ""} · {euros(g.totalPaye)} payé
+                    {g.totalAttente > 0 ? ` · ${euros(g.totalAttente)} en attente` : ""}
+                  </span>
+                </p>
+                {g.commandes.map((c) => carteCommande(c))}
+              </div>
+            ))}
+
           {commandesAffichees.length === 0 && (
             <p className="text-sm text-slate-500">Aucune commande pour le moment.</p>
           )}

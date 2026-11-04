@@ -148,6 +148,7 @@ function resumeSegment(segment) {
   }
   if (adherents === "adherents") parts.push("Adhérents à jour uniquement");
   if (adherents === "non_adherents") parts.push("Non-adhérents uniquement");
+  if (segment?.sansCompte) parts.push("compte non activé uniquement");
   if (inclutContacts(segment)) parts.push("+ contacts hors familles");
   if (segment?.exclureToutPsMs) parts.push("hors familles dont tous les enfants sont en PS/MS");
   if (segment?.exclureDejaServis) parts.push("hors déjà destinataires");
@@ -158,7 +159,7 @@ function resumeSegment(segment) {
 // avec « Adhérents à jour uniquement » : par définition ces contacts n'ont
 // pas d'adhésion, les inclure serait un contresens.
 function inclutContacts(segment) {
-  return Boolean(segment?.inclureContacts) && segment?.adherents !== "adherents";
+  return Boolean(segment?.inclureContacts) && segment?.adherents !== "adherents" && !segment?.sansCompte;
 }
 
 // Adresses (en minuscules) ayant déjà reçu un e-mail d'une campagne
@@ -280,15 +281,36 @@ async function chargerFamilles(admin) {
   return familles;
 }
 
+// Adresses dont le compte est VRAIMENT activé : seule une connexion effective
+// (`last_sign_in_at`) le prouve. L'invitation crée le compte Auth dès l'envoi
+// (`confirmed_at` est alors déjà rempli), elle ne dit donc rien (même règle
+// que l'écran Familles, cf. /api/admin/familles).
+async function emailsAvecCompteActive(admin) {
+  const actives = new Set();
+  const parPage = 1000;
+  for (let page = 1; page <= 20; page++) {
+    const { data } = await admin.auth.admin.listUsers({ page, perPage: parPage });
+    const users = data?.users || [];
+    for (const u of users) {
+      if (u.email && u.last_sign_in_at) actives.add(u.email.toLowerCase());
+    }
+    if (users.length < parPage) break;
+  }
+  return actives;
+}
+
 // Un destinataire par parent (pas par famille) : le prénom qui apparaît
 // dans "Bonjour {{prenom}}" doit être celui de la personne qui reçoit
 // l'e-mail, pas celui de son conjoint.
-function destinatairesDe(familles) {
+function destinatairesDe(familles, comptesActives = null) {
   const vus = new Set();
   const destinataires = [];
   for (const f of familles) {
     for (const p of f.parents) {
       if (!p.email || vus.has(p.email.toLowerCase())) continue;
+      // Relance « sans compte » : on écarte les personnes qui se sont déjà
+      // connectées au moins une fois (cf. emailsAvecCompteActive).
+      if (comptesActives && comptesActives.has(p.email.toLowerCase())) continue;
       if (p.email_opt_out) continue; // désinscrit des e-mails
       if (p.email_invalide_le) continue; // adresse signalée invalide (rebond)
       vus.add(p.email.toLowerCase());
@@ -431,7 +453,8 @@ export async function POST(request) {
   } else {
     const familles = await chargerFamilles(auth.admin);
     const correspondantes = famillesCorrespondantes(familles, segment);
-    destinataires = destinatairesDe(correspondantes);
+    const comptesActives = segment?.sansCompte ? await emailsAvecCompteActive(auth.admin) : null;
+    destinataires = destinatairesDe(correspondantes, comptesActives);
 
     if (inclutContacts(segment)) {
       const { data: contacts } = await auth.admin
