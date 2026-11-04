@@ -434,6 +434,90 @@ function ModifierEnfant({ child, token, onDone }) {
   );
 }
 
+// Rattache un enfant à une autre famille (cas typique : deux fiches pour la
+// même famille). L'ancienne fiche n'est jamais supprimée automatiquement.
+function RattacherEnfant({ child, familles, familleActuelleId, token, onDone }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [recherche, setRecherche] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const q = recherche.trim().toLowerCase();
+  const candidates = familles
+    .filter((f) => f.id !== familleActuelleId)
+    .filter((f) => {
+      if (!q) return false;
+      const texte = [
+        nomFamille(f),
+        ...f.parents.map((p) => p.email || ""),
+        ...f.children.map((c) => `${c.first_name} ${c.last_name}`),
+      ].join(" ").toLowerCase();
+      return texte.includes(q);
+    })
+    .slice(0, 6);
+
+  async function rattacher(f) {
+    const enfants = f.children.map((c) => c.first_name).join(", ");
+    if (!confirm(`Rattacher ${child.first_name} ${child.last_name} à la famille « ${nomFamille(f)} »${enfants ? ` (enfants : ${enfants})` : ""} ?`)) return;
+    setBusy(true);
+    const res = await fetch("/api/admin/familles", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ type: "deplacer_enfant", childId: child.id, familyId: f.id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      alert(data.error || "Impossible de rattacher cet enfant.");
+      return;
+    }
+    if (data.ancienneFamilleSansEnfant) {
+      alert("Fait. L'ancienne fiche n'a plus d'enfant : vous pouvez la nettoyer en retirant son parent (bouton « retirer »).");
+    }
+    setOuvert(false);
+    onDone();
+  }
+
+  if (!ouvert) {
+    return (
+      <button type="button" onClick={() => setOuvert(true)} className="text-xs text-slate-400 hover:text-sou-blue ml-1">
+        changer de famille
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-1 ml-1 space-y-1">
+      <div className="flex items-center gap-2">
+        <input
+          autoFocus
+          placeholder="Nom d'un parent, e-mail ou enfant de la bonne famille..."
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+          className="border border-slate-300 rounded-lg px-2 py-1 text-xs w-72"
+        />
+        <button type="button" onClick={() => setOuvert(false)} className="text-xs text-slate-400">
+          Annuler
+        </button>
+      </div>
+      {q && candidates.length === 0 && <p className="text-xs text-slate-400">Aucune autre famille trouvée.</p>}
+      {candidates.map((f) => (
+        <button
+          key={f.id}
+          type="button"
+          disabled={busy}
+          onClick={() => rattacher(f)}
+          className="block text-left text-xs border border-slate-200 rounded-lg px-2 py-1 hover:border-sou-blue disabled:opacity-60"
+        >
+          <span className="font-semibold text-slate-700">{nomFamille(f)}</span>
+          <span className="text-slate-400">
+            {f.children.length > 0 ? ` — enfants : ${f.children.map((c) => c.first_name).join(", ")}` : ""}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // Rangée de pastilles de filtre (une seule sélectionnée à la fois).
 function FiltrePills({ valeur, onChange, options }) {
   return (
@@ -768,6 +852,7 @@ function ListeFamilles({ token }) {
                         <li key={c.id}>
                           {c.first_name} {c.last_name}
                           <ModifierEnfant child={c} token={token} onDone={charger} />
+                          <RattacherEnfant child={c} familles={familles} familleActuelleId={f.id} token={token} onDone={charger} />
                           {scolarise ? (
                             c.class_level && (
                               <span className="text-slate-400"> — {c.class_level}</span>
