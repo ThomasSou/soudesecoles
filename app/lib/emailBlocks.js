@@ -220,6 +220,31 @@ export const TEMPLATES = [
     ],
   },
   {
+    key: "activer-compte",
+    label: "Relance — activer son espace famille (à envoyer aux « sans compte »)",
+    blocks: () => [
+      { ...newBlock("heading"), text: "Bonjour {{prenom}}, votre espace famille vous attend" },
+      {
+        ...newBlock("paragraph"),
+        text: "Le Sou des Écoles vous a invité(e) à créer votre espace famille, mais vous ne vous y êtes pas encore connecté(e). Cela ne prend que quelques instants.",
+      },
+      {
+        ...newBlock("paragraph"),
+        text: "Dans votre espace, vous pouvez adhérer en ligne, retrouver votre carte d'adhérent avec son QR code et consulter l'historique de vos achats et de vos adhésions.",
+      },
+      { ...newBlock("heading"), text: "Comment faire ?", size: "sm" },
+      {
+        ...newBlock("paragraph"),
+        text: "1. Cliquez sur le bouton ci-dessous.\n2. Saisissez l'adresse e-mail sur laquelle vous avez reçu ce message.\n3. Vous recevez un lien pour choisir votre mot de passe.\n\nVous aviez déjà reçu une invitation ? Pensez à regarder dans vos courriers indésirables : ce nouveau lien fait la même chose.",
+      },
+      { ...newBlock("button"), text: "Créer mon mot de passe", url: `${SITE_URL}/mot-de-passe-oublie` },
+      {
+        ...newBlock("paragraph"),
+        text: "Une difficulté ? Répondez simplement à ce message ou écrivez-nous à contact@sou-montmerle.fr : nous vous aiderons.\n\nMerci pour votre soutien !\nLe bureau du Sou des Écoles",
+      },
+    ],
+  },
+  {
     key: "cotisation",
     label: "Relance cotisation",
     blocks: () => [
