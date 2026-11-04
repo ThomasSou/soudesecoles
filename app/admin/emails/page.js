@@ -63,6 +63,9 @@ function EnvoiEmails({ token, parent }) {
   const [niveaux, setNiveaux] = useState([]);
   const [niveauEnfant, setNiveauEnfant] = useState([]);
   const [adherents, setAdherents] = useState("tous");
+  // Relance : seulement les parents qui ne se sont jamais connectés (compte
+  // créé par l'invitation mais jamais activé).
+  const [sansCompte, setSansCompte] = useState(false);
   // Envoi ciblé sur une liste d'adresses collées (scope "liste").
   const [adresses, setAdresses] = useState("");
   // Contacts légers (email_contacts) : adresses récoltées sans fiche famille.
@@ -236,7 +239,8 @@ function EnvoiEmails({ token, parent }) {
       niveaux: scope === "toute" ? [] : niveaux,
       niveauEnfant: scope === "toute" ? [] : niveauEnfant,
       adherents,
-      inclureContacts,
+      sansCompte,
+      inclureContacts: inclureContacts && !sansCompte,
       exclureDejaServis,
       exclureToutPsMs,
     };
@@ -609,6 +613,7 @@ function EnvoiEmails({ token, parent }) {
     setNiveaux(Array.isArray(seg.niveaux) ? seg.niveaux : []);
     setNiveauEnfant(Array.isArray(seg.niveauEnfant) ? seg.niveauEnfant : []);
     setAdherents(seg.adherents || "tous");
+    setSansCompte(!!seg.sansCompte);
     setAdresses(
       typeof seg.adresses === "string"
         ? seg.adresses
@@ -776,6 +781,23 @@ function EnvoiEmails({ token, parent }) {
               </button>
             ))}
           </div>
+        )}
+
+        {scope !== "liste" && (
+          <label className="flex items-start gap-2 text-sm mb-4">
+            <input
+              type="checkbox"
+              checked={sansCompte}
+              onChange={(e) => setSansCompte(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span className="text-slate-600">
+              Seulement les parents qui <strong>n&apos;ont pas activé leur compte</strong>{" "}
+              <span className="text-xs text-slate-400">
+                (jamais connectés : relance pour créer le mot de passe ; les contacts sans fiche famille sont alors exclus)
+              </span>
+            </span>
+          </label>
         )}
 
         {scope !== "liste" && contactsCount > 0 && (
