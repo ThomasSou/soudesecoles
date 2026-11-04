@@ -18,5 +18,17 @@ export async function GET(request) {
     .limit(300);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, orders: data || [] });
+
+  // La boutique (donc la manifestation) d'une commande se déduit de ses
+  // produits : chaque ligne garde l'identifiant du produit commandé, et chaque
+  // produit appartient à une boutique. Pas de migration nécessaire.
+  const { data: produits } = await auth.admin.from("shop_products").select("id, boutique_id");
+  const boutiqueParProduit = Object.fromEntries((produits || []).map((p) => [p.id, p.boutique_id]));
+  const orders = (data || []).map((o) => ({
+    ...o,
+    boutiqueIds: [
+      ...new Set((o.items || []).map((it) => boutiqueParProduit[it.productId]).filter(Boolean)),
+    ],
+  }));
+  return NextResponse.json({ ok: true, orders });
 }

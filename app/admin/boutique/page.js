@@ -399,6 +399,8 @@ function BoutiqueAdmin({ accessToken }) {
   const [produits, setProduits] = useState([]);
   const [commandes, setCommandes] = useState([]);
   const [onglet, setOnglet] = useState("produits"); // produits | commandes | boutiques
+  // Filtre de l'onglet Commandes : "" = toutes, "autres" = produit disparu.
+  const [boutiqueCommandes, setBoutiqueCommandes] = useState("");
   const [nouveau, setNouveau] = useState(false);
   const [enEdition, setEnEdition] = useState(null);
   const [nouvelleBoutique, setNouvelleBoutique] = useState(false);
@@ -579,9 +581,17 @@ function BoutiqueAdmin({ accessToken }) {
 
   const boutiqueActive = boutiques.find((b) => b.id === boutiqueFiltre);
 
-  const commandesPayees = commandes.filter((c) => c.status === "paid");
+  const commandesAffichees = commandes.filter((c) =>
+    !boutiqueCommandes
+      ? true
+      : boutiqueCommandes === "autres"
+      ? (c.boutiqueIds || []).length === 0
+      : (c.boutiqueIds || []).includes(boutiqueCommandes)
+  );
+  const nomBoutique = (id) => boutiques.find((b) => b.id === id)?.name || "";
+  const commandesPayees = commandesAffichees.filter((c) => c.status === "paid");
   const totalPayeCents = commandesPayees.reduce((s, c) => s + (c.total_cents || 0), 0);
-  const commandesEnAttente = commandes.filter((c) => c.status === "pending");
+  const commandesEnAttente = commandesAffichees.filter((c) => c.status === "pending");
   const totalAttenteCents = commandesEnAttente.reduce((s, c) => s + (c.total_cents || 0), 0);
 
   return (
@@ -800,6 +810,22 @@ function BoutiqueAdmin({ accessToken }) {
 
       {onglet === "commandes" && (
         <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-3 mb-1">
+            <select
+              value={boutiqueCommandes}
+              onChange={(e) => setBoutiqueCommandes(e.target.value)}
+              className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm"
+            >
+              <option value="">Toutes les boutiques</option>
+              {boutiques.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+              <option value="autres">Autres (produit supprimé)</option>
+            </select>
+            <span className="text-sm text-slate-500">
+              {commandesAffichees.length} commande{commandesAffichees.length > 1 ? "s" : ""}
+            </span>
+          </div>
           <div className="flex flex-wrap gap-3">
             <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2">
               <p className="text-xs text-green-700">Total encaissé (commandes payées)</p>
@@ -822,7 +848,7 @@ function BoutiqueAdmin({ accessToken }) {
               </div>
             )}
           </div>
-          {commandes.map((c) => (
+          {commandesAffichees.map((c) => (
             <div key={c.id} className="bg-white border border-slate-200 rounded-xl p-4">
               <div className="flex justify-between items-start">
                 <div>
@@ -833,6 +859,11 @@ function BoutiqueAdmin({ accessToken }) {
                       {c.buyer_phone ? ` — ${c.buyer_phone}` : ""})
                     </span>
                   </p>
+                  {(c.boutiqueIds || []).length > 0 && (
+                    <p className="text-xs font-semibold text-sou-blue mt-0.5">
+                      {c.boutiqueIds.map(nomBoutique).filter(Boolean).join(" · ")}
+                    </p>
+                  )}
                   <ul className="text-xs text-slate-500 mt-1 space-y-0.5">
                     {(c.items || []).map((it, k) => (
                       <li key={k}>
@@ -864,7 +895,7 @@ function BoutiqueAdmin({ accessToken }) {
               </div>
             </div>
           ))}
-          {commandes.length === 0 && (
+          {commandesAffichees.length === 0 && (
             <p className="text-sm text-slate-500">Aucune commande pour le moment.</p>
           )}
         </div>
