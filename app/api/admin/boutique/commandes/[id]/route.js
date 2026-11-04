@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../../lib/adminAuth";
 import { getCheckoutIntent, checkoutIntentIsPaid } from "../../../../../lib/helloasso";
-import { confirmOrderIfPaid } from "../../../../../lib/boutiqueOrders";
+import { confirmOrderIfPaid, libelleCommande } from "../../../../../lib/boutiqueOrders";
+import { currentSchoolYear } from "../../../../../lib/anneeScolaire";
 import { sendMail, CONTACT_EMAIL } from "../../../../../lib/mail";
 import { SITE_URL } from "../../../../../lib/emailBlocks";
 
@@ -69,6 +70,7 @@ function echapper(t) {
 // POST { action } sur une commande en attente :
 // - "verifier"  : redemande à HelloAsso si elle est payée (et la passe en « Payée » si oui) ;
 // - "relancer"  : e-mail à l'acheteur avec le récapitulatif et un lien de paiement ;
+// - "marquer_payee" : encaissement hors HelloAsso (chèque ou espèces), avec note ;
 // - "annuler"   : passe la commande en « annulée » (on garde la trace, contrairement à « supprimer »).
 export async function POST(request, { params }) {
   const auth = await requirePermission(request, "boutique");
@@ -76,7 +78,7 @@ export async function POST(request, { params }) {
 
   const body = await request.json().catch(() => ({}));
   const action = body?.action;
-  if (!["verifier", "relancer", "annuler"].includes(action)) {
+  if (!["verifier", "relancer", "annuler", "marquer_payee"].includes(action)) {
     return NextResponse.json({ error: "Action invalide." }, { status: 400 });
   }
 
@@ -99,6 +101,49 @@ export async function POST(request, { params }) {
       .eq("status", "pending");
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
+  }
+
+  if (action === "marquer_payee") {
+    const mode = body?.mode;
+    if (!["cheque", "especes"].includes(mode)) {
+      return NextResponse.json({ error: "Indiquez le mode de paiement (chèque ou espèces)." }, { status: 400 });
+    }
+    const note = typeof body?.note === "string" ? body.note.trim().slice(0, 200) : "";
+    const maintenant = new Date().toISOString();
+    const base = { status: "paid", paid_at: maintenant };
+    let migrationManquante = false;
+    let { data: prise, error } = await auth.admin
+      .from("shop_orders")
+      .update({ ...base, paiement_mode: mode, paiement_note: note || null })
+      .eq("id", order.id)
+      .eq("status", "pending")
+      .select("id");
+    if (error && /paiement_(mode|note)/i.test(error.message)) {
+      // Migration 0058 pas encore passée : on enregistre quand même le paiement.
+      migrationManquante = true;
+      ({ data: prise, error } = await auth.admin
+        .from("shop_orders")
+        .update(base)
+        .eq("id", order.id)
+        .eq("status", "pending")
+        .select("id"));
+    }
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!prise?.length) return NextResponse.json({ error: "Cette commande n'est plus en attente." }, { status: 409 });
+
+    // Même historique d'achats pour la famille que pour un paiement HelloAsso.
+    if (order.family_id) {
+      await auth.admin.from("purchases").insert({
+        family_id: order.family_id,
+        school_year: currentSchoolYear(),
+        label: libelleCommande(order.items),
+        event_name: "Boutique",
+        amount: order.total_cents / 100,
+        payment_method: mode,
+        purchased_at: maintenant,
+      });
+    }
+    return NextResponse.json({ ok: true, migrationManquante });
   }
 
   // relancer
@@ -133,7 +178,16 @@ export async function POST(request, { params }) {
     "Le Sou des Écoles",
   ].join("\n");
 
-  const mail = await sendMail({ to: order.buyer_email, subject: sujet, html, text, replyTo: CONTACT_EMAIL });
+  // SMTP en premier : fiable et rapide. Sender (circuit par défaut des envois
+  // unitaires) répond lentement et pouvait faire dépasser le temps imparti.
+  const mail = await sendMail({
+    to: order.buyer_email,
+    subject: sujet,
+    html,
+    text,
+    replyTo: CONTACT_EMAIL,
+    viaSmtpDabord: true,
+  });
   if (!mail.sent) {
     return NextResponse.json({ error: "L'e-mail n'a pas pu être envoyé. Réessayez dans un instant." }, { status: 502 });
   }

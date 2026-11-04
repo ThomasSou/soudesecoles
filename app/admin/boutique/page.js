@@ -402,6 +402,8 @@ function BoutiqueAdmin({ accessToken }) {
   // Filtre de l'onglet Commandes : "" = toutes, "autres" = produit disparu.
   const [boutiqueCommandes, setBoutiqueCommandes] = useState("");
   const [tri, setTri] = useState("commande"); // commande | produit | acheteur
+  // Commande en cours de « marquage payée » (chèque / espèces) : { id, mode, note }.
+  const [marquage, setMarquage] = useState(null);
   const [nouveau, setNouveau] = useState(false);
   const [enEdition, setEnEdition] = useState(null);
   const [nouvelleBoutique, setNouvelleBoutique] = useState(false);
@@ -662,11 +664,34 @@ function BoutiqueAdmin({ accessToken }) {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ action }),
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) alert(data.error || "Action impossible.");
+    const data = await res.json().catch(() => null);
+    if (data === null) {
+      alert("Le serveur n'a pas répondu à temps. Rechargez la page pour voir si l'action a bien été prise en compte avant de recommencer.");
+    } else if (!res.ok) alert(data.error || "Action impossible.");
     else if (action === "verifier")
       alert(data.payee ? "Paiement confirmé : la commande est maintenant « Payée »." : "Toujours pas de paiement chez HelloAsso : la commande reste en attente.");
     else if (succes) alert(succes);
+    charger();
+  }
+
+  // Encaissement hors HelloAsso (chèque, espèces) : choix du mode + note libre.
+  async function validerMarquage(c) {
+    const res = await fetch(`/api/admin/boutique/commandes/${c.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ action: "marquer_payee", mode: marquage.mode, note: marquage.note }),
+    });
+    const data = await res.json().catch(() => null);
+    if (data === null) {
+      alert("Le serveur n'a pas répondu à temps. Rechargez la page pour vérifier avant de recommencer.");
+    } else if (!res.ok) {
+      alert(data.error || "Action impossible.");
+    } else {
+      if (data.migrationManquante) {
+        alert("Commande marquée « Payée », mais le mode de paiement n'a pas pu être enregistré : la migration 0058 n'a pas encore été lancée.");
+      }
+      setMarquage(null);
+    }
     charger();
   }
 
@@ -732,6 +757,10 @@ function BoutiqueAdmin({ accessToken }) {
                     "Rappel envoyé.")}>
                   relancer par e-mail
                 </button>
+                <button type="button" className="text-slate-400 hover:text-green-700 underline"
+                  onClick={() => setMarquage({ id: c.id, mode: "cheque", note: "" })}>
+                  marquer payée (chèque, espèces)
+                </button>
                 <button type="button" className="text-slate-400 hover:text-amber-600 underline"
                   onClick={() => actionCommande(c, "annuler",
                     `Annuler la commande de ${c.buyer_first_name} ${c.buyer_last_name} ? Elle sera conservée dans la liste avec le statut « annulée ».`)}>
@@ -745,6 +774,31 @@ function BoutiqueAdmin({ accessToken }) {
             )}
           </div>
         </div>
+        {marquage?.id === c.id && (
+          <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-slate-600">Réglée par</span>
+            <select
+              value={marquage.mode}
+              onChange={(e) => setMarquage({ ...marquage, mode: e.target.value })}
+              className="border border-slate-300 rounded-lg px-2 py-1 text-sm"
+            >
+              <option value="cheque">chèque</option>
+              <option value="especes">espèces</option>
+            </select>
+            <input
+              value={marquage.note}
+              onChange={(e) => setMarquage({ ...marquage, note: e.target.value })}
+              placeholder="Note (n° de chèque, qui a encaissé…)"
+              className="border border-slate-300 rounded-lg px-2 py-1 text-sm flex-1 min-w-[12rem]"
+            />
+            <button type="button" onClick={() => validerMarquage(c)} className="text-sm font-semibold text-green-700">
+              Confirmer le paiement
+            </button>
+            <button type="button" onClick={() => setMarquage(null)} className="text-sm text-slate-400">
+              Annuler
+            </button>
+          </div>
+        )}
       </div>
     );
   }
