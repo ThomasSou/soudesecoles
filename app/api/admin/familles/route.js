@@ -334,6 +334,35 @@ export async function PATCH(request) {
     return NextResponse.json({ ok: true });
   }
 
+  // Rattache un enfant à une AUTRE famille existante (ex. deux fiches créées
+  // pour la même famille parce que l'un des parents n'avait pas d'e-mail). On
+  // ne supprime jamais l'ancienne fiche toute seule : si elle est vide, on le
+  // signale et le bureau la nettoie (bouton « retirer » sur ses parents).
+  if (type === "deplacer_enfant") {
+    const { childId, familyId } = body;
+    if (!childId || !familyId) {
+      return NextResponse.json({ error: "childId ou familyId manquant." }, { status: 400 });
+    }
+    const [{ data: enfant }, { data: cible }] = await Promise.all([
+      auth.admin.from("children").select("id, family_id").eq("id", childId).maybeSingle(),
+      auth.admin.from("families").select("id").eq("id", familyId).maybeSingle(),
+    ]);
+    if (!enfant) return NextResponse.json({ error: "Enfant introuvable." }, { status: 404 });
+    if (!cible) return NextResponse.json({ error: "Famille de destination introuvable." }, { status: 404 });
+    if (enfant.family_id === familyId) {
+      return NextResponse.json({ error: "Cet enfant est déjà dans cette famille." }, { status: 400 });
+    }
+
+    const { error } = await auth.admin.from("children").update({ family_id: familyId }).eq("id", childId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    const { count } = await auth.admin
+      .from("children")
+      .select("id", { count: "exact", head: true })
+      .eq("family_id", enfant.family_id);
+    return NextResponse.json({ ok: true, ancienneFamilleSansEnfant: (count || 0) === 0 });
+  }
+
   // Marque (ou retire) l'alerte "e-mail invalide" sur un parent — posée à la
   // main par le bureau quand un envoi de campagne rebondit (pas de détection
   // automatique : les rebonds arrivent dans la boîte contact@, pas via un
