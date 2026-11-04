@@ -51,19 +51,38 @@ function ListeDemandes({ token }) {
     setBusyId(id);
     setError("");
     setAvis("");
-    const res = await fetch("/api/admin/demandes", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ id, action, message: motifs[id] || "" }),
-    });
-    const data = await res.json();
+    // L'envoi des e-mails peut être lent : si le serveur coupe avant de
+    // répondre, la décision est déjà enregistrée mais la réponse n'est pas du
+    // JSON. Dans ce cas on recharge la liste (au lieu de laisser l'écran
+    // périmé) et on le dit, pour ne pas cliquer une seconde fois dans le vide.
+    let res = null;
+    let data = null;
+    try {
+      res = await fetch("/api/admin/demandes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ id, action, message: motifs[id] || "" }),
+      });
+      data = await res.json().catch(() => null);
+    } catch {
+      res = null;
+    }
     setBusyId(null);
 
+    if (!res || data === null) {
+      setError(
+        "Le serveur a mis trop de temps à répondre. La liste vient d'être rechargée : vérifiez si la demande est bien traitée avant de recommencer."
+      );
+      await charger();
+      return;
+    }
     if (!res.ok) {
       setError(data.error || "Une erreur est survenue.");
+      // « déjà traitée » : l'écran était périmé, on le remet à jour.
+      if (res.status === 409) await charger();
       return;
     }
     if (data.mailSent === false) {
