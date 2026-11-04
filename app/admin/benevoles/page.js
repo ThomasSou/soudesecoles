@@ -282,6 +282,12 @@ function AtelierBloc({ atelier, accessToken, onChange }) {
   );
 }
 
+// « Ewen (PS), Maël (CM2) » : les enfants de la famille du bénévole, quand elle
+// est reconnue (compte connecté ou même adresse e-mail qu'un parent).
+function libelleEnfants(enfants) {
+  return (enfants || []).map((e) => (e.classe ? `${e.prenom} (${e.classe})` : e.prenom)).join(", ");
+}
+
 function InscriptionsRoster({ evenementId, accessToken }) {
   const [inscriptions, setInscriptions] = useState([]);
   const [chargement, setChargement] = useState(true);
@@ -302,7 +308,7 @@ function InscriptionsRoster({ evenementId, accessToken }) {
 
   function exporterCsv() {
     const lignes = [
-      ["Événement", "Atelier", "Créneau", "Prénom", "Nom", "E-mail", "Téléphone"],
+      ["Événement", "Atelier", "Créneau", "Prénom", "Nom", "E-mail", "Téléphone", "Enfants (classe)"],
       ...inscriptions.map((i) => [
         i.evenementNom,
         i.atelierNom,
@@ -311,6 +317,7 @@ function InscriptionsRoster({ evenementId, accessToken }) {
         i.last_name,
         i.email,
         i.phone || "",
+        libelleEnfants(i.enfants),
       ]),
     ];
     const csv = lignes.map((l) => l.map((v) => `"${(v || "").replace(/"/g, '""')}"`).join(";")).join("\n");
@@ -387,6 +394,7 @@ function InscriptionsRoster({ evenementId, accessToken }) {
                   <th className="py-1.5 pr-3">Nom</th>
                   <th className="py-1.5 pr-3">E-mail</th>
                   <th className="py-1.5 pr-3">Téléphone</th>
+                  <th className="py-1.5 pr-3">Enfants (classe)</th>
                 </tr>
               </thead>
               <tbody>
@@ -399,6 +407,7 @@ function InscriptionsRoster({ evenementId, accessToken }) {
                     </td>
                     <td className="py-1.5 pr-3">{i.email}</td>
                     <td className="py-1.5 pr-3">{i.phone}</td>
+                    <td className="py-1.5 pr-3">{libelleEnfants(i.enfants) || <span className="text-slate-300">—</span>}</td>
                   </tr>
                 ))}
               </tbody>
