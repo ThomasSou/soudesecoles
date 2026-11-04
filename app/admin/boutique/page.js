@@ -652,6 +652,24 @@ function BoutiqueAdmin({ accessToken }) {
     );
   }
 
+  // Actions sur une commande en attente : vérifier le paiement, relancer
+  // l'acheteur par e-mail, annuler. Chacune revérifie d'abord auprès de
+  // HelloAsso que la commande n'a pas été payée entre-temps.
+  async function actionCommande(c, action, confirmation, succes) {
+    if (confirmation && !confirm(confirmation)) return;
+    const res = await fetch(`/api/admin/boutique/commandes/${c.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ action }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) alert(data.error || "Action impossible.");
+    else if (action === "verifier")
+      alert(data.payee ? "Paiement confirmé : la commande est maintenant « Payée »." : "Toujours pas de paiement chez HelloAsso : la commande reste en attente.");
+    else if (succes) alert(succes);
+    charger();
+  }
+
   async function supprimerCommande(c) {
     if (
       !confirm(
@@ -703,12 +721,24 @@ function BoutiqueAdmin({ accessToken }) {
             <p className="font-semibold text-sou-blue">{euros(c.total_cents)}</p>
             {badgeStatut(c.status)}
             {c.status === "pending" && (
-              <div>
-                <button
-                  type="button"
-                  onClick={() => supprimerCommande(c)}
-                  className="text-xs text-slate-400 hover:text-red-600 underline"
-                >
+              <div className="flex flex-col items-end gap-0.5 text-xs">
+                <button type="button" className="text-slate-400 hover:text-sou-blue underline"
+                  onClick={() => actionCommande(c, "verifier")}>
+                  vérifier le paiement
+                </button>
+                <button type="button" className="text-slate-400 hover:text-sou-blue underline"
+                  onClick={() => actionCommande(c, "relancer",
+                    `Envoyer un rappel de paiement par e-mail à ${c.buyer_first_name} ${c.buyer_last_name} (${c.buyer_email}) ?`,
+                    "Rappel envoyé.")}>
+                  relancer par e-mail
+                </button>
+                <button type="button" className="text-slate-400 hover:text-amber-600 underline"
+                  onClick={() => actionCommande(c, "annuler",
+                    `Annuler la commande de ${c.buyer_first_name} ${c.buyer_last_name} ? Elle sera conservée dans la liste avec le statut « annulée ».`)}>
+                  annuler
+                </button>
+                <button type="button" onClick={() => supprimerCommande(c)}
+                  className="text-slate-400 hover:text-red-600 underline">
                   supprimer
                 </button>
               </div>
