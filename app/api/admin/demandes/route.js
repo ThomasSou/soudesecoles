@@ -119,10 +119,21 @@ export async function POST(request) {
   };
 
   if (action === "refuser") {
-    await admin
+    // La décision est enregistrée EN PREMIER et de façon exclusive (seulement
+    // si la demande est encore en attente) : l'envoi de l'e-mail, plus lent,
+    // peut être coupé par le serveur sans laisser la demande dans l'ancien état.
+    const { data: prise, error: majError } = await admin
       .from("registration_requests")
       .update({ status: "refused", ...decisionCommune })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("status", "pending")
+      .select("id");
+    if (majError) {
+      return NextResponse.json({ error: majError.message }, { status: 500 });
+    }
+    if (!prise?.length) {
+      return NextResponse.json({ error: "Cette demande a déjà été traitée." }, { status: 409 });
+    }
 
     const mail = await sendMail({
       to: demande.email,
@@ -212,10 +223,16 @@ export async function POST(request) {
     await admin.from("children").insert(childRows);
   }
 
-  await admin
+  const { error: majApprouvee } = await admin
     .from("registration_requests")
     .update({ status: "approved", ...decisionCommune })
     .eq("id", id);
+  if (majApprouvee) {
+    return NextResponse.json(
+      { error: `Famille créée et invitation envoyée, mais la demande n'a pas pu être marquée comme validée : ${majApprouvee.message}` },
+      { status: 500 }
+    );
+  }
 
   // Notification interne au bureau.
   await sendMail({
