@@ -144,7 +144,7 @@ export async function PATCH(request, { params }) {
   if (body.paiementStatut !== undefined) {
     const concernePaiement =
       ligne.sens === "depense" &&
-      ligne.source === "manuel" &&
+      (ligne.source === "manuel" || ligne.source === "enseignant") &&
       (ligne.paye_par || "sou") !== "benevole";
     if (!concernePaiement) {
       return NextResponse.json(
@@ -172,16 +172,33 @@ export async function PATCH(request, { params }) {
         body.paiementLe !== undefined
           ? body.paiementLe || null
           : dateActuelle || new Date().toISOString().slice(0, 10);
-      if (statutActuel !== "paye" || moyen !== moyenActuel || date !== dateActuelle) {
+      // Référence (n° de chèque, référence du virement) : écrite seulement si
+      // elle change (compat avant la migration 0059).
+      const referenceDemandee =
+        body.paiementReference !== undefined
+          ? body.paiementReference?.trim() || null
+          : (ligne.paiement_reference ?? null);
+      const referenceChange = referenceDemandee !== (ligne.paiement_reference ?? null);
+      if (statutActuel !== "paye" || moyen !== moyenActuel || date !== dateActuelle || referenceChange) {
         update.paiement_statut = "paye";
         update.moyen_paiement = moyen;
         update.paiement_le = date;
+        if (referenceChange) update.paiement_reference = referenceDemandee;
       }
-    } else if (statutActuel === "paye" || moyenActuel || dateActuelle) {
-      // Retour à « à payer » : on efface le moyen et la date.
+    } else if (
+      ligne.paiement_statut === "paye" ||
+      moyenActuel ||
+      dateActuelle ||
+      ligne.paiement_reference ||
+      // Facture enseignant dont le « payée » est seulement déduit de sa fiche :
+      // on écrit « à payer » en dur pour que le choix du bureau l'emporte.
+      (ligne.source === "enseignant" && ligne.paiement_statut !== "a_payer")
+    ) {
+      // Retour à « à payer » : on efface le moyen, la date et la référence.
       update.paiement_statut = "a_payer";
       update.moyen_paiement = null;
       update.paiement_le = null;
+      if (ligne.paiement_reference) update.paiement_reference = null;
     }
   }
 
@@ -452,6 +469,20 @@ export async function DELETE(request, { params }) {
           "Cette ligne vient d'une demande de remboursement : utilisez le bouton « Refuser » sur la ligne (par exemple pour retirer un doublon), pas la suppression directe.",
       },
       { status: 400 }
+    );
+  }
+
+  // Recette issue d'une facture émise : on ne la supprime pas à la main (la
+  // facture, elle, est numérotée et définitive) ; on annule la facture.
+  const { data: factureLiee } = await auth.admin
+    .from("factures_emises")
+    .select("numero_complet")
+    .eq("recette_ligne_id", params.id)
+    .maybeSingle();
+  if (factureLiee) {
+    return NextResponse.json(
+      { error: `Cette recette est liée à la facture ${factureLiee.numero_complet} : annulez la facture (écran Factures) plutôt que de supprimer la ligne.` },
+      { status: 409 }
     );
   }
 

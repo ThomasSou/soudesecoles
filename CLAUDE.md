@@ -74,6 +74,8 @@ Permissions actuelles : `familles`, `demandes`, `messages`, `emails`, `boutique`
 | `stats.js` | Incrémentation des compteurs de fréquentation |
 | `anneeScolaire.js` | Année scolaire courante et validité d'une adhésion |
 | `adminAuth.js` | Authentification et permissions du back-office |
+| `facturesEmises.js` | Factures émises par le Sou : séries PA/MN, numérotation continue sans trou (une facture s'annule, ne se supprime jamais), recette liée en compta, refus de facturer un don |
+| `facturePdf.js` | PDF d'une facture (bibliothèque `pdf-lib`, ajoutée pour cet export) : logo, mentions légales, « acquittée le… par… », signature du président |
 
 ### Base de données
 

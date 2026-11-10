@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import AdminShell from "../../admin-shell";
+import { telechargerAvecJeton } from "../../../lib/telechargement";
 
 function euros(cents) {
   if (cents == null) return "—";
@@ -43,6 +44,9 @@ function SectionCoordonnees({ accessToken, partenaire, onMaj }) {
     ville: partenaire.ville || "",
     siteWeb: partenaire.site_web || "",
     notes: partenaire.notes || "",
+    raisonSociale: partenaire.raison_sociale || "",
+    formeJuridique: partenaire.forme_juridique || "",
+    siren: partenaire.siren || "",
   }));
   const [envoi, setEnvoi] = useState(false);
   const [msg, setMsg] = useState("");
@@ -112,6 +116,9 @@ function SectionCoordonnees({ accessToken, partenaire, onMaj }) {
           ["codePostal", "Code postal"],
           ["ville", "Ville"],
           ["siteWeb", "Site web"],
+          ["raisonSociale", "Raison sociale (facturation)"],
+          ["formeJuridique", "Forme juridique (SARL, SAS, EI…)"],
+          ["siren", "SIREN (9 chiffres)"],
         ].map(([champ, label]) => (
           <label key={champ} className="text-sm">
             <span className="text-xs font-semibold text-slate-500">{label}</span>
@@ -397,6 +404,55 @@ function SectionPaiements({ accessToken, partenaireId, paiements, periodes, onRe
 }
 
 // --- Section : avantages + utilisation --------------------------------
+// --- Section : factures émises par le Sou ------------------------------
+function SectionFactures({ accessToken, partenaireId, factures }) {
+  const [erreur, setErreur] = useState("");
+  async function pdf(f) {
+    setErreur("");
+    try {
+      await telechargerAvecJeton(`/api/admin/factures/${f.id}/pdf`, accessToken, `${f.numero_complet}.pdf`);
+    } catch (e) {
+      setErreur(e.message);
+    }
+  }
+  return (
+    <div className="border border-slate-200 rounded-xl p-5">
+      <div className="flex items-baseline justify-between gap-3 mb-1">
+        <h2 className="font-semibold text-sou-blue">Factures émises</h2>
+        <Link
+          href={`/admin/comptabilite/factures?partenaire=${partenaireId}`}
+          className="text-sm text-sou-blue underline"
+        >
+          Émettre une facture →
+        </Link>
+      </div>
+      <p className="text-xs text-slate-400 mb-3">
+        Visibles aussi par le partenaire dans son espace. Un don ne se facture pas : il fait l&apos;objet d&apos;un reçu fiscal (Cerfa).
+      </p>
+      {erreur && <p className="text-sm text-red-600 mb-2">{erreur}</p>}
+      {(factures || []).length === 0 ? (
+        <p className="text-sm text-slate-500">Aucune facture émise pour ce partenaire.</p>
+      ) : (
+        <ul className="divide-y divide-slate-100 text-sm">
+          {factures.map((f) => (
+            <li key={f.id} className="py-2 flex items-center justify-between gap-3">
+              <span>
+                <span className="font-semibold">{f.numero_complet}</span>
+                {f.statut === "annulee" && <span className="ml-2 text-xs text-red-600">annulée</span>}
+                <span className="text-slate-500"> · {dateFr(f.date_facture)} · {f.objet}</span>
+              </span>
+              <span className="flex items-center gap-3 shrink-0">
+                <span className="font-semibold">{euros(f.montant_cents)}</span>
+                <button onClick={() => pdf(f)} className="text-sou-blue underline text-xs">PDF</button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function SectionAvantages({ avantages, evenements }) {
   return (
     <div className="border border-slate-200 rounded-xl p-5">
@@ -603,6 +659,7 @@ function FichePartenaire({ accessToken }) {
         periodes={data.periodes}
         onRecharger={recharger}
       />
+      <SectionFactures accessToken={accessToken} partenaireId={id} factures={data.factures} />
       <SectionAvantages avantages={data.avantages} evenements={data.evenements} />
       <SectionDocuments
         accessToken={accessToken}

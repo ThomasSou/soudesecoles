@@ -14,6 +14,18 @@ const SENS = ["depense", "recette"];
 const COMPTES = ["courant", "placement"];
 const MOYENS_PAIEMENT = ["virement", "cheque", "cb", "especes", "prelevement", "autre"];
 
+// Une dépense dont le règlement se suit ici (« à payer » / « payée » + moyen) :
+// saisie à la main OU facture de fournisseur venue de l'espace enseignant,
+// dans les deux cas réglée par le Sou. Les avances de bénévoles ont leur
+// propre suivi (rembourse_le).
+function reglementParLeSou(l) {
+  return (
+    l.sens === "depense" &&
+    (l.source === "manuel" || l.source === "enseignant") &&
+    (l.paye_par || "sou") !== "benevole"
+  );
+}
+
 // Recopie en lignes de compta les factures des enseignants de l'année qui
 // n'y sont pas encore (source = 'enseignant'). Idempotent grâce à l'index
 // unique sur teacher_invoice_id. Pas de trigger SQL : cohérent avec le reste
@@ -202,6 +214,32 @@ export async function GET(request) {
     }
   }
 
+  // Factures émises par le Sou liées à ces recettes (table absente tant que la
+  // migration 0060 n'est pas passée : on ignore simplement l'erreur).
+  const { data: facturesEmises } = ids.length
+    ? await auth.admin
+        .from("factures_emises")
+        .select("id, numero_complet, recette_ligne_id")
+        .in("recette_ligne_id", ids)
+    : { data: [] };
+  const factureEmiseParLigne = Object.fromEntries(
+    (facturesEmises || []).map((f) => [f.recette_ligne_id, f])
+  );
+
+  // Factures enseignant liées : une facture déjà « remboursée » côté
+  // enseignants est considérée comme réglée tant que le bureau n'a rien
+  // précisé ici (évite d'afficher « À payer » sur du déjà payé).
+  const factureIds = [
+    ...new Set((lignesBrutes || []).map((l) => l.teacher_invoice_id).filter(Boolean)),
+  ];
+  const { data: facturesLiees } = factureIds.length
+    ? await auth.admin
+        .from("teacher_invoices")
+        .select("id, status, reimbursed_at")
+        .in("id", factureIds)
+    : { data: [] };
+  const factureParId = Object.fromEntries((facturesLiees || []).map((f) => [f.id, f]));
+
   // Statut de la demande de remboursement liée (pour les lignes bénévoles).
   const demandeIds = [
     ...new Set((lignesBrutes || []).map((l) => l.reimbursement_request_id).filter(Boolean)),
@@ -228,6 +266,8 @@ export async function GET(request) {
     // Justificatif : fichier propre à la ligne (avec sa nature devis /
     // facture provisoire / définitive), ou — pour une ligne recopiée d'une
     // facture enseignant ou d'une demande bénévole — le fichier de celle-ci.
+    facture_emise_id: factureEmiseParLigne[l.id]?.id || null,
+    facture_emise_numero: factureEmiseParLigne[l.id]?.numero_complet || null,
     a_justificatif: Boolean(
       l.justificatif_path || l.teacher_invoice_id || l.reimbursement_request_id
     ),
@@ -256,14 +296,22 @@ export async function GET(request) {
     // (rembourse_le) ; les factures enseignant sont pilotées depuis leur
     // fiche. Défaut « à payer » déduit ici : la colonne n'est écrite que
     // quand le bureau renseigne le paiement (compat avant migration 0049).
-    paiement_concerne:
-      l.sens === "depense" && l.source === "manuel" && (l.paye_par || "sou") !== "benevole",
-    paiement_statut:
-      l.sens === "depense" && l.source === "manuel" && (l.paye_par || "sou") !== "benevole"
-        ? l.paiement_statut || "a_payer"
-        : null,
+    paiement_concerne: reglementParLeSou(l),
+    paiement_statut: reglementParLeSou(l)
+      ? l.paiement_statut ||
+        (l.source === "enseignant" && factureParId[l.teacher_invoice_id]?.status === "remboursee"
+          ? "paye"
+          : "a_payer")
+      : null,
     moyen_paiement: l.moyen_paiement || null,
-    paiement_le: l.paiement_le || null,
+    paiement_le:
+      l.paiement_le ||
+      (!l.paiement_statut &&
+      l.source === "enseignant" &&
+      factureParId[l.teacher_invoice_id]?.status === "remboursee"
+        ? factureParId[l.teacher_invoice_id].reimbursed_at?.slice(0, 10) || null
+        : null),
+    paiement_reference: l.paiement_reference || null,
   }));
 
   // Filtres portant sur les tables de liaison : appliqués ici.
@@ -466,6 +514,7 @@ export async function POST(request) {
   const paiementPaye = concernePaiement && body?.paiementStatut === "paye";
   const moyenPaiement = MOYENS_PAIEMENT.includes(body?.moyenPaiement) ? body.moyenPaiement : null;
   const paiementLe = body?.paiementLe || null;
+  const paiementReference = body?.paiementReference?.trim() || null;
 
   // Un devis (non validé) est une dépense prévisionnelle : la ligne est
   // forcée en statut « prevu », quel que soit le statut demandé.
@@ -617,6 +666,7 @@ export async function POST(request) {
     nouvelleLigne.paiement_statut = "paye";
     nouvelleLigne.moyen_paiement = moyenPaiement;
     if (paiementLe) nouvelleLigne.paiement_le = paiementLe;
+    if (paiementReference) nouvelleLigne.paiement_reference = paiementReference;
   }
 
   const { data: ligne, error } = await auth.admin
