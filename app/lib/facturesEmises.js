@@ -4,6 +4,7 @@
 // Cerfa 2041-MEC-SD) : une facture peut seulement mentionner un don séparé.
 
 import { currentSchoolYear } from "./anneeScolaire";
+import { BUCKET } from "./enseignantFichiers";
 
 // Coordonnées de l'association, imprimées sur chaque facture.
 export const SOU = {
@@ -227,4 +228,33 @@ export async function verifierRattachements(admin, v) {
     if (!data) return "Ce paiement n'appartient pas à ce partenaire.";
   }
   return null;
+}
+
+// Signature du président : image rangée dans le bucket PRIVÉ (jamais dans le
+// dépôt, qui est public, ni dans /public). Lue côté serveur uniquement, au
+// moment de fabriquer le PDF.
+const CHEMIN_SIGNATURE = "factures/signature-president";
+
+export async function chargerSignature(admin) {
+  for (const ext of ["png", "jpg"]) {
+    const { data } = await admin.storage.from(BUCKET).download(`${CHEMIN_SIGNATURE}.${ext}`);
+    if (data) return { octets: new Uint8Array(await data.arrayBuffer()), type: ext };
+  }
+  return null;
+}
+
+export async function enregistrerSignature(admin, dataUrl) {
+  const m = /^data:image\/(png|jpeg);base64,(.+)$/.exec(dataUrl || "");
+  if (!m) return { error: "Image invalide (PNG ou JPEG)." };
+  const buffer = Buffer.from(m[2], "base64");
+  if (buffer.length === 0 || buffer.length > 2 * 1024 * 1024) {
+    return { error: "Image trop lourde (2 Mo maximum)." };
+  }
+  const ext = m[1] === "png" ? "png" : "jpg";
+  // Une seule signature à la fois : on retire l'autre format s'il existait.
+  await admin.storage.from(BUCKET).remove([`${CHEMIN_SIGNATURE}.${ext === "png" ? "jpg" : "png"}`]);
+  const { error } = await admin.storage
+    .from(BUCKET)
+    .upload(`${CHEMIN_SIGNATURE}.${ext}`, buffer, { contentType: `image/${m[1]}`, upsert: true });
+  return error ? { error: error.message } : { ok: true };
 }

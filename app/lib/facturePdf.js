@@ -35,7 +35,8 @@ async function imageDistante(chemin) {
   }
 }
 
-export async function genererPdfFacture(f) {
+// `signature` : { octets, type } renvoyé par chargerSignature (ou null).
+export async function genererPdfFacture(f, { signature = null } = {}) {
   const doc = await PDFDocument.create();
   doc.setTitle(`${f.numero_complet} — ${SOU.nom}`);
   doc.setAuthor(SOU.nom);
@@ -157,17 +158,20 @@ export async function genererPdfFacture(f) {
     y -= 4;
   }
 
-  // Signature du président + (si le fichier existe) image de signature.
+  // Signature du président (image facultative, chargée depuis l'espace privé).
   y -= 24;
   const bloc = G + L - 200;
   ecrire("Le Président", bloc, y, { font: gras, size: 10 });
   ecrire(SOU.president, bloc, y - 14, { size: 10 });
-  const signature = await imageDistante("/documents/signature-president.png");
   if (signature) {
-    const img = await doc.embedPng(signature);
-    const h = 50;
-    const w = Math.min(160, (img.width / img.height) * h);
-    page.drawImage(img, { x: bloc, y: y - 14 - 8 - h, width: w, height: h });
+    try {
+      const img = signature.type === "png" ? await doc.embedPng(signature.octets) : await doc.embedJpg(signature.octets);
+      const h = 50;
+      const w = Math.min(160, (img.width / img.height) * h);
+      page.drawImage(img, { x: bloc, y: y - 14 - 8 - h, width: w, height: h });
+    } catch {
+      /* image illisible : on laisse l'espace de signature vide */
+    }
   }
 
   if (f.statut === "annulee") {

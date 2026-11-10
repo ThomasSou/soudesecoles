@@ -489,6 +489,54 @@ function LigneFacture({ accessToken, facture, donnees, onChange }) {
   );
 }
 
+function BlocSignature({ accessToken, chargee, onDone }) {
+  const [erreur, setErreur] = useState("");
+  const [occupe, setOccupe] = useState(false);
+
+  function lire(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
+  async function choisir(file) {
+    if (!file) return;
+    setErreur("");
+    setOccupe(true);
+    try {
+      const imageDataUrl = await lire(file);
+      const res = await fetch("/api/admin/factures/signature", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ imageDataUrl }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Envoi impossible.");
+      onDone();
+    } catch (e) {
+      setErreur(e.message);
+    }
+    setOccupe(false);
+  }
+
+  return (
+    <div className="text-sm border border-slate-200 rounded-xl p-3 mb-5 flex flex-wrap items-center gap-3">
+      <span className="font-semibold text-slate-700">Signature du président sur les PDF :</span>
+      <span className={chargee ? "text-green-700" : "text-amber-700"}>{chargee ? "chargée ✓" : "pas encore chargée"}</span>
+      <label className="text-sou-blue underline cursor-pointer">
+        {chargee ? "remplacer l'image" : "charger l'image"} (PNG ou JPEG)
+        <input type="file" accept="image/png,image/jpeg" disabled={occupe} className="hidden" onChange={(e) => choisir(e.target.files?.[0])} />
+      </label>
+      <span className="text-xs text-slate-400 w-full">
+        Conservée dans un espace privé (jamais publique). Un PNG à fond transparent donne le meilleur rendu.
+      </span>
+      {erreur && <span className="text-red-600 w-full">{erreur}</span>}
+    </div>
+  );
+}
+
 function Liste({ accessToken }) {
   const recherche = useSearchParams();
   const partenaireInitial = recherche.get("partenaire") || "";
@@ -519,6 +567,7 @@ function Liste({ accessToken }) {
 
       {donnees && (
         <>
+          <BlocSignature accessToken={accessToken} chargee={donnees.signatureChargee} onDone={charger} />
           {!formOuvert ? (
             <button onClick={() => { setFormOuvert(true); setMessage(""); }} className="bg-sou-blue text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-sou-gold transition-colors mb-5">
               + Émettre une facture

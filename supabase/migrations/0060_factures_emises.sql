@@ -17,7 +17,7 @@
 --
 -- Pièces déjà émises HORS du site, à reprendre pour que la suite continue
 -- sans trou :
---   PA2026-001  Restaurant Emile Job, Pack Bronze 2025, 50 €,  acquittée le 19/10/2026 par virement
+--   PA2026-001  Restaurant Emile Job, Pack Bronze 2025, 50 €,  émise le 10/11/2026, acquittée le 19/10/2026 par virement
 --   PA2026-002  Restaurant Emile Job, Pack Argent 2026, 100 €, même règlement
 --   MN2026-001  reçu du marché de Noël (non repris ici : seul son numéro compte)
 -- => prochaine facture de partenariat : PA2026-003 ; prochaine pièce du marché
@@ -109,35 +109,57 @@ create index if not exists idx_factures_emises_partenaire on factures_emises (pa
 create index if not exists idx_factures_emises_recette on factures_emises (recette_ligne_id);
 alter table factures_emises enable row level security;
 
--- 4. Les deux factures de partenariat déjà émises -----------------------------------
+-- 4. Les deux factures de partenariat déjà émises (données des PDF d'origine) ----------
+-- Émises le 10/11/2026 ; acquittées le 19/10/2026 par DEUX virements (300 € et
+-- 600 €, soit 900 € au total) qui comprennent aussi le don de 750 € (couvert par
+-- un reçu fiscal Cerfa 2041-MEC-SD séparé, donc simplement mentionné).
 -- Le partenaire est retrouvé par son nom s'il existe déjà dans le back-office ;
 -- sinon il reste vide et se rattache ensuite depuis l'écran des factures.
--- ATTENTION : date_facture est fixée au 19/10/2026 (date de l'acquittement,
--- seule date connue) — à corriger par un `update` si la date d'émission diffère.
 insert into factures_emises
   (serie, annee, numero, numero_complet, date_facture,
-   client_raison_sociale, client_adresse, client_code_postal, client_ville,
-   objet, montant_cents, acquittee_le, moyen_paiement, partenaire_id)
-select 'PA', 2026, 1, 'PA2026-001', date '2026-10-19',
-       'Restaurant Emile Job', '12 rue du Pont', '01090', 'Montmerle-sur-Saône',
-       'Partenariat — Pack Bronze 2025', 5000, date '2026-10-19', 'virement',
+   client_raison_sociale, client_forme, client_siren,
+   client_adresse, client_code_postal, client_ville,
+   objet, montant_cents, acquittee_le, moyen_paiement, paiement_reference,
+   don_associe_cents, partenaire_id)
+select 'PA', 2026, 1, 'PA2026-001', date '2026-11-10',
+       'RESTAURANT EMILE JOB', 'SAS', '334139326',
+       '12 rue du Pont', '01090', 'Montmerle-sur-Saône',
+       'Adhésion partenaire Pack Bronze — année 2025 du Sou des Écoles',
+       5000, date '2026-10-19', 'virement',
+       'deux virements de 300,00 € et 600,00 € (900,00 € au total, don compris)',
+       75000,
        (select id from partenaires where nom ilike 'emile job%' order by created_at limit 1)
 where not exists (select 1 from factures_emises where numero_complet = 'PA2026-001');
 
 insert into factures_emises
   (serie, annee, numero, numero_complet, date_facture,
-   client_raison_sociale, client_adresse, client_code_postal, client_ville,
-   objet, montant_cents, acquittee_le, moyen_paiement, partenaire_id)
-select 'PA', 2026, 2, 'PA2026-002', date '2026-10-19',
-       'Restaurant Emile Job', '12 rue du Pont', '01090', 'Montmerle-sur-Saône',
-       'Partenariat — Pack Argent 2026', 10000, date '2026-10-19', 'virement',
+   client_raison_sociale, client_forme, client_siren,
+   client_adresse, client_code_postal, client_ville,
+   objet, montant_cents, acquittee_le, moyen_paiement, paiement_reference,
+   don_associe_cents, partenaire_id)
+select 'PA', 2026, 2, 'PA2026-002', date '2026-11-10',
+       'RESTAURANT EMILE JOB', 'SAS', '334139326',
+       '12 rue du Pont', '01090', 'Montmerle-sur-Saône',
+       'Adhésion partenaire Pack Argent — année 2026 du Sou des Écoles : logo format moyen sur tous les supports (roll-up, banderole, affiches), page partenaire sur sou-montmerle.fr, logo sur Facebook, Instagram et en pied des mails, table partenaires lors des manifestations, espace partenaire et 1 mail dédié par an.',
+       10000, date '2026-10-19', 'virement',
+       'deux virements de 300,00 € et 600,00 € (900,00 € au total, don compris)',
+       75000,
        (select id from partenaires where nom ilike 'emile job%' order by created_at limit 1)
 where not exists (select 1 from factures_emises where numero_complet = 'PA2026-002');
 
+-- Si la fiche du partenaire existe, on y renseigne les coordonnées de facturation
+-- (seulement les champs encore vides).
+update partenaires
+   set raison_sociale = coalesce(raison_sociale, 'RESTAURANT EMILE JOB'),
+       forme_juridique = coalesce(forme_juridique, 'SAS'),
+       siren = coalesce(siren, '334139326')
+ where nom ilike 'emile job%';
+
 -- Vérif après commit :
--- select numero_complet, client_raison_sociale, montant_cents, acquittee_le, partenaire_id is not null as rattachee
+-- select numero_complet, client_raison_sociale, client_siren, montant_cents, don_associe_cents,
+--        date_facture, acquittee_le, partenaire_id is not null as rattachee
 --   from factures_emises order by numero_complet;
---   attendu : PA2026-001 (5000) et PA2026-002 (10000)
+--   attendu : PA2026-001 (5000) et PA2026-002 (10000), SIREN 334139326, don 75000
 -- select * from facture_numeros_hors_site;
 --   attendu : MN / 2026 / 1
 

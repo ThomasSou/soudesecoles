@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolvePartenaireSession } from "../../../../../lib/partenaires";
 import { genererPdfFacture } from "../../../../../lib/facturePdf";
+import { chargerSignature } from "../../../../../lib/facturesEmises";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -20,7 +21,7 @@ export async function GET(request, { params }) {
     .maybeSingle();
   if (!facture) return NextResponse.json({ error: "Facture introuvable." }, { status: 404 });
 
-  const pdf = await genererPdfFacture(facture);
+  const pdf = await genererPdfFacture(facture, { signature: await chargerSignature(admin) });
   return new Response(pdf, {
     headers: {
       "Content-Type": "application/pdf",

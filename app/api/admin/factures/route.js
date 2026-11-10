@@ -7,6 +7,7 @@ import {
   prochainNumero,
   formaterNumero,
   verifierRattachements,
+  chargerSignature,
 } from "../../../lib/facturesEmises";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +60,7 @@ export async function GET(request) {
 
   return NextResponse.json({
     ok: true,
+    signatureChargee: Boolean(await chargerSignature(admin)),
     factures: (factures || []).map((f) => ({ ...f, partenaireNom: nomPartenaire[f.partenaire_id] || null })),
     series: series || [],
     prochains,
