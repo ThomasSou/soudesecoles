@@ -472,6 +472,20 @@ export async function DELETE(request, { params }) {
     );
   }
 
+  // Recette issue d'une facture émise : on ne la supprime pas à la main (la
+  // facture, elle, est numérotée et définitive) ; on annule la facture.
+  const { data: factureLiee } = await auth.admin
+    .from("factures_emises")
+    .select("numero_complet")
+    .eq("recette_ligne_id", params.id)
+    .maybeSingle();
+  if (factureLiee) {
+    return NextResponse.json(
+      { error: `Cette recette est liée à la facture ${factureLiee.numero_complet} : annulez la facture (écran Factures) plutôt que de supprimer la ligne.` },
+      { status: 409 }
+    );
+  }
+
   const { error } = await auth.admin.from("compta_lignes").delete().eq("id", params.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

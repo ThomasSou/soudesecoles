@@ -214,6 +214,18 @@ export async function GET(request) {
     }
   }
 
+  // Factures émises par le Sou liées à ces recettes (table absente tant que la
+  // migration 0060 n'est pas passée : on ignore simplement l'erreur).
+  const { data: facturesEmises } = ids.length
+    ? await auth.admin
+        .from("factures_emises")
+        .select("id, numero_complet, recette_ligne_id")
+        .in("recette_ligne_id", ids)
+    : { data: [] };
+  const factureEmiseParLigne = Object.fromEntries(
+    (facturesEmises || []).map((f) => [f.recette_ligne_id, f])
+  );
+
   // Factures enseignant liées : une facture déjà « remboursée » côté
   // enseignants est considérée comme réglée tant que le bureau n'a rien
   // précisé ici (évite d'afficher « À payer » sur du déjà payé).
@@ -254,6 +266,8 @@ export async function GET(request) {
     // Justificatif : fichier propre à la ligne (avec sa nature devis /
     // facture provisoire / définitive), ou — pour une ligne recopiée d'une
     // facture enseignant ou d'une demande bénévole — le fichier de celle-ci.
+    facture_emise_id: factureEmiseParLigne[l.id]?.id || null,
+    facture_emise_numero: factureEmiseParLigne[l.id]?.numero_complet || null,
     a_justificatif: Boolean(
       l.justificatif_path || l.teacher_invoice_id || l.reimbursement_request_id
     ),

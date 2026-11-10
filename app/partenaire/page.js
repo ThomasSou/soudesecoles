@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../lib/supabaseClient";
 import EditeurPage from "./EditeurPage";
+import { telechargerAvecJeton } from "../lib/telechargement";
 
 function euros(cents) {
   if (cents == null) return "—";
@@ -38,6 +39,51 @@ const STATUT_MESSAGE = {
   refuse: "Refusé",
   publie: "Publié",
 };
+
+// --- Mes factures ------------------------------------------------------
+function MesFactures({ accessToken }) {
+  const [factures, setFactures] = useState(null);
+  const [erreur, setErreur] = useState("");
+
+  useEffect(() => {
+    fetch("/api/partenaire/factures", { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then((r) => r.json())
+      .then((d) => (d.error ? setErreur(d.error) : setFactures(d.factures || [])))
+      .catch(() => setErreur("Chargement impossible."));
+  }, [accessToken]);
+
+  async function pdf(f) {
+    try {
+      await telechargerAvecJeton(`/api/partenaire/factures/${f.id}/pdf`, accessToken, `${f.numero_complet}.pdf`);
+    } catch (e) {
+      setErreur(e.message);
+    }
+  }
+
+  if (erreur) return <p className="text-sm text-red-600">{erreur}</p>;
+  if (!factures) return <p className="text-slate-500 text-sm">Chargement...</p>;
+  if (factures.length === 0) {
+    return <p className="text-sm text-slate-500">Aucune facture pour le moment.</p>;
+  }
+  return (
+    <ul className="divide-y divide-slate-100 text-sm">
+      {factures.map((f) => (
+        <li key={f.id} className="py-2 flex items-center justify-between gap-3">
+          <span>
+            <span className="font-semibold">{f.numero_complet}</span>
+            <span className="text-slate-500"> · {dateFr(f.date_facture)} · {f.objet}</span>
+          </span>
+          <span className="flex items-center gap-3 shrink-0">
+            <span className="font-semibold">{euros(f.montant_cents)}</span>
+            <button onClick={() => pdf(f)} className="text-sou-blue underline text-xs">
+              Télécharger (PDF)
+            </button>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 // --- Messages « nouveautés » -----------------------------------------
 function MesMessagesNouveautes({ accessToken }) {
@@ -576,6 +622,14 @@ export default function PartenairePage() {
               ))}
             </ul>
           )}
+        </div>
+
+        <div className="border border-slate-200 rounded-xl p-6">
+          <h2 className="font-semibold text-sou-blue mb-1">Mes factures</h2>
+          <p className="text-sm text-slate-500 mb-3">
+            Les factures émises par le Sou des Écoles pour votre partenariat (acquittées), à télécharger.
+          </p>
+          <MesFactures accessToken={accessToken} />
         </div>
 
         <div className="border border-slate-200 rounded-xl p-6">

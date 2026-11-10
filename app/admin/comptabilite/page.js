@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import AdminShell from "../admin-shell";
 import {
   CLASSES_REFERENCE,
@@ -1408,6 +1409,9 @@ function LigneRow({
           {ligne.source === "enseignant" && (
             <span className="text-sou-blue"> · facture enseignant</span>
           )}
+          {ligne.facture_emise_numero && (
+            <span className="text-green-700"> · facture émise {ligne.facture_emise_numero}</span>
+          )}
           {ligne.paye_par === "benevole" && (
             <span className="text-amber-700"> · avancé par {payeurNom(ligne, parents)}</span>
           )}
@@ -1576,7 +1580,7 @@ function LigneRow({
             Éditer
           </button>
         )}
-        {ligne.source === "manuel" && (
+        {ligne.source === "manuel" && !ligne.facture_emise_numero && (
           <button
             onClick={supprimer}
             disabled={envoi}
@@ -1885,6 +1889,12 @@ function ComptaAdmin({ accessToken }) {
         >
           Relevé bancaire
         </button>
+        <Link
+          href="/admin/comptabilite/factures"
+          className="px-4 py-2 rounded-full text-sm font-semibold bg-white border border-slate-300 text-slate-600 hover:border-sou-blue"
+        >
+          Factures émises →
+        </Link>
       </div>
 
       {onglet === "releve" && (

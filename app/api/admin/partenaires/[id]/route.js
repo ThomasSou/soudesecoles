@@ -29,12 +29,18 @@ export async function GET(request, { params }) {
     { data: avantages },
     { data: documents },
     { data: evenements },
+    { data: factures },
   ] = await Promise.all([
     admin.from("partenaire_periodes").select("*").eq("partenaire_id", params.id).order("debut", { ascending: false }),
     admin.from("partenaire_paiements").select("*").eq("partenaire_id", params.id).order("recu_le", { ascending: false }),
     admin.from("avantages").select("*").eq("partenaire_id", params.id).order("created_at", { ascending: false }),
     admin.from("partenaire_documents").select("*").eq("partenaire_id", params.id).order("depose_le", { ascending: false }),
     admin.from("avantage_evenements").select("*").eq("partenaire_id", params.id).order("created_at", { ascending: false }).limit(200),
+    admin
+      .from("factures_emises")
+      .select("id, numero_complet, type_piece, statut, date_facture, objet, montant_cents, acquittee_le, periode_id")
+      .eq("partenaire_id", params.id)
+      .order("date_facture", { ascending: false }),
   ]);
 
   // Nombre d'utilisations (consommations familles) par avantage.
@@ -58,6 +64,7 @@ export async function GET(request, { params }) {
     avantages: (avantages || []).map((a) => ({ ...a, utilisations: utilisationsParAvantage[a.id] || 0 })),
     documents: documents || [],
     evenements: evenements || [],
+    factures: factures || [],
   });
 }
 
@@ -79,9 +86,18 @@ export async function PATCH(request, { params }) {
     siteWeb: "site_web",
     notes: "notes",
     slug: "slug",
+    raisonSociale: "raison_sociale",
+    formeJuridique: "forme_juridique",
   };
   for (const [cle, colonne] of Object.entries(champs)) {
     if (typeof body?.[cle] === "string") update[colonne] = body[cle].trim() || null;
+  }
+  if (typeof body?.siren === "string") {
+    const siren = body.siren.replace(/[\s.]/g, "");
+    if (siren && !/^\d{9}$/.test(siren)) {
+      return NextResponse.json({ error: "Le SIREN doit comporter 9 chiffres." }, { status: 400 });
+    }
+    update.siren = siren || null;
   }
   if (typeof body?.email === "string") update.email = body.email.trim().toLowerCase() || null;
   if (typeof body?.active === "boolean") update.active = body.active;
