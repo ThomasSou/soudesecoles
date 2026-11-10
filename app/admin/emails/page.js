@@ -31,12 +31,17 @@ const NIVEAUX = [
 
 // Niveau individuel de l'enfant (indépendant de sa classe) : utile pour les
 // classes à double niveau, où seuls les enfants du niveau coché doivent
-// recevoir l'e-mail — pas toute la classe. Élémentaire pas encore disponible
-// (le niveau individuel n'y est pas encore distingué de la classe).
+// recevoir l'e-mail — pas toute la classe. Les niveaux de l'élémentaire se
+// renseignent par l'import de la liste de l'école (écran Enfants).
 const NIVEAUX_ENFANT = [
   { key: "PS", label: "Petite section (PS)" },
   { key: "MS", label: "Moyenne section (MS)" },
   { key: "GS", label: "Grande section (GS)" },
+  { key: "CP", label: "CP" },
+  { key: "CE1", label: "CE1" },
+  { key: "CE2", label: "CE2" },
+  { key: "CM1", label: "CM1" },
+  { key: "CM2", label: "CM2" },
 ];
 
 // Pause entre deux vagues d'envoi (cf. app/lib/emailCampagne.js : ~20
