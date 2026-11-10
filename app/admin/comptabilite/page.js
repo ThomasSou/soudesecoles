@@ -548,6 +548,10 @@ function LigneForm({
   // toucher au montant ni à « qui a avancé » — ça reste ce que le bénévole
   // a déclaré.
   const estBenevole = ligne?.source === "benevole";
+  // Facture de fournisseur venue de l'espace enseignant : libellé, montant,
+  // fournisseur et classes restent pilotés par la fiche enseignant ; le
+  // bureau ne règle ici que la date, le règlement, la note et le justificatif.
+  const estEnseignant = ligne?.source === "enseignant";
   const groupes = GROUPES;
   const anneesOptions = [
     ...new Set([
@@ -596,6 +600,7 @@ function LigneForm({
   );
   const [moyenPaiement, setMoyenPaiement] = useState(ligne?.moyen_paiement || "virement");
   const [paiementLe, setPaiementLe] = useState(ligne?.paiement_le || "");
+  const [paiementReference, setPaiementReference] = useState(ligne?.paiement_reference || "");
   const [note, setNote] = useState(ligne?.note || "");
   const [justificatif, setJustificatif] = useState(null);
   const [justificatifType, setJustificatifType] = useState(
@@ -675,7 +680,7 @@ function LigneForm({
       );
       return;
     }
-    if (!fournisseur.trim()) {
+    if (!estEnseignant && !fournisseur.trim()) {
       setErreur("Le fournisseur est obligatoire.");
       return;
     }
@@ -730,6 +735,10 @@ function LigneForm({
       paiementLe:
         sens === "depense" && payePar === "sou" && paiementStatut === "paye"
           ? paiementLe || null
+          : undefined,
+      paiementReference:
+        sens === "depense" && payePar === "sou" && paiementStatut === "paye"
+          ? paiementReference
           : undefined,
       justificatifDataUrl,
       justificatifType,
@@ -790,6 +799,22 @@ function LigneForm({
       onSubmit={soumettre}
       className="border border-sou-blue/30 bg-sou-blue/5 rounded-xl p-4 space-y-3"
     >
+      {estEnseignant && (
+        <div className="text-sm rounded-lg bg-white border border-slate-200 p-3 space-y-0.5">
+          <p className="font-semibold text-slate-700">{ligne.libelle}</p>
+          <p className="text-slate-500">
+            {ligne.fournisseur ? `${ligne.fournisseur} · ` : ""}
+            {euros(ligne.montant_cents)}
+            {ligne.classes?.length ? ` · ${ligne.classes.map((c) => libelleClasse(c)).join(", ")}` : ""}
+          </p>
+          <p className="text-xs text-slate-400">
+            Facture venue de l&apos;espace enseignant : libellé, montant et classes se modifient depuis
+            l&apos;onglet Enseignants. Ici, vous réglez la date, le règlement, la note et le justificatif.
+          </p>
+        </div>
+      )}
+
+      {!estEnseignant && (
       <div className="flex gap-2">
         {["depense", "recette"].map((s) => (
           <button
@@ -809,6 +834,9 @@ function LigneForm({
         ))}
       </div>
 
+      )}
+
+      {!estEnseignant && (
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="text-sm">
           Rubrique
@@ -825,8 +853,9 @@ function LigneForm({
           </select>
         </label>
       </div>
+      )}
 
-      {rubrique === "evenement" && (
+      {!estEnseignant && rubrique === "evenement" && (
         <div className="text-sm space-y-2">
           <p>
             Manifestation(s) concernée(s){" "}
@@ -891,7 +920,7 @@ function LigneForm({
         </div>
       )}
 
-      {rubrique === "classe" && (
+      {!estEnseignant && rubrique === "classe" && (
         <div className="text-sm space-y-2">
           <p>
             Classe(s) concernée(s){" "}
@@ -942,6 +971,8 @@ function LigneForm({
       )}
 
       <div className="grid sm:grid-cols-2 gap-3">
+        {!estEnseignant && (
+          <>
         <label className="text-sm">
           Libellé
           <input
@@ -983,6 +1014,8 @@ function LigneForm({
             </span>
           )}
         </label>
+          </>
+        )}
         <label className="text-sm">
           Date de l&apos;opération{" "}
           <span className="text-slate-400">
@@ -1027,6 +1060,7 @@ function LigneForm({
             ))}
           </select>
         </label>
+        {!estEnseignant && (
         <label className="text-sm">
           Exercice{" "}
           <span className="text-slate-400">
@@ -1044,9 +1078,10 @@ function LigneForm({
             ))}
           </select>
         </label>
+        )}
       </div>
 
-      {estBenevole ? (
+      {estEnseignant ? null : estBenevole ? (
         <p className="text-sm">
           Avance de{" "}
           <strong>
@@ -1133,6 +1168,15 @@ function LigneForm({
                   value={paiementLe}
                   onChange={(e) => setPaiementLe(e.target.value)}
                   className={champ}
+                />
+              </label>
+              <label className="text-sm sm:col-span-2">
+                N° de chèque / référence du virement (facultatif)
+                <input
+                  value={paiementReference}
+                  onChange={(e) => setPaiementReference(e.target.value)}
+                  className={champ}
+                  placeholder="ex. chèque n° 1234567"
                 />
               </label>
             </div>
@@ -1479,6 +1523,7 @@ function LigneRow({
                   ? ` par ${(MOYENS_PAIEMENT[ligne.moyen_paiement] || ligne.moyen_paiement).toLowerCase()}`
                   : ""}
                 {ligne.paiement_le ? ` le ${formatDate(ligne.paiement_le)}` : ""}
+                {ligne.paiement_reference ? ` (${ligne.paiement_reference})` : ""}
               </span>
               <button
                 onClick={() => patch({ paiementStatut: "a_payer" })}
@@ -1523,7 +1568,7 @@ function LigneRow({
             </button>
           ))}
 
-        {(ligne.source === "manuel" || ligne.source === "benevole") && (
+        {(ligne.source === "manuel" || ligne.source === "benevole" || ligne.source === "enseignant") && (
           <button
             onClick={() => setEdition(true)}
             className="text-xs font-semibold text-sou-blue px-2"
