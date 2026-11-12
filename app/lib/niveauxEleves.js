@@ -67,14 +67,35 @@ export function rapprocherNiveaux(eleves, enfants) {
   const ambigus = [];
   const vus = new Set();
 
+  // La liste ne concerne que l'élémentaire : un enfant de maternelle du site
+  // n'est jamais le bon, même s'il porte le même nom (ex. deux « Granger Léo »,
+  // l'un en MS, l'autre en CM1-CM2).
+  const tokens = (classe) => String(classe || "").toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
+  const enMaternelle = (c) => tokens(c.class_level).some((t) => ["PS", "MS", "GS"].includes(t));
+  const dejaPris = new Set();
+
   for (const el of eleves) {
-    const trouves = parCle.get(el.cle) || [];
+    let trouves = (parCle.get(el.cle) || []).filter((c) => !enMaternelle(c));
+    // Homonymes : on départage par la classe (même classe que sur la liste,
+    // sinon classe qui contient le niveau), puis on écarte un enfant déjà
+    // attribué à une autre ligne de la liste.
+    if (trouves.length > 1) {
+      const memeClasse = trouves.filter((c) => el.classe && cleNom(c.class_level) === cleNom(el.classe));
+      const memeNiveau = trouves.filter((c) => tokens(c.class_level).includes(el.niveau));
+      if (memeClasse.length >= 1) trouves = memeClasse;
+      else if (memeNiveau.length >= 1) trouves = memeNiveau;
+    }
+    if (trouves.length > 1) {
+      const libres = trouves.filter((c) => !dejaPris.has(c.id));
+      if (libres.length === 1) trouves = libres;
+    }
     if (trouves.length === 0) {
       nonRetrouves.push(el);
     } else if (trouves.length > 1) {
       ambigus.push(el);
     } else {
       const enfant = trouves[0];
+      dejaPris.add(enfant.id);
       vus.add(enfant.id);
       const entree = { enfant, niveau: el.niveau, classeListe: el.classe };
       if ((enfant.niveau || null) === el.niveau) dejaAJour.push(entree);
