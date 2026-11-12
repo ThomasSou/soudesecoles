@@ -29,7 +29,7 @@ const COLONNES = [
 // pas conservé ; date de naissance et sexe sont ignorés.
 function ImportNiveaux({ token, onDone }) {
   const [ouvert, setOuvert] = useState(false);
-  const [pdf, setPdf] = useState(null);
+  const [pdf, setPdf] = useState(null); // corps à renvoyer à l'application : { pdfDataUrl } ou { eleves }
   const [apercu, setApercu] = useState(null);
   const [alignerClasse, setAlignerClasse] = useState(false);
   const [occupe, setOccupe] = useState(false);
@@ -61,9 +61,17 @@ function ImportNiveaux({ token, onDone }) {
     setApercu(null);
     setOccupe(true);
     try {
-      const pdfDataUrl = await lire(file);
-      setPdf(pdfDataUrl);
-      setApercu(await appeler({ pdfDataUrl, appliquer: false }));
+      // Fichier .json : liste déjà lue (secours quand le PDF n'est pas lisible
+      // par le serveur). Sinon, le PDF lui-même.
+      let source;
+      if (/\.json$/i.test(file.name)) {
+        const contenu = JSON.parse(await file.text());
+        source = { eleves: Array.isArray(contenu) ? contenu : contenu.eleves };
+      } else {
+        source = { pdfDataUrl: await lire(file) };
+      }
+      setPdf(source);
+      setApercu(await appeler({ ...source, appliquer: false }));
     } catch (e) {
       setErreur(e.message);
     }
@@ -73,7 +81,7 @@ function ImportNiveaux({ token, onDone }) {
     setErreur("");
     setOccupe(true);
     try {
-      const d = await appeler({ pdfDataUrl: pdf, appliquer: true, alignerClasse });
+      const d = await appeler({ ...pdf, appliquer: true, alignerClasse });
       setFait(`${d.ecrits} enfant${d.ecrits > 1 ? "s" : ""} mis à jour.`);
       setApercu(null);
       setPdf(null);
@@ -103,7 +111,7 @@ function ImportNiveaux({ token, onDone }) {
         son prénom, et renseigne son niveau (utile pour cibler les e-mails dans les classes à double niveau). Rien n&apos;est
         écrit avant votre confirmation ; le PDF n&apos;est pas conservé, la date de naissance et le sexe sont ignorés.
       </p>
-      <input type="file" accept="application/pdf" disabled={occupe} onChange={(e) => choisir(e.target.files?.[0])} className="text-sm" />
+      <input type="file" accept="application/pdf,application/json,.json" disabled={occupe} onChange={(e) => choisir(e.target.files?.[0])} className="text-sm" />
       {occupe && <p className="text-slate-500">Lecture en cours...</p>}
       {erreur && <p className="text-red-600">{erreur}</p>}
       {fait && <p className="text-green-700 font-semibold">{fait}</p>}
