@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../../lib/adminAuth";
 import { currentSchoolYear } from "../../../../lib/anneeScolaire";
-import { lireListeEcole, rapprocherNiveaux } from "../../../../lib/niveauxEleves";
+import { lireListeEcole, rapprocherNiveaux, cleNom } from "../../../../lib/niveauxEleves";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 const MAX_OCTETS = 5 * 1024 * 1024;
+const NIVEAUX_OK = ["CP", "CE1", "CE2", "CM1", "CM2"];
+const CLASSE_OK = /^(CP|CE1|CE2|CM1|CM2)(-(CP|CE1|CE2|CM1|CM2))?$/;
 
 // Importe les niveaux individuels (CP, CE1, CE2, CM1, CM2) depuis la « Liste
 // simple des élèves par classe » de l'école (PDF).
@@ -20,24 +22,44 @@ export async function POST(request) {
   if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const body = await request.json().catch(() => null);
-  const m = /^data:application\/pdf;base64,(.+)$/.exec(body?.pdfDataUrl || "");
-  if (!m) return NextResponse.json({ error: "Déposez la liste de l'école au format PDF." }, { status: 400 });
-  const octets = Buffer.from(m[1], "base64");
-  if (octets.length === 0 || octets.length > MAX_OCTETS) {
-    return NextResponse.json({ error: "PDF vide ou trop lourd (5 Mo maximum)." }, { status: 400 });
+  // Deux entrées possibles :
+  //  - `eleves` : liste déjà lue (fichier .json préparé à partir du PDF) —
+  //    solution de secours, la lecture de PDF échouant sur l'hébergement ;
+  //  - `pdfDataUrl` : le PDF de l'école, lu ici.
+  let eleves;
+  if (Array.isArray(body?.eleves)) {
+    eleves = body.eleves
+      .slice(0, 1000)
+      .filter((e) => e && typeof e.brut === "string" && NIVEAUX_OK.includes(e.niveau))
+      .map((e) => ({
+        brut: e.brut.slice(0, 120),
+        cle: cleNom(e.brut),
+        niveau: e.niveau,
+        classe: typeof e.classe === "string" && CLASSE_OK.test(e.classe) ? e.classe : null,
+      }))
+      .filter((e) => e.cle);
+  } else {
+    const m = /^data:application\/pdf;base64,(.+)$/.exec(body?.pdfDataUrl || "");
+    if (!m) return NextResponse.json({ error: "Déposez la liste de l'école (PDF ou fichier .json préparé)." }, { status: 400 });
+    const octets = Buffer.from(m[1], "base64");
+    if (octets.length === 0 || octets.length > MAX_OCTETS) {
+      return NextResponse.json({ error: "PDF vide ou trop lourd (5 Mo maximum)." }, { status: 400 });
+    }
+    let texte;
+    try {
+      const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default;
+      texte = (await pdfParse(octets)).text;
+    } catch (e) {
+      return NextResponse.json(
+        { error: `Lecture du PDF impossible sur le serveur (${String(e?.message || e).slice(0, 160)}). Utilisez le fichier .json préparé à la place.` },
+        { status: 422 }
+      );
+    }
+    eleves = lireListeEcole(texte);
   }
-
-  let texte;
-  try {
-    const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default;
-    texte = (await pdfParse(octets)).text;
-  } catch {
-    return NextResponse.json({ error: "Lecture du PDF impossible." }, { status: 400 });
-  }
-  const eleves = lireListeEcole(texte);
   if (eleves.length === 0) {
     return NextResponse.json(
-      { error: "Aucun élève reconnu : est-ce bien la « Liste simple des élèves par classe » de l'élémentaire ?" },
+      { error: "Aucun élève reconnu dans ce fichier." },
       { status: 400 }
     );
   }
