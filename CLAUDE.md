@@ -164,14 +164,29 @@ des membres du bureau sont opérationnels et testés.
 - Segmentation plus fine des destinataires d'e-mails.
 - Intégration SumUp pour la buvette et le rapprochement des cotisations (reportée).
 
-## Préférence de Thomas : automatiser au maximum
+## Préférence de Thomas : automatiser au maximum, et orchestrer
 
-Thomas veut automatiser un maximum. Ne lui demande une action manuelle que si
-elle est vraiment impossible à faire autrement : pousse, ouvre et fusionne les
-demandes de fusion toi-même quand il te le demande, et donne-lui le texte prêt
-à coller pour sa session Cowork quand une console web est nécessaire. Les
-migrations SQL restent lancées par lui (ou par Cowork sur sa demande), jamais
-par toi.
+Thomas veut automatiser un maximum. **La session « Sou - Orchestrateur site »
+est l'orchestrateur** : elle délègue les tâches aux autres conversations (dans
+le nuage ou sur son ordinateur) et ne demande à Thomas que ce qu'elle ne peut
+vraiment pas faire elle-même.
+
+- Avant de demander quoi que ce soit à Thomas, regarder les sessions
+  joignables (`list_sessions`). La session **« SOU - Pilotage chrome Sou »**
+  tourne sur son ordinateur et pilote son navigateur (Supabase, Netlify,
+  back-office du site) : lui envoyer la tâche directement (`send_message`) et
+  lui demander un compte rendu en retour.
+- Si aucune session ne peut le faire, donner à Thomas **une seule** marche à
+  suivre, la plus fiable, avec le texte prêt à coller dans la bonne
+  conversation. Ne pas lui faire essayer plusieurs pistes.
+- Une session dans le nuage n'a accès ni à la base, ni au navigateur, ni aux
+  fichiers de son ordinateur : le dire tout de suite, ne pas le laisser chercher.
+- Pousser, ouvrir et fusionner les demandes de fusion soi-même.
+- Les migrations SQL ne sont jamais lancées par la session de code : elles
+  passent par la session de pilotage (ou par Thomas), avec vérification par un
+  `select` indépendant.
+- Ne jamais livrer un écran « à essayer » sans dire ce qui n'a pas été testé
+  en ligne (l'import PDF des niveaux marchait hors ligne et a échoué sur Netlify).
 
 ## Deux points de méthode
 
