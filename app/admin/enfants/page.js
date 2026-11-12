@@ -165,11 +165,19 @@ function ImportNiveaux({ token, onDone }) {
   );
 }
 
+// Niveaux dans l'ordre de la scolarité (sert au filtre et au tri de la colonne).
+const NIVEAUX_ORDRE = ["PS", "MS", "GS", "CP", "CE1", "CE2", "CM1", "CM2"];
+const rangNiveau = (n) => {
+  const i = NIVEAUX_ORDRE.indexOf(n);
+  return i === -1 ? NIVEAUX_ORDRE.length : i; // sans niveau : à la fin
+};
+
 function ListeEnfants({ token }) {
   const [familles, setFamilles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [recherche, setRecherche] = useState("");
   const [classe, setClasse] = useState("toutes");
+  const [niveau, setNiveau] = useState("tous"); // "tous" | un niveau | "aucun"
   const [tri, setTri] = useState({ colonne: "lastName", sens: 1 });
 
   const charger = useCallback(async () => {
@@ -228,6 +236,7 @@ function ListeEnfants({ token }) {
     const q = recherche.trim().toLowerCase();
     return enfants.filter((e) => {
       if (classe !== "toutes" && e.classLevel !== classe) return false;
+      if (niveau === "aucun" ? Boolean(e.niveau) : niveau !== "tous" && e.niveau !== niveau) return false;
       if (!q) return true;
       return (
         e.firstName.toLowerCase().includes(q) ||
@@ -238,11 +247,15 @@ function ListeEnfants({ token }) {
         e.teacherName.toLowerCase().includes(q)
       );
     });
-  }, [enfants, recherche, classe]);
+  }, [enfants, recherche, classe, niveau]);
 
   const tries = useMemo(() => {
     const copie = [...filtres];
     copie.sort((a, b) => {
+      // Niveau : ordre de la scolarité (PS … CM2), pas l'ordre alphabétique.
+      if (tri.colonne === "niveau") {
+        return (rangNiveau(a.niveau) - rangNiveau(b.niveau)) * tri.sens || a.lastName.localeCompare(b.lastName, "fr");
+      }
       const va = tri.colonne === "aJour" ? Number(a.aJour) : String(a[tri.colonne] || "");
       const vb = tri.colonne === "aJour" ? Number(b.aJour) : String(b[tri.colonne] || "");
       if (va < vb) return -1 * tri.sens;
@@ -285,10 +298,25 @@ function ListeEnfants({ token }) {
             </option>
           ))}
         </select>
+        <select
+          value={niveau}
+          onChange={(e) => setNiveau(e.target.value)}
+          className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="tous">Tous les niveaux</option>
+          {NIVEAUX_ORDRE.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+          <option value="aucun">Sans niveau renseigné</option>
+        </select>
       </div>
 
       <p className="text-sm text-slate-500 mb-3">
-        {tries.length} enfant{tries.length > 1 ? "s" : ""}
+        {tries.length === enfants.length
+          ? `${enfants.length} enfant${enfants.length > 1 ? "s" : ""}`
+          : `${tries.length} / ${enfants.length} enfants`}
       </p>
 
       <div className="overflow-x-auto border border-slate-200 rounded-xl">
