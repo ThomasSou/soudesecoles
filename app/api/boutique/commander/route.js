@@ -167,7 +167,14 @@ export async function POST(request) {
       metadata: { orderId: order.id },
     });
   } catch (err) {
-    await admin.from("shop_orders").update({ status: "failed" }).eq("id", order.id);
+    // On garde la raison donnée par HelloAsso (colonne ajoutée par la migration
+    // 0062 ; sans elle, on note seulement l'échec comme avant).
+    const raison = String(err?.message || err).slice(0, 600);
+    const { error: eRaison } = await admin
+      .from("shop_orders")
+      .update({ status: "failed", erreur_paiement: raison })
+      .eq("id", order.id);
+    if (eRaison) await admin.from("shop_orders").update({ status: "failed" }).eq("id", order.id);
     return NextResponse.json(
       { error: "Le paiement en ligne n'est pas disponible pour le moment. Merci de réessayer plus tard." },
       { status: 502 }
@@ -175,6 +182,11 @@ export async function POST(request) {
   }
 
   await admin.from("shop_orders").update({ checkout_intent_id: intent.id }).eq("id", order.id);
+  // Premier essai refusé puis second accepté : on garde la raison, utile pour
+  // comprendre ce qui bloque certains acheteurs.
+  if (intent.avertissement) {
+    await admin.from("shop_orders").update({ erreur_paiement: intent.avertissement.slice(0, 600) }).eq("id", order.id);
+  }
 
   return NextResponse.json({ ok: true, orderId: order.id, redirectUrl: intent.redirectUrl });
 }
