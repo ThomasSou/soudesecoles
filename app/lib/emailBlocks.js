@@ -139,6 +139,68 @@ export const TEMPLATES = [
     ],
   },
   {
+    key: "noel-benevoles-boutique",
+    label: "Marché de Noël — bénévoles pour aider les PS/MS + précommandes (parents hors PS/MS)",
+    blocks: () => [
+      { ...newBlock("heading"), text: "Bonjour {{prenom}}, le Marché de Noël a besoin de bras… et de gourmands !" },
+      {
+        ...newBlock("image"),
+        url: `${SITE_URL}/evenements/marche-de-noel-affiche.jpg`,
+        alt: "Affiche du Marché de Noël artisanal, samedi 28 novembre 2026",
+        link: `${SITE_URL}/evenements/marche-de-noel`,
+      },
+      {
+        ...newBlock("paragraph"),
+        text: "Le Marché de Noël du Sou des Écoles aura lieu le samedi 28 novembre 2026, de 11h à 20h, place du Marché à Montmerle-sur-Saône. Tous les bénéfices financent les projets scolaires de vos enfants.",
+      },
+      { ...newBlock("heading"), text: "🙋 1. Un coup de main aux parents de petite et moyenne section", size: "sm" },
+      {
+        ...newBlock("paragraph"),
+        text: "Cette année, l'organisation du marché repose sur les parents des classes de petite et moyenne section. Ils ont **de gros besoins** et comptent sur vous pour les aider :\n\n• **Le vendredi 27 novembre au soir** : montage des stands et de la place.\n• **Le samedi 28 novembre** : buvette, restauration, stands et animations.\n• **Le samedi soir** : démontage, rangement et nettoyage.\n\nMême une heure fait la différence, sans aucune compétence particulière, dans une ambiance conviviale. Choisissez votre créneau en quelques clics.",
+      },
+      { ...newBlock("button"), text: "Je m'inscris comme bénévole", url: `${SITE_URL}/benevoles` },
+      { type: "divider", id: "b1" },
+      { ...newBlock("heading"), text: "🎄 2. Les précommandes sont ouvertes", size: "sm" },
+      {
+        ...newBlock("paragraph"),
+        text: "Pour éviter les déceptions et nous aider à préparer le marché, commandez dès maintenant sur la boutique en ligne :\n\n• Les **sapins du Morvan**, à choisir dans notre forêt de sapins\n• La **tartiflette**, le pain d'épices et les boules de Noël\n• Les tours de **biathlon laser**, le passeport jeux, les tickets de tombola, les lampions…\n\nLe paiement est sécurisé, et toute la recette finance les projets des écoles de Montmerle-Lurcy.",
+      },
+      { ...newBlock("button"), text: "Précommander sur la boutique", url: `${SITE_URL}/boutique` },
+      {
+        ...newBlock("paragraph"),
+        text: "Merci pour votre soutien !\nLe bureau du Sou des Écoles",
+      },
+    ],
+  },
+  {
+    key: "noel-psms-rappel",
+    label: "Marché de Noël — rappel aux parents de PS/MS (inscription bénévole + précommandes)",
+    blocks: () => [
+      { ...newBlock("heading"), text: "Bonjour {{prenom}}, merci et dernier rappel pour le Marché de Noël !" },
+      {
+        ...newBlock("paragraph"),
+        text: "Le Marché de Noël du Sou des Écoles aura lieu le samedi 28 novembre 2026, de 11h à 20h, place du Marché à Montmerle-sur-Saône. Son organisation repose cette année sur les familles de petite et moyenne section.",
+      },
+      { ...newBlock("heading"), text: "🙏 Merci aux familles déjà inscrites !", size: "sm" },
+      {
+        ...newBlock("paragraph"),
+        text: "Un grand merci à celles et ceux qui se sont déjà inscrits : votre aide est précieuse.\n\nVous ne l'avez pas encore fait ? Merci de vous inscrire **dès que possible sur au moins un créneau** : montage le vendredi 27 novembre au soir, journée du samedi 28, ou démontage le samedi soir. Même une heure compte.",
+      },
+      { ...newBlock("button"), text: "Je m'inscris sur un créneau", url: `${SITE_URL}/benevoles` },
+      { type: "divider", id: "p1" },
+      { ...newBlock("heading"), text: "🎄 Pensez aussi aux précommandes !", size: "sm" },
+      {
+        ...newBlock("paragraph"),
+        text: "La boutique en ligne est ouverte : sapins du Morvan, tartiflette, pain d'épices, boules de Noël, tours de biathlon laser, passeport jeux, tickets de tombola… Précommander nous aide à préparer le marché, et toute la recette finance les projets des écoles.",
+      },
+      { ...newBlock("button"), text: "Précommander sur la boutique", url: `${SITE_URL}/boutique` },
+      {
+        ...newBlock("paragraph"),
+        text: "Merci pour votre engagement !\nLa commission du marché de Noël et le bureau du Sou des Écoles",
+      },
+    ],
+  },
+  {
     key: "noel-sapins",
     label: "Marché de Noël — sapins du Morvan et boutique (reste de l'école)",
     blocks: () => [
