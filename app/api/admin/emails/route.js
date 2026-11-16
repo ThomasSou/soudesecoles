@@ -326,6 +326,75 @@ function destinatairesDe(familles, comptesActives = null) {
   return destinataires;
 }
 
+// Liste des destinataires d'un segment, avec l'exclusion éventuelle des
+// adresses déjà servies. Commune à l'envoi immédiat, à l'aperçu et au
+// lancement d'une campagne programmée (calculée au moment de l'envoi).
+async function calculerDestinataires(admin, segment) {
+  let destinataires;
+  if (segment?.scope === "liste") {
+    destinataires = await destinatairesDeListe(admin, segment.adresses);
+  } else {
+    const familles = await chargerFamilles(admin);
+    const correspondantes = famillesCorrespondantes(familles, segment);
+    const comptesActives = segment?.sansCompte ? await emailsAvecCompteActive(admin) : null;
+    destinataires = destinatairesDe(correspondantes, comptesActives);
+
+    if (inclutContacts(segment)) {
+      const { data: contacts } = await admin
+        .from("email_contacts")
+        .select("id, first_name, last_name, email, email_opt_out");
+      const dejaPris = new Set(destinataires.map((d) => d.email.toLowerCase()));
+      destinataires.push(...contactsDestinataires(contacts, dejaPris));
+    }
+  }
+
+  let exclusDejaServis = 0;
+  if (segment?.exclureDejaServis) {
+    const servies = await adressesDejaServies(admin);
+    const avant = destinataires.length;
+    destinataires = destinataires.filter((d) => !servies.has((d.email || "").toLowerCase()));
+    exclusDejaServis = avant - destinataires.length;
+  }
+  return { destinataires, exclusDejaServis };
+}
+
+// Lance les campagnes programmées arrivées à échéance : calcule leurs
+// destinataires maintenant, puis les passe « en_cours » (la tâche de fond
+// les fait ensuite avancer par vagues). Le passage de 'programme' à
+// 'en_cours' est exclusif : aucun double lancement possible.
+async function lancerProgrammees(admin) {
+  const { data: dues, error } = await admin
+    .from("email_campaigns")
+    .select("*")
+    .eq("status", "programme")
+    .lte("programme_le", new Date().toISOString());
+  if (error) return { ok: false, error: error.message, lancees: [] };
+
+  const lancees = [];
+  for (const c of dues || []) {
+    const { destinataires } = await calculerDestinataires(admin, c.segment || {});
+    const mailConfigured = isMailConfigured();
+    const aEnvoyer = mailConfigured && destinataires.length > 0;
+    const { data: pris } = await admin
+      .from("email_campaigns")
+      .update({
+        recipients_count: destinataires.length,
+        sent_count: 0,
+        mail_configured: mailConfigured,
+        status: aEnvoyer ? "en_cours" : "termine",
+        next_index: 0,
+        recipients: aEnvoyer ? destinataires : [],
+        // Ancien exprès : la première vague peut démarrer sans attendre (cf. POST).
+        updated_at: new Date(0).toISOString(),
+      })
+      .eq("id", c.id)
+      .eq("status", "programme")
+      .select("id");
+    if (pris?.length) lancees.push({ id: c.id, destinataires: destinataires.length });
+  }
+  return { ok: true, lancees };
+}
+
 // Historique des campagnes envoyées.
 export async function GET(request) {
   const auth = await requirePermission(request, "emails");
@@ -389,6 +458,7 @@ export async function POST(request) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
+  const corps = await request.json();
   const {
     segment,
     subject,
@@ -398,7 +468,63 @@ export async function POST(request) {
     brouillon,
     campaignId,
     brouillonId,
-  } = await request.json();
+    programmerLe,
+  } = corps;
+
+  // Lancement des envois programmés arrivés à échéance : appelé par la tâche
+  // de fond Netlify avec le jeton de service, jamais depuis le navigateur.
+  if (corps.lancerProgrammees) {
+    if (!parJeton) return NextResponse.json({ error: "Réservé à la tâche planifiée." }, { status: 403 });
+    return NextResponse.json(await lancerProgrammees(auth.admin));
+  }
+
+  // Programmation d'un envoi : le contenu et le segment sont figés comme pour
+  // un brouillon ; les destinataires seront calculés à l'heure dite.
+  if (programmerLe) {
+    const quand = new Date(programmerLe);
+    if (Number.isNaN(quand.getTime()) || quand.getTime() < Date.now() + 2 * 60 * 1000) {
+      return NextResponse.json(
+        { error: "Choisissez une date et une heure dans le futur (au moins quelques minutes)." },
+        { status: 400 }
+      );
+    }
+    const blocs = contentBlocks || [];
+    if (!subject?.trim() || blocs.length === 0) {
+      return NextResponse.json({ error: "Sujet et contenu obligatoires." }, { status: 400 });
+    }
+    const { data: prog, error: errProg } = await auth.admin
+      .from("email_campaigns")
+      .insert({
+        subject,
+        message: renderBlocksToText(blocs),
+        html: renderBlocksToHtml(blocs, { subject }),
+        content_blocks: blocs,
+        segment: segment || {},
+        segment_summary: resumeSegment(segment),
+        recipients_count: 0,
+        sent_count: 0,
+        mail_configured: isMailConfigured(),
+        created_by: auth.parent.id,
+        status: "programme",
+        programme_le: quand.toISOString(),
+        next_index: 0,
+        recipients: [],
+        benevoles_evenement_id: benevolesEvenementId || null,
+      })
+      .select("id")
+      .single();
+    if (errProg) {
+      const manque = /programme_le/i.test(errProg.message);
+      return NextResponse.json(
+        { error: manque ? "La programmation n'est pas encore activée (migration 0061 à lancer)." : errProg.message },
+        { status: manque ? 503 : 500 }
+      );
+    }
+    if (brouillonId) {
+      await auth.admin.from("email_campaigns").delete().eq("id", brouillonId).eq("status", "brouillon");
+    }
+    return NextResponse.json({ ok: true, programme: true, campaignId: prog.id, programmeLe: quand.toISOString() });
+  }
 
   // Enregistrement d'un brouillon : on fige le contenu de l'éditeur sur une
   // ligne email_campaigns en statut 'brouillon', sans calculer de
@@ -447,31 +573,7 @@ export async function POST(request) {
     return NextResponse.json({ ok: true, brouillon: true, campaignId: ligne.id });
   }
 
-  let destinataires;
-  if (segment?.scope === "liste") {
-    destinataires = await destinatairesDeListe(auth.admin, segment.adresses);
-  } else {
-    const familles = await chargerFamilles(auth.admin);
-    const correspondantes = famillesCorrespondantes(familles, segment);
-    const comptesActives = segment?.sansCompte ? await emailsAvecCompteActive(auth.admin) : null;
-    destinataires = destinatairesDe(correspondantes, comptesActives);
-
-    if (inclutContacts(segment)) {
-      const { data: contacts } = await auth.admin
-        .from("email_contacts")
-        .select("id, first_name, last_name, email, email_opt_out");
-      const dejaPris = new Set(destinataires.map((d) => d.email.toLowerCase()));
-      destinataires.push(...contactsDestinataires(contacts, dejaPris));
-    }
-  }
-
-  let exclusDejaServis = 0;
-  if (segment?.exclureDejaServis) {
-    const servies = await adressesDejaServies(auth.admin);
-    const avant = destinataires.length;
-    destinataires = destinataires.filter((d) => !servies.has((d.email || "").toLowerCase()));
-    exclusDejaServis = avant - destinataires.length;
-  }
+  const { destinataires, exclusDejaServis } = await calculerDestinataires(auth.admin, segment);
 
   if (dryRun) {
     return NextResponse.json({
@@ -576,5 +678,29 @@ export async function DELETE(request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  return NextResponse.json({ ok: true });
+}
+
+// Annule une programmation : la campagne redevient un brouillon (son contenu et
+// ses destinataires visés sont conservés, rien n'est envoyé).
+export async function PATCH(request) {
+  const auth = await requirePermission(request, "emails");
+  if (auth.error) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+  const { id, action } = await request.json().catch(() => ({}));
+  if (!id || action !== "annuler_programmation") {
+    return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
+  }
+  const { data, error } = await auth.admin
+    .from("email_campaigns")
+    .update({ status: "brouillon", programme_le: null, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("status", "programme")
+    .select("id");
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data?.length) {
+    return NextResponse.json({ error: "Cette campagne n'est plus programmée (déjà lancée ?)." }, { status: 409 });
+  }
   return NextResponse.json({ ok: true });
 }

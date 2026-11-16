@@ -96,6 +96,10 @@ function EnvoiEmails({ token, parent }) {
 
   // Double validation : l'envoi réel ne part qu'après confirmation explicite.
   const [confirmation, setConfirmation] = useState(false);
+  // Programmation de l'envoi (date et heure) : panneau + valeur « datetime-local ».
+  const [programmerOuvert, setProgrammerOuvert] = useState(false);
+  const [programmeLe, setProgrammeLe] = useState("");
+  const [busyProg, setBusyProg] = useState(false);
   const [confirmCoche, setConfirmCoche] = useState(false);
   // Envois par vagues en cours, un par campagne : { [campaignId]: { campaignId,
   // sent, total, done, enPause, enErreur } }. Plusieurs campagnes peuvent
@@ -514,6 +518,73 @@ function EnvoiEmails({ token, parent }) {
     setAdresses("");
     setBrouillonId(null);
     setBrouillonMsg("");
+  }
+
+  // Valeur minimale du sélecteur : dans 10 minutes, à l'heure locale.
+  function minimumProgrammation() {
+    const d = new Date(Date.now() + 10 * 60 * 1000);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  }
+
+  async function ouvrirProgrammation() {
+    setError("");
+    if (!subject.trim() || contenuVide) {
+      setError("Merci de renseigner le sujet et le contenu avant de programmer l'envoi.");
+      return;
+    }
+    setProgrammerOuvert(true);
+    await voirApercu(); // nombre de destinataires actuel, à titre indicatif
+  }
+
+  async function confirmerProgrammation() {
+    setError("");
+    if (!programmeLe) {
+      setError("Choisissez la date et l'heure d'envoi.");
+      return;
+    }
+    setBusyProg(true);
+    try {
+      const res = await fetch("/api/admin/emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          programmerLe: new Date(programmeLe).toISOString(),
+          segment: segment(),
+          subject,
+          contentBlocks: blocks,
+          benevolesEvenementId: benevolesEvenementId || null,
+          brouillonId,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "La programmation a échoué.");
+        return;
+      }
+      const quand = new Date(data.programmeLe).toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short" });
+      nouvelEmailPendantEnvoi();
+      setProgrammerOuvert(false);
+      setProgrammeLe("");
+      setResultat({ programme: true, quand });
+      charger();
+    } catch {
+      setError("Impossible de joindre le serveur.");
+    } finally {
+      setBusyProg(false);
+    }
+  }
+
+  async function annulerProgrammation(id) {
+    if (!window.confirm("Annuler la programmation ? Le message redevient un brouillon, rien n'est envoyé.")) return;
+    const res = await fetch("/api/admin/emails", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ id, action: "annuler_programmation" }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) setError(data.error || "Impossible d'annuler la programmation.");
+    charger();
   }
 
   async function envoyerTest() {
@@ -1070,7 +1141,48 @@ function EnvoiEmails({ token, parent }) {
                 ? "Enregistrer le brouillon"
                 : "Enregistrer comme brouillon"}
             </button>
+            <button
+              onClick={ouvrirProgrammation}
+              disabled={busyProg}
+              className="text-sm font-semibold text-sou-blue border border-sou-blue px-4 py-2 rounded-full hover:bg-sou-blue hover:text-white transition-colors disabled:opacity-60"
+            >
+              Programmer l&apos;envoi
+            </button>
             {brouillonMsg && <span className="text-xs text-slate-500">{brouillonMsg}</span>}
+          </div>
+        )}
+
+        {programmerOuvert && !confirmation && (
+          <div className="mt-4 border-2 border-sou-blue/40 bg-sou-blue/5 rounded-xl p-4 text-sm space-y-3">
+            <p className="font-semibold text-sou-blue">Programmer l&apos;envoi</p>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500">Date et heure d&apos;envoi</span>
+              <input
+                type="datetime-local"
+                value={programmeLe}
+                min={minimumProgrammation()}
+                onChange={(e) => setProgrammeLe(e.target.value)}
+                className="block border border-slate-300 rounded-lg px-3 py-2 text-sm mt-1"
+              />
+            </label>
+            <p className="text-xs text-slate-500">
+              {apercu ? `Aujourd'hui, ce message concernerait ${apercu.count} destinataire${apercu.count > 1 ? "s" : ""}` : "Calcul des destinataires…"}
+              {apercu?.segmentSummary ? ` (${apercu.segmentSummary})` : ""}. La liste est recalculée au moment de
+              l&apos;envoi : une famille inscrite entre-temps est prise en compte, un désinscrit est exclu. L&apos;envoi démarre
+              à l&apos;heure choisie, avec un retard possible de 10 minutes au plus.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={confirmerProgrammation}
+                disabled={busyProg || !programmeLe}
+                className="bg-sou-blue text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-sou-gold transition-colors disabled:opacity-60"
+              >
+                {busyProg ? "Programmation…" : "Confirmer la programmation"}
+              </button>
+              <button onClick={() => setProgrammerOuvert(false)} className="text-sm text-slate-500 px-3">
+                Annuler
+              </button>
+            </div>
           </div>
         )}
 
@@ -1189,7 +1301,16 @@ function EnvoiEmails({ token, parent }) {
             </div>
           ))}
 
-        {resultat && (
+        {resultat && resultat.programme && (
+          <div className="mt-4 border border-slate-200 rounded-xl p-4 text-sm">
+            <p className="text-green-700">
+              Envoi programmé pour le {resultat.quand}. Vous pouvez fermer la page : il partira tout seul. Vous le retrouvez
+              dans l&apos;historique ci-dessous, où vous pouvez annuler la programmation.
+            </p>
+          </div>
+        )}
+
+        {resultat && !resultat.programme && (
           <div className="mt-4 border border-slate-200 rounded-xl p-4 text-sm">
             {resultat.mailConfigured ? (
               <p className="text-green-700">
@@ -1232,12 +1353,19 @@ function EnvoiEmails({ token, parent }) {
                         brouillon
                       </span>
                     )}
+                    {c.status === "programme" && (
+                      <span className="ml-2 text-xs font-semibold text-sou-blue bg-sou-blue/10 rounded-full px-2 py-0.5">
+                        programmé
+                      </span>
+                    )}
                   </p>
                   <p className="text-slate-500">
                     {c.status === "brouillon"
                       ? "Brouillon non envoyé"
+                      : c.status === "programme"
+                      ? `Départ le ${new Date(c.programme_le).toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short" })} — ${c.segment_summary}`
                       : `${c.segment_summary} — ${c.sent_count}/${c.recipients_count} destinataire(s)`}
-                    {c.status !== "brouillon" &&
+                    {c.status !== "brouillon" && c.status !== "programme" &&
                       !c.mail_configured &&
                       " (envoi non configuré au moment de l'envoi)"}
                   </p>
@@ -1299,6 +1427,14 @@ function EnvoiEmails({ token, parent }) {
                   >
                     {c.status === "brouillon" ? "Modifier ce brouillon" : "Réutiliser le contenu"}
                   </button>
+                  {c.status === "programme" && (
+                    <button
+                      onClick={() => annulerProgrammation(c.id)}
+                      className="text-xs font-semibold text-red-600 hover:text-red-700"
+                    >
+                      Annuler la programmation
+                    </button>
+                  )}
                   {c.status === "brouillon" && (
                     <button
                       onClick={() => supprimerBrouillon(c.id)}

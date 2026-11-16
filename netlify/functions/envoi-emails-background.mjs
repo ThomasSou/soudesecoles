@@ -21,6 +21,20 @@ export default async (req) => {
   let vagues = 0;
 
   while (Date.now() - debut < BUDGET_MS) {
+    // Envois programmés arrivés à l'heure dite : on les lance (calcul des
+    // destinataires) avant de faire avancer les campagnes en cours.
+    try {
+      const rp = await fetch(`${site}/api/admin/emails`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-token": jeton },
+        body: JSON.stringify({ lancerProgrammees: true }),
+      });
+      const dp = await rp.json().catch(() => ({}));
+      if (dp.lancees?.length) console.log(`[envoi-emails] ${dp.lancees.length} envoi(s) programmé(s) lancé(s).`);
+    } catch (e) {
+      console.error("[envoi-emails] lancement des envois programmés impossible :", e.message);
+    }
+
     let data;
     try {
       const res = await fetch(`${site}/api/admin/emails/continuer`, {
