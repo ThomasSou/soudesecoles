@@ -71,24 +71,80 @@ async function haFetch(path, options = {}) {
   return data;
 }
 
+// Texte envoyé à HelloAsso : sans caractères de contrôle ni symboles exotiques
+// (émojis, retours à la ligne…). Une partie des libellés vient de ce que les
+// acheteurs ont tapé (prénom d'une boule personnalisée, etc.).
+function nettoyer(texte, max) {
+  return String(texte ?? "")
+    .normalize("NFC")
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/[^\p{L}\p{N}\s.,;:()'’\-–—/&+€%!?"«»]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+}
+const lettresSeulement = (texte, max) =>
+  String(texte ?? "").normalize("NFC").replace(/[^\p{L}\s'’-]/gu, "").replace(/\s+/g, " ").trim().slice(0, max);
+
 // Crée une intention de paiement pour une commande de la boutique.
 // `totalCents` doit être le montant exact recalculé côté serveur (jamais
 // celui envoyé par le navigateur), en centimes.
+//
+// HelloAsso refuse parfois la création (message d'erreur non conservé jusqu'ici,
+// d'où des commandes « failed » inexpliquées). On fait donc un SECOND essai avec
+// un libellé neutre et des noms ne comportant que des lettres, et on garde le
+// message du premier refus (`avertissement`) pour comprendre la cause. Seules
+// les erreurs d'authentification ne sont pas rejouées.
 export async function createCheckoutIntent({ totalCents, itemName, backUrl, errorUrl, returnUrl, payer, metadata }) {
-  return haFetch(`/organizations/${ORG_SLUG}/checkout-intents`, {
-    method: "POST",
-    body: JSON.stringify({
-      totalAmount: totalCents,
-      initialAmount: totalCents,
-      itemName: itemName.slice(0, 250),
-      backUrl,
-      errorUrl,
-      returnUrl,
-      containsDonation: false,
-      payer,
-      metadata,
-    }),
-  });
+  const essais = [
+    {
+      itemName: nettoyer(itemName, 250) || "Boutique Sou des Écoles",
+      payer: {
+        ...payer,
+        firstName: nettoyer(payer?.firstName, 60) || payer?.firstName,
+        lastName: nettoyer(payer?.lastName, 60) || payer?.lastName,
+        email: String(payer?.email || "").trim(),
+      },
+    },
+    {
+      itemName: "Boutique Sou des Écoles — commande",
+      payer: {
+        ...payer,
+        firstName: lettresSeulement(payer?.firstName, 60) || "Client",
+        lastName: lettresSeulement(payer?.lastName, 60) || "Boutique",
+        email: String(payer?.email || "").trim().toLowerCase(),
+      },
+    },
+  ];
+
+  const erreurs = [];
+  for (const essai of essais) {
+    try {
+      const intent = await haFetch(`/organizations/${ORG_SLUG}/checkout-intents`, {
+        method: "POST",
+        body: JSON.stringify({
+          totalAmount: totalCents,
+          initialAmount: totalCents,
+          itemName: essai.itemName,
+          backUrl,
+          errorUrl,
+          returnUrl,
+          containsDonation: false,
+          payer: essai.payer,
+          metadata,
+        }),
+      });
+      if (erreurs.length) intent.avertissement = `1er essai refusé : ${erreurs[0]}`;
+      return intent;
+    } catch (err) {
+      erreurs.push(`${err.status || "?"} ${err.message}`.slice(0, 300));
+      console.error("[helloasso] création de l'intention refusée :", erreurs[erreurs.length - 1]);
+      if (err.status === 401 || err.status === 403) break;
+    }
+  }
+  const erreurFinale = new Error(erreurs.join(" | "));
+  erreurFinale.status = 502;
+  throw erreurFinale;
 }
 
 export async function getCheckoutIntent(checkoutIntentId) {

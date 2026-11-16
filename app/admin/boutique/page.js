@@ -753,6 +753,12 @@ function BoutiqueAdmin({ accessToken }) {
                   : "Famille connue, sans enfant cette année"}
               </p>
             )}
+            {c.erreur_paiement && (
+              <p className="text-xs text-red-600 mt-0.5 break-words">
+                {c.status === "failed" ? "Refusée par HelloAsso : " : "Note HelloAsso : "}
+                {c.erreur_paiement}
+              </p>
+            )}
             {(c.boutiqueIds || []).length > 0 && (
               <p className="text-xs font-semibold text-sou-blue mt-0.5">
                 {c.boutiqueIds.map(nomBoutique).filter(Boolean).join(" · ")}

@@ -10,13 +10,14 @@ export async function GET(request) {
   const auth = await requirePermission(request, "boutique");
   if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const { data, error } = await auth.admin
-    .from("shop_orders")
-    .select(
-      "id, items, total_cents, buyer_first_name, buyer_last_name, buyer_email, buyer_phone, status, created_at, paid_at, parent_id, family_id"
-    )
-    .order("created_at", { ascending: false })
-    .limit(300);
+  // `erreur_paiement` (migration 0062) : raison du refus HelloAsso. Lecture
+  // tolérante tant que la colonne n'existe pas.
+  const colonnes =
+    "id, items, total_cents, buyer_first_name, buyer_last_name, buyer_email, buyer_phone, status, created_at, paid_at, parent_id, family_id";
+  const lire = (cols) =>
+    auth.admin.from("shop_orders").select(cols).order("created_at", { ascending: false }).limit(300);
+  let { data, error } = await lire(`${colonnes}, erreur_paiement`);
+  if (error && /erreur_paiement/i.test(error.message)) ({ data, error } = await lire(colonnes));
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
