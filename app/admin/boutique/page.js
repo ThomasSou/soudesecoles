@@ -1106,7 +1106,14 @@ function BoutiqueAdmin({ accessToken }) {
           {recapAcheteurs.total > 0 && (
             <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm">
               <p className="font-semibold text-slate-700 mb-1">
-                Qui achète ? <span className="font-normal text-slate-500">({recapAcheteurs.total} acheteur{recapAcheteurs.total > 1 ? "s" : ""} distinct{recapAcheteurs.total > 1 ? "s" : ""}, commandes payées)</span>
+                Qui achète ?{" "}
+                <span className="font-normal text-slate-500">
+                  ({recapAcheteurs.total} acheteur{recapAcheteurs.total > 1 ? "s" : ""} distinct{recapAcheteurs.total > 1 ? "s" : ""}, commandes payées
+                  {commandesPayees.length > 0
+                    ? ` · panier moyen ${euros(Math.round(totalPayeCents / commandesPayees.length))} sur ${commandesPayees.length} commande${commandesPayees.length > 1 ? "s" : ""}`
+                    : ""}
+                  )
+                </span>
               </p>
               <ul className="text-slate-600 space-y-0.5">
                 <li>
