@@ -493,6 +493,29 @@ function EnvoiEmails({ token, parent }) {
     charger();
   }
 
+  // Un envoi lancé depuis l'éditeur garde la main sur l'éditeur (boutons
+  // « Envoyer » masqués, éditeur vidé à la fin de l'envoi). Pour composer un
+  // AUTRE e-mail pendant qu'il part, on le détache : il continue en arrière-plan
+  // (carte « autre campagne en cours ») et l'éditeur redevient libre — sans
+  // risque que la fin de l'envoi n'efface le nouveau message.
+  function nouvelEmailPendantEnvoi() {
+    setEnvoiEditeurId(null);
+    setApercu(null);
+    setConfirmation(false);
+    setResultat(null);
+    setError("");
+    setSubject("");
+    setBlocks(TEMPLATES[0].blocks());
+    setBenevolesEvenementId("");
+    setInclureContacts(false);
+    setExclureDejaServis(false);
+    setExclureToutPsMs(false);
+    setScope("toute");
+    setAdresses("");
+    setBrouillonId(null);
+    setBrouillonMsg("");
+  }
+
   async function envoyerTest() {
     if (!testEmail.trim() || !subject.trim() || contenuVide) {
       setError("Merci de renseigner l'adresse de test, le sujet et le contenu.");
@@ -904,7 +927,12 @@ function EnvoiEmails({ token, parent }) {
             {TEMPLATES.map((t) => (
               <button
                 key={t.key}
-                onClick={() => setBlocks(t.blocks())}
+                onClick={() => {
+                  setBlocks(t.blocks());
+                  // Choisir un modèle = commencer un nouveau message : l'envoi
+                  // précédent continue seul en arrière-plan.
+                  setEnvoiEditeurId(null);
+                }}
                 className="text-xs px-2.5 py-1 rounded-full border border-slate-300 text-slate-600 hover:border-sou-blue hover:text-sou-blue"
               >
                 {t.label}
@@ -922,7 +950,11 @@ function EnvoiEmails({ token, parent }) {
           type="text"
           placeholder="Sujet de l'e-mail"
           value={subject}
-          onChange={(e) => setSubject(e.target.value)}
+          onChange={(e) => {
+            setSubject(e.target.value);
+            // Modifier le sujet après un envoi lancé = nouveau message.
+            if (envoiEditeurId) setEnvoiEditeurId(null);
+          }}
           className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-3"
         />
 
@@ -1146,6 +1178,14 @@ function EnvoiEmails({ token, parent }) {
               <p className="text-xs text-slate-400 mt-2">
                 Vous pouvez fermer cette page : l&apos;envoi est repris depuis l&apos;historique.
               </p>
+              {p.campaignId === envoiEditeurId && (
+                <button
+                  onClick={nouvelEmailPendantEnvoi}
+                  className="mt-3 text-sm font-semibold text-sou-blue border border-sou-blue px-4 py-1.5 rounded-full hover:bg-sou-blue hover:text-white transition-colors"
+                >
+                  Écrire un autre e-mail pendant l&apos;envoi
+                </button>
+              )}
             </div>
           ))}
 

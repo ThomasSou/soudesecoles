@@ -162,6 +162,7 @@ des membres du bureau sont opérationnels et testés.
 - Pages dédiées pour chaque manifestation (seule la Foire en a une).
 - Réservation de créneaux bénévoles.
 - Segmentation plus fine des destinataires d'e-mails.
+- Programmation de l'envoi des e-mails (date et heure) ; aujourd'hui un envoi part dès qu'il est lancé.
 - Intégration SumUp pour la buvette et le rapprochement des cotisations (reportée).
 
 ## Préférence de Thomas : automatiser au maximum, et orchestrer
