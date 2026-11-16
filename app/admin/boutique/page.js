@@ -400,7 +400,7 @@ function BoutiqueAdmin({ accessToken }) {
   const [commandes, setCommandes] = useState([]);
   const [onglet, setOnglet] = useState("produits"); // produits | commandes | boutiques
   // Filtre de l'onglet Commandes : "" = toutes, "autres" = produit disparu.
-  const [boutiqueCommandes, setBoutiqueCommandes] = useState("");
+  const [boutiqueCommandes, setBoutiqueCommandes] = useState(null); // null = pas encore choisi : boutique en cours par défaut
   const [tri, setTri] = useState("commande"); // commande | produit | acheteur
   // Commande en cours de « marquage payée » (chèque / espèces) : { id, mode, note }.
   const [marquage, setMarquage] = useState(null);
@@ -584,13 +584,34 @@ function BoutiqueAdmin({ accessToken }) {
 
   const boutiqueActive = boutiques.find((b) => b.id === boutiqueFiltre);
 
+  // Par défaut, les commandes de la manifestation en cours (la boutique ouverte
+  // qui ferme le plus tôt : Marché de Noël, puis Loto…). « Toutes les
+  // boutiques » reste disponible dans le menu.
+  const filtreCommandes = boutiqueCommandes ?? boutiqueParDefaut(boutiques) ?? "tous";
   const commandesAffichees = commandes.filter((c) =>
-    !boutiqueCommandes
+    filtreCommandes === "tous"
       ? true
-      : boutiqueCommandes === "autres"
+      : filtreCommandes === "autres"
       ? (c.boutiqueIds || []).length === 0
-      : (c.boutiqueIds || []).includes(boutiqueCommandes)
+      : (c.boutiqueIds || []).includes(filtreCommandes)
   );
+
+  // Récap des acheteurs (commandes payées de la sélection), un acheteur compté
+  // une fois même s'il a passé plusieurs commandes (même adresse e-mail).
+  const recapAcheteurs = (() => {
+    const vus = new Map();
+    for (const c of commandesAffichees) {
+      if (c.status !== "paid") continue;
+      const cle = (c.buyer_email || `${c.buyer_first_name} ${c.buyer_last_name}`).trim().toLowerCase();
+      const ancien = vus.get(cle);
+      // Si une même personne a plusieurs profils (compte connecté ou non), on garde le plus informatif.
+      const ordre = { parent_adherent: 3, parent_non_adherent: 2, sans_enfant: 1, inconnu: 0 };
+      if (!ancien || (ordre[c.profil] ?? 0) > (ordre[ancien] ?? 0)) vus.set(cle, c.profil);
+    }
+    const n = { parent_adherent: 0, parent_non_adherent: 0, sans_enfant: 0, inconnu: 0 };
+    for (const p of vus.values()) n[p] = (n[p] || 0) + 1;
+    return { total: vus.size, ...n, parents: n.parent_adherent + n.parent_non_adherent };
+  })();
   const nomBoutique = (id) => boutiques.find((b) => b.id === id)?.name || "";
   const commandesPayees = commandesAffichees.filter((c) => c.status === "paid");
   const totalPayeCents = commandesPayees.reduce((s, c) => s + (c.total_cents || 0), 0);
@@ -723,6 +744,15 @@ function BoutiqueAdmin({ accessToken }) {
                 {c.buyer_phone ? ` — ${c.buyer_phone}` : ""})
               </span>
             </p>
+            {c.profil && c.profil !== "inconnu" && (
+              <p className="text-xs text-slate-500 mt-0.5">
+                {c.profil === "parent_adherent"
+                  ? "Parent d'élève · adhérent"
+                  : c.profil === "parent_non_adherent"
+                  ? "Parent d'élève · non adhérent"
+                  : "Famille connue, sans enfant cette année"}
+              </p>
+            )}
             {(c.boutiqueIds || []).length > 0 && (
               <p className="text-xs font-semibold text-sou-blue mt-0.5">
                 {c.boutiqueIds.map(nomBoutique).filter(Boolean).join(" · ")}
@@ -1022,11 +1052,11 @@ function BoutiqueAdmin({ accessToken }) {
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-3 mb-1">
             <select
-              value={boutiqueCommandes}
+              value={filtreCommandes}
               onChange={(e) => setBoutiqueCommandes(e.target.value)}
               className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm"
             >
-              <option value="">Toutes les boutiques</option>
+              <option value="tous">Toutes les boutiques</option>
               {boutiques.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
@@ -1067,6 +1097,29 @@ function BoutiqueAdmin({ accessToken }) {
               </div>
             )}
           </div>
+          {recapAcheteurs.total > 0 && (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm">
+              <p className="font-semibold text-slate-700 mb-1">
+                Qui achète ? <span className="font-normal text-slate-500">({recapAcheteurs.total} acheteur{recapAcheteurs.total > 1 ? "s" : ""} distinct{recapAcheteurs.total > 1 ? "s" : ""}, commandes payées)</span>
+              </p>
+              <ul className="text-slate-600 space-y-0.5">
+                <li>
+                  <strong>{recapAcheteurs.parents}</strong> parents d&apos;élèves retrouvés (enfant scolarisé cette année) :{" "}
+                  <strong className="text-green-700">{recapAcheteurs.parent_adherent}</strong> adhérents,{" "}
+                  <strong>{recapAcheteurs.parent_non_adherent}</strong> non adhérents
+                </li>
+                <li>
+                  <strong>{recapAcheteurs.sans_enfant + recapAcheteurs.inconnu}</strong> sans enfant à l&apos;école :{" "}
+                  {recapAcheteurs.sans_enfant} famille{recapAcheteurs.sans_enfant > 1 ? "s" : ""} connue{recapAcheteurs.sans_enfant > 1 ? "s" : ""} sans enfant cette année,{" "}
+                  {recapAcheteurs.inconnu} adresse{recapAcheteurs.inconnu > 1 ? "s" : ""} non reconnue{recapAcheteurs.inconnu > 1 ? "s" : ""} dans la base
+                </li>
+              </ul>
+              <p className="text-xs text-slate-400 mt-1">
+                Un parent qui commande avec une autre adresse e-mail que celle de sa fiche apparaît dans « adresse non reconnue ».
+              </p>
+            </div>
+          )}
+
           {tri === "commande" && commandesAffichees.map((c) => carteCommande(c))}
 
           {tri === "produit" &&
