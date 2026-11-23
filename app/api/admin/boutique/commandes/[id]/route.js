@@ -163,7 +163,7 @@ export async function POST(request, { params }) {
       <p style="text-align: center; margin: 24px 0;">
         <a href="${lien}" style="background: #1F3864; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 999px; font-weight: bold;">Payer ma commande</a>
       </p>
-      <p style="font-size: 13px; color: #64748b;">Le paiement est sécurisé (HelloAsso). Sur sa page de paiement, HelloAsso peut proposer une contribution volontaire à son service : elle est facultative, vous pouvez la modifier ou la supprimer (« autre montant »). Attention : sur Firefox pour téléphone Android, un défaut de la page de HelloAsso empêche de modifier cette contribution ; ouvrez alors le lien avec Chrome, depuis un ordinateur, ou activez le « mode ordinateur » de Firefox. Ce problème vient de HelloAsso, pas du Sou des Écoles.</p>
+      <p style="font-size: 13px; color: #64748b;">Le paiement est sécurisé (HelloAsso). Sur sa page de paiement, HelloAsso peut proposer une contribution volontaire à son service : elle est facultative, vous pouvez la modifier ou la supprimer (« autre montant »). Si vous utilisez Firefox sur téléphone et que cette contribution ne se laisse pas modifier (cela a été constaté sur certains appareils), ouvrez le lien avec Chrome, depuis un ordinateur, ou activez le « mode ordinateur » de Firefox. Cela dépend de la page de paiement de HelloAsso et de votre appareil, pas du site du Sou des Écoles.</p>
       <p style="font-size: 13px; color: #64748b;">Si vous ne souhaitez plus cette commande, ignorez simplement ce message. Une question ? Répondez à cet e-mail.</p>
     </div>`;
   const texte = [
@@ -175,7 +175,7 @@ export async function POST(request, { params }) {
     "",
     `Payer ma commande : ${lien}`,
     "",
-    "Sur sa page de paiement, HelloAsso peut proposer une contribution volontaire à son service : elle est facultative, vous pouvez la modifier ou la supprimer (« autre montant »). Attention : sur Firefox pour téléphone Android, un défaut de la page de HelloAsso empêche de modifier cette contribution ; ouvrez alors le lien avec Chrome, depuis un ordinateur, ou activez le « mode ordinateur » de Firefox. Ce problème vient de HelloAsso, pas du Sou des Écoles.",
+    "Sur sa page de paiement, HelloAsso peut proposer une contribution volontaire à son service : elle est facultative, vous pouvez la modifier ou la supprimer (« autre montant »). Si vous utilisez Firefox sur téléphone et que cette contribution ne se laisse pas modifier (cela a été constaté sur certains appareils), ouvrez le lien avec Chrome, depuis un ordinateur, ou activez le « mode ordinateur » de Firefox. Cela dépend de la page de paiement de HelloAsso et de votre appareil, pas du site du Sou des Écoles.",
     "",
     "Si vous ne souhaitez plus cette commande, ignorez simplement ce message. Une question ? Répondez à cet e-mail.",
     "Le Sou des Écoles",
