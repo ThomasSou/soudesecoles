@@ -42,7 +42,7 @@ function BoutonMicro({ onTexte }) {
 }
 
 // Saisie dictée d'un inventaire ou d'achats : texte -> propositions à vérifier -> enregistrement.
-function Saisie({ token, articles, evenements, mode, onFait }) {
+function Saisie({ token, articles, evenements, mode, manifestation, onFait }) {
   const [texte, setTexte] = useState("");
   const [date, setDate] = useState(aujourdhui());
   const [libelle, setLibelle] = useState("");
@@ -77,7 +77,7 @@ function Saisie({ token, articles, evenements, mode, onFait }) {
     try {
       const valides = lignes.filter((l) => l.choix && l.quantite != null);
       const corps = {
-        action: inventaire ? "inventaire" : "achats", date, libelle, fournisseur,
+        action: inventaire ? "inventaire" : mode === "besoins" ? "besoins" : "achats", manifestation, date, libelle, fournisseur,
         lignes: valides.map((l) => ({ articleId: l.choix, quantite: l.quantite, prix: l.prix, datePeremption: l.datePeremption, libelle: l.libelle })),
       };
       await appeler(token, "POST", corps);
@@ -90,11 +90,13 @@ function Saisie({ token, articles, evenements, mode, onFait }) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-600">
-        {inventaire
+        {mode === "besoins"
+          ? "Dictez ce dont la manifestation a besoin, une ligne par article (ex. « trois cents gobelets, quarante packs de coca zéro »). Ce que vous dictez remplace le besoin déjà noté pour ces articles."
+          : inventaire
           ? "Comptez ce qu'il reste au local et dictez-le, une ligne par article (ex. « quarante canettes de coca zéro périmées mars 2027 »)."
           : "Dictez ce qui vient d'être acheté (ex. « douze packs de coca zéro, trois cartons de gobelets »)."}
       </p>
-      <div className="flex flex-wrap gap-2">
+      <div className={`flex flex-wrap gap-2 ${mode === "besoins" ? "hidden" : ""}`}>
         <label className="text-sm">Date <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="border rounded px-2 py-1 ml-1" /></label>
         {inventaire ? (
           <input value={libelle} onChange={(e) => setLibelle(e.target.value)} placeholder="Libellé (ex. Après le Marché de Noël)" list="evts" className="border rounded px-2 py-1 flex-1 min-w-[12rem]" />
@@ -119,7 +121,7 @@ function Saisie({ token, articles, evenements, mode, onFait }) {
                 {[...articles, ...(lignes[i].nouveaux || [])].filter((a) => a.actif !== false).map((a) => <option key={a.id} value={a.id}>{a.nom}</option>)}
               </select>
               {!l.choix && <button type="button" onClick={() => creerArticle(i)} className="text-sm text-sou-blue underline">+ nouvel article</button>}
-              {!inventaire && <input type="number" step="any" min="0" value={l.prix ?? ""} onChange={(e) => maj(i, { prix: e.target.value })} placeholder="Prix unitaire €" className="w-32 border rounded px-2 py-1" />}
+              {mode === "achats" && <input type="number" step="any" min="0" value={l.prix ?? ""} onChange={(e) => maj(i, { prix: e.target.value })} placeholder="Prix unitaire €" className="w-32 border rounded px-2 py-1" />}
               {inventaire && <input type="date" value={l.datePeremption || ""} onChange={(e) => maj(i, { datePeremption: e.target.value || null })} title="Date de péremption" className="border rounded px-2 py-1" />}
               <span className="text-xs text-slate-500 basis-full">« {l.brut} »{l.sur ? " · reconnu" : l.candidats?.length ? " · à confirmer" : " · inconnu"}</span>
               <button type="button" onClick={() => setLignes((ls) => ls.filter((_, k) => k !== i))} className="text-xs text-red-600">retirer</button>
@@ -138,6 +140,11 @@ function Saisie({ token, articles, evenements, mode, onFait }) {
 
 // Colle ici le tableau Excel (copier-coller des cellules) : Nom, Quantité, Péremption, Catégorie, Unité.
 function ImportExcel({ token, onFait }) {
+  const [depart, setDepart] = useState("");
+  async function importerDepart() {
+    if (!window.confirm("Charger l'inventaire de départ préparé à partir de votre tableau (articles, fournisseurs, quantités connues, matériel) ?")) return;
+    try { const r = await appeler(token, "POST", { action: "importer_depart", date: aujourdhui() }); setDepart(`Fait : ${r.articles} articles, ${r.lignes} quantités reprises.`); onFait(true); } catch (e) { setDepart(e.message); }
+  }
   const [texte, setTexte] = useState("");
   const [date, setDate] = useState(aujourdhui());
   const [msg, setMsg] = useState("");
@@ -166,12 +173,93 @@ function ImportExcel({ token, onFait }) {
   }
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-600">Sélectionnez les cellules de votre tableau Excel (avec la ligne de titres si possible), copiez, collez ci-dessous. Colonnes reconnues (grâce à la ligne de titres) : Nom, Quantité, Péremption, Catégorie, Unité, Fournisseur. Les prix de l'ancien fichier ne sont pas repris : ils viendront des factures. Cela crée l&apos;inventaire de départ.</p>
+      <div className="border rounded-lg p-3 bg-sky-50 space-y-2">
+        <p className="text-sm">Votre tableau « STOCK Marché de Noël 2026 » (feuilles Stock et Matériel) est déjà préparé : un clic le charge, sans copier-coller. À faire une seule fois.</p>
+        <button type="button" onClick={importerDepart} className="px-4 py-2 rounded-lg bg-sou-blue text-white font-semibold">Charger l&apos;inventaire de départ</button>
+        {depart && <p className="text-sm">{depart}</p>}
+      </div>
+      <p className="text-sm text-slate-600">Sinon, sélectionnez les cellules de votre tableau Excel (avec la ligne de titres si possible), copiez, collez ci-dessous. Colonnes reconnues (grâce à la ligne de titres) : Nom, Quantité, Péremption, Catégorie, Unité, Fournisseur. Les prix de l'ancien fichier ne sont pas repris : ils viendront des factures. Cela crée l&apos;inventaire de départ.</p>
       <label className="text-sm">Date de ce comptage <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="border rounded px-2 py-1 ml-1" /></label>
       <textarea value={texte} onChange={(e) => setTexte(e.target.value)} rows={10} className="w-full border rounded-lg p-3 font-mono text-sm" />
       <p className="text-xs text-slate-500">{texte.trim() ? `${lire().length} ligne(s) lisible(s)` : ""}</p>
       <button type="button" onClick={envoyer} disabled={!texte.trim()} className="px-4 py-2 rounded-lg bg-sou-blue text-white font-semibold disabled:opacity-50">Importer</button>
       {msg && <p className="text-sm">{msg}</p>}
+    </div>
+  );
+}
+
+
+// Besoins d'une manifestation -> liste de courses (besoin − stock estimé), classée par fournisseur.
+function Courses({ token, d, nom, onChange }) {
+  const manifs = [...new Set(d.besoins.map((b) => b.manifestation))];
+  const [manif, setManif] = useState(manifs[0] || "Marché de Noël 2026");
+  const [dicter, setDicter] = useState(false);
+  const [ajout, setAjout] = useState("");
+  const [msg, setMsg] = useState("");
+  const estime = Object.fromEntries(d.estime.map((e) => [e.article_id, e.quantite]));
+  const lignes = d.besoins.filter((b) => b.manifestation === manif && nom[b.article_id]);
+  const calc = lignes.map((b) => ({ ...b, art: nom[b.article_id], stock: estime[b.article_id] || 0, acheter: Math.max(0, Number(b.quantite) - (estime[b.article_id] || 0)) }));
+  const parFournisseur = {};
+  for (const l of calc) if (l.acheter > 0) (parFournisseur[l.art.fournisseur || "Fournisseur à préciser"] ||= []).push(l);
+
+  async function fixer(articleId, quantite) {
+    setMsg("");
+    try { await appeler(token, "POST", { action: "besoins", manifestation: manif, lignes: [{ articleId, quantite }] }); onChange(); } catch (e) { setMsg(e.message); }
+  }
+  async function toutAchete() {
+    if (!window.confirm("Noter tout ce qui est à acheter comme acheté aujourd'hui ? (le stock estimé augmentera d'autant)")) return;
+    const lignesA = calc.filter((l) => l.acheter > 0).map((l) => ({ articleId: l.article_id, quantite: l.acheter }));
+    try { await appeler(token, "POST", { action: "achats", date: aujourdhui(), note: `Courses ${manif}`, lignes: lignesA }); onChange(); } catch (e) { setMsg(e.message); }
+  }
+  if (!d.besoinsDispo) return <p className="text-amber-700">Cet écran attend la migration 0064 (besoins par manifestation).</p>;
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap gap-2 items-center print:hidden">
+        <label className="text-sm">Manifestation <input list="manifs" value={manif} onChange={(e) => setManif(e.target.value)} className="border rounded px-2 py-1 ml-1 w-64" /></label>
+        <datalist id="manifs">{manifs.map((m) => <option key={m} value={m} />)}</datalist>
+        <button onClick={() => setDicter(!dicter)} className="px-3 py-1.5 rounded bg-slate-200 text-sm font-semibold">{dicter ? "Fermer la dictée" : "Dicter les besoins"}</button>
+        <select value={ajout} onChange={(e) => { setAjout(""); if (e.target.value) fixer(e.target.value, 0); }} className="border rounded px-2 py-1 text-sm">
+          <option value="">+ ajouter un article…</option>
+          {d.articles.filter((a) => a.actif !== false && !a.durable).map((a) => <option key={a.id} value={a.id}>{a.nom}</option>)}
+        </select>
+        <button onClick={() => window.print()} className="px-3 py-1.5 rounded bg-slate-200 text-sm font-semibold">Imprimer</button>
+      </div>
+      {msg && <p className="text-sm text-red-600">{msg}</p>}
+      {dicter && <Saisie token={token} articles={d.articles.filter((a) => !a.durable)} evenements={[]} mode="besoins" manifestation={manif} onFait={() => { onChange(); setDicter(false); }} />}
+
+      <div>
+        <h2 className="font-bold text-sou-blue mb-2">Besoins de « {manif} »</h2>
+        {calc.length === 0 ? <p className="text-slate-600 text-sm">Aucun besoin noté. Dictez-les ou ajoutez des articles.</p> : (
+          <table className="w-full text-sm bg-white border rounded-lg">
+            <thead><tr className="text-left bg-slate-100"><th className="p-2">Article</th><th className="p-2 text-right">Besoin</th><th className="p-2 text-right">En stock</th><th className="p-2 text-right">À acheter</th><th className="p-2">Fournisseur</th><th className="print:hidden" /></tr></thead>
+            <tbody>
+              {calc.sort((a, b) => a.art.nom.localeCompare(b.art.nom)).map((l) => (
+                <tr key={l.id} className="border-t">
+                  <td className="p-2">{l.art.nom}</td>
+                  <td className="p-2 text-right"><input type="number" step="any" min="0" defaultValue={l.quantite} onBlur={(e) => e.target.value !== String(l.quantite) && fixer(l.article_id, Number(e.target.value))} className="w-20 border rounded px-1 text-right" /></td>
+                  <td className="p-2 text-right">{fmtNb(l.stock)}</td>
+                  <td className={`p-2 text-right font-semibold ${l.acheter > 0 ? "text-red-600" : "text-green-700"}`}>{l.acheter > 0 ? fmtNb(l.acheter) : "rien"}</td>
+                  <td className="p-2 text-slate-500">{l.art.fournisseur}</td>
+                  <td className="p-2 print:hidden"><button className="text-xs text-red-600" onClick={async () => { await appeler(token, "POST", { action: "supprimer_besoin", id: l.id }); onChange(); }}>retirer</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {Object.keys(parFournisseur).length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 mb-2"><h2 className="font-bold text-sou-blue">Liste de courses</h2>
+            <button onClick={toutAchete} className="print:hidden text-sm px-3 py-1 rounded bg-green-600 text-white font-semibold">Tout est acheté → noter les achats</button></div>
+          {Object.entries(parFournisseur).sort().map(([f, ls]) => (
+            <div key={f} className="mb-3 bg-white border rounded-lg">
+              <div className="px-3 py-1.5 bg-slate-100 font-semibold">{f}</div>
+              <ul className="divide-y text-sm">{ls.map((l) => <li key={l.id} className="px-3 py-1.5 flex justify-between"><span>☐ {l.art.nom}</span><span className="font-semibold">{fmtNb(l.acheter)} {l.art.unite}</span></li>)}</ul>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -189,7 +277,7 @@ function Contenu({ token }) {
   if (!d) return <p className="text-slate-500">Chargement…</p>;
   const nom = Object.fromEntries(d.articles.map((a) => [a.id, a]));
   const apresFait = (retour) => { charger(); if (retour) setVue("stock"); };
-  const onglets = [["stock", "Stock actuel"], ["inventaire", "Faire un inventaire"], ["achats", "Noter des achats"], ["conso", "Consommation"], ["articles", "Articles"], ["import", "Import Excel"]];
+  const onglets = [["stock", "Stock actuel"], ["inventaire", "Faire un inventaire"], ["courses", "Liste de courses"], ["achats", "Noter des achats"], ["conso", "Consommation"], ["articles", "Articles"], ["import", "Import Excel"]];
 
   return (
     <div>
@@ -222,6 +310,7 @@ function Contenu({ token }) {
         )
       )}
 
+      {vue === "courses" && <Courses token={token} d={d} nom={nom} onChange={charger} />}
       {vue === "inventaire" && <Saisie token={token} articles={d.articles} evenements={d.inventaires.map((i) => i.libelle).filter(Boolean)} mode="inventaire" onFait={apresFait} />}
       {vue === "achats" && (
         <div className="space-y-6">

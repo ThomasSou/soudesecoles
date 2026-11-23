@@ -1,0 +1,2558 @@
+[
+{
+"nom": "agrafeuses",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Ail semoule 140g",
+"categorie": "Produits frais et viandes",
+"unite": "g",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "allume feu gaz",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Aluminium 200x0,45m",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 1.5,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "aluminium 50 x 29",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 2.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "assiette diam 15",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 155.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "assiette diam 23",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 500.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Baguettes moulées pour hot dog",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Spar",
+"observation": null,
+"durable": false
+},
+{
+"nom": "barquette \"boite burger\" 115x115x78",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 180.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Barquette KRAFT MEDIUM",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Barquettes 1000cc (moules)",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 300.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Barquettes 125cc (sauce)",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 300.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Barquettes 500cl (frites)",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 20.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "barquettes aluminium",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Barquettes Hot-dog américain craft 1l",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "barquettes kraft grande",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 100.0,
+"fournisseur": "Metro",
+"observation": null,
+"durable": false
+},
+{
+"nom": "barquettes kraft petite 13X8X4,9",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 50.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Batons pour barbe à papa",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 200.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Beurre demi sel",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Beurre doux",
+"categorie": "Produits frais et viandes",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Bièrebouteille 75cl",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "blocs post it",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "boite allumettes",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Boite blanche 22,9x15,2",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "boite d'aiguilles",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "boite de Gaufres (congelées)",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Boîtes en carton GF 16x5 pour les gâteaux",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 65.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Boîtes en carton PF 14X5 (réf, caissettes patissières)",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 100.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Bouteille Crème Cassis pour Kir",
+"categorie": "Boissons",
+"unite": "cl",
+"quantite": 1.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Bouteille d'eau pétillante 1L cocktail",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": "Spar",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Bouteille Eau 0,5l",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Spar",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Bouteille Eau 1,5l",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": 8.0,
+"fournisseur": "Spar",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Bouteille EAU pétillante 0,5l",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Spar",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Bouteille gaz Butane (1 couleur)",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Bouteille gaz propane (bicolore)",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Spar",
+"observation": null,
+"durable": false
+},
+{
+"nom": "briquet",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Café 225g",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": 13.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "calculatrice",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "canada dry GINGER 1,5 L",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": 3.0,
+"fournisseur": "Spar",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Canette coca 33cl",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Spar",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Canette Ice Tea 33cl",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Spar",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Canette jus de pomme 33cl MINUTE MAID",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": 18.0,
+"fournisseur": "Spar",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Canette oasis 33cl",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": 17.0,
+"fournisseur": "Spar",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Canette Orangina 33cl",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": 32.0,
+"fournisseur": "Spar",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Caramel liquide 1kg",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Cartons crêpes/gaufres (réf. carrés saines 17x17)",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 291.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Charbon de bois 4kg",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Charbon de bois 8kg/20L",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Chips paquet individuel",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Chips-maïs",
+"categorie": "Épicerie et condiments",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Chocolat poudre 1Kg",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Citron",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": "4 kg = 28 citrons environ",
+"durable": false
+},
+{
+"nom": "Concombres salade grecque",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Miloud",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Confiture de fraise 750 gr",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Cornichon gros en tranche",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Cornichons 360gr",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Couvert cuillere bois",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 164.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Couverts couteau bois",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": 150.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Couverts fourchette bois",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 158.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Couverture anti feu",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "couverture de survie",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "crayons de papier",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "crémant blanc de blanc 1,5L (pétillant)",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Lurcy",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Crème fraiche liquide",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Croissant",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Cumin",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "cure-dent",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "cutters",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Dégraissant four",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Dégraissant grille barbecue",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Donut",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Elastiques pour tickets",
+"categorie": "Papeterie et divers",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Eponge metal inox",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Eponges",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": 5.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "équerres",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Essuie tout",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": 3.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Farine 1Kg",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "ficelle",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "fiero Martini 1L",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": 4.0,
+"fournisseur": "Amazon",
+"observation": null,
+"durable": false
+},
+{
+"nom": "film étirable 20 x 32,5",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Film étirable 300x0,45m",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 3.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Film plastifieuse A3",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Film plastifieuse A4",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Frites FRAICHES diam10 (pour la foire)",
+"categorie": "Produits frais et viandes",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Miloud",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Fut Bière 30L",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Millesime",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Fut Bièrede noël 30L",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Fut de bière 30L",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Original Drinks",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Gants taille (L)",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Gants taille (M)",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Gants taille (XL)",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Gaufres McCain x9",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Gel hydro-alcoolique",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Glace x60kg",
+"categorie": "Boissons",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Homard arcadien",
+"observation": null,
+"durable": false
+},
+{
+"nom": "glaçons sachet de 10kg pour cocktail (glace pilée)",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "glaçons sachet de 1kg pour cocktail",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Gobelet 300ml",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Gobelet à pop corn 100cl",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Gobelet à pop corn 72cl",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 80.0,
+"fournisseur": "Confiserie foraine",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Gobelets 15cl",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Gobelets 24cL",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 50.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Gobelets Café de 10cl",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": 300.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Gobelets Thé de 35cl",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": 130.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "gommes",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Haricots rouges en boite",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Herbes de Provences 230 gr",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Huile (en mL) tournesol",
+"categorie": "Épicerie et condiments",
+"unite": "ml",
+"quantite": 2000.0,
+"fournisseur": "Miloud",
+"observation": null,
+"durable": false
+},
+{
+"nom": "huile d'olive",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Miloud",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Huile frite tournesol en 25L",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Huile frite tournesol en 5L",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Huille d'olive",
+"categorie": "Épicerie et condiments",
+"unite": "l",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "joints",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "ju de citron en ML",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": 1000.0,
+"fournisseur": "Miloud",
+"observation": null,
+"durable": false
+},
+{
+"nom": "ketchup 460 gr",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "LAIT demi écrémé",
+"categorie": "Boissons",
+"unite": "l",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Lavettes",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Liquide vaisselle 1,5L",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Liquide vaisselle 500 ml",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Maïs en boite",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Mayonnaise 425g",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Mayonnaise 475g",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Mayonnaise 710g",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Merguez",
+"categorie": "Produits frais et viandes",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Diennet",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Moule",
+"categorie": "Produits frais et viandes",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Homard arcadien",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Moutarde 500g",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Multi surface sol 2l",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": 1.5,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "multiprises",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Nappe Papier 100m",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Oignons jaunes émincés andouillettes et moules",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Miloud",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Oignons rouges salades grecque",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Miloud",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Olives noires à la grecque",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Miloud",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Orange",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": "36 oranges = 8kg",
+"durable": false
+},
+{
+"nom": "Pailles",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 200.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Pain burger",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Boulangerie saint jean",
+"observation": null,
+"durable": false
+},
+{
+"nom": "papier toilette",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Papillote",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "pate à fix",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Pâte à tartiner chocolat 1kg (liquide)",
+"categorie": "Épicerie et condiments",
+"unite": "l",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": "1,5 kg utilisé en 2024",
+"durable": false
+},
+{
+"nom": "Perrier 1L",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Perrier 33 cl",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Spar",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Persil émincé",
+"categorie": "Produits frais et viandes",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Miloud",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Pic en bois",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 500.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Pic fouchette frites",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Pilons de poulet",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Diennet",
+"observation": null,
+"durable": false
+},
+{
+"nom": "pique brochette",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 150.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Poivre 18 gr",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": 10.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Pomme de terre pour frites",
+"categorie": "Produits frais et viandes",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Miloud",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Pop Corn 30 L",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "l",
+"quantite": null,
+"fournisseur": "Confiserie foraine",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Pot Fibre bambou 150ml",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "prises programables",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "règles",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Rince doigts",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 25.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "rivesaltes ambré1L",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": 20.0,
+"fournisseur": "Spar",
+"observation": null,
+"durable": false
+},
+{
+"nom": "roulette tombola",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Rubalise (rouleau de 100m)",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "sac à sandwich",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sac congélation 1,5L",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 300.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "sac épais",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "sac kraft 14x29",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "sac kraft grand",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "sac légers",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sac poubelles 100L en nb de rouleaux",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sachet bonbon dragibus",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sachet bonbon fraise tagada",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 19.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sachet bonbon schtroumph",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 24.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sachets de sucre 5g (dosette)",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 600.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sacs poubelle 30L en nb de rouleaux",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Saint roch graine",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Pain du gones",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Salade verte 1 kg en feuille",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sanytol surface alimentaire 750ml pchit",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": 9.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sauce Burger 1080g",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sauce Ketchup 1040g",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sauce Mayonnaise 970 g",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sauce Moutarde 950g",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": 14.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Saucisse merguez",
+"categorie": "Produits frais et viandes",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Diennet",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Saucisse Merguez hallal",
+"categorie": "Produits frais et viandes",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Jasmin",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Saucisses Chipolata",
+"categorie": "Produits frais et viandes",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Diennet",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Saucisses hot dog",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Spar",
+"observation": null,
+"durable": false
+},
+{
+"nom": "scotch de bureaux",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "scotch gris",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Scotch Marron",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Scotch orange",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Scotch transparent",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "sel fin 550 gr",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": 4.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sel fin 750gr",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sel fin petit format 50g",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": 12.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "serflexes",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Serviettes en papier 30x30",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "unité",
+"quantite": 600.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Stylo",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "sucre barbe à papa1 kg",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sucre de canne/roux 1Kg",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sucre en poudre (à saupoudrer) 1Kg",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": 5.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sucre glace 500gr",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Sucre morceau 1kg",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Tabasco",
+"categorie": "Épicerie et condiments",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Thé noir sachets",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": 25.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "thé vert",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "ticket souche Bleu foncé (menu moules-frites)",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "ticket souche Jaune (festif-lasagnes)",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "ticket souche marron",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "ticket souche Orange (frites)",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "ticket souche Rouge (Junior)",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "ticket souche vert",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "ticket souche Violet (menu charcutier)",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "tire-bouchons",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Tomate en boite purée",
+"categorie": "Emballages et vaisselle jetable",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Tomates salade grecque",
+"categorie": "Produits frais et viandes",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Miloud",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Touillettes pour café",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": 1000.0,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "trombones",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "vérifier trousse de secours",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Viande Hachée",
+"categorie": "Produits frais et viandes",
+"unite": "kg",
+"quantite": null,
+"fournisseur": "Diennet",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Vin blanc",
+"categorie": "Boissons",
+"unite": "l",
+"quantite": null,
+"fournisseur": "Millesime",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Vin blanc château des loges",
+"categorie": "Boissons",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Château des loges",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Vin rosé",
+"categorie": "Boissons",
+"unite": "l",
+"quantite": null,
+"fournisseur": "Millesime",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Vin rouge",
+"categorie": "Boissons",
+"unite": "l",
+"quantite": null,
+"fournisseur": "Millesime",
+"observation": null,
+"durable": false
+},
+{
+"nom": "vinaigre blanc 1L",
+"categorie": "Entretien et hygiène",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "vis barnum",
+"categorie": "Papeterie et divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": "Promocash",
+"observation": null,
+"durable": false
+},
+{
+"nom": "Barbecue 1/2 tonneau + 4 pieds + grille",
+"categorie": "Matériel durable — Appareil",
+"unite": "unité",
+"quantite": 2.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Bouilloire",
+"categorie": "Matériel durable — Appareil",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Cafetière",
+"categorie": "Matériel durable — Appareil",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Crêpière",
+"categorie": "Matériel durable — Appareil",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Grille pain",
+"categorie": "Matériel durable — Appareil",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Machine à Hot Dog",
+"categorie": "Matériel durable — Appareil",
+"unite": "unité",
+"quantite": 2.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Percolateur 6L",
+"categorie": "Matériel durable — Appareil",
+"unite": "unité",
+"quantite": 2.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Stérilisateur",
+"categorie": "Matériel durable — Appareil",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Caisse de cales en bois",
+"categorie": "Matériel durable — Divers",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Caisse sacs poubelle",
+"categorie": "Matériel durable — Divers",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Caisse torchons",
+"categorie": "Matériel durable — Divers",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "T.Shirt jaune",
+"categorie": "Matériel durable — Divers",
+"unite": "unité",
+"quantite": 4.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Tablier",
+"categorie": "Matériel durable — Divers",
+"unite": "unité",
+"quantite": 11.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Adaptateur prise",
+"categorie": "Matériel durable — Matériel",
+"unite": "unité",
+"quantite": 6.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Banc",
+"categorie": "Matériel durable — Matériel",
+"unite": "unité",
+"quantite": 54.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Barnum 3X3m",
+"categorie": "Matériel durable — Matériel",
+"unite": "unité",
+"quantite": 12.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Barnum blanc 5X10m (marquage orange + sans couleur)",
+"categorie": "Matériel durable — Matériel",
+"unite": "unité",
+"quantite": 2.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Barnum blanc 5X12m (marquage jaune)",
+"categorie": "Matériel durable — Matériel",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Barnum grand \"vieux\"",
+"categorie": "Matériel durable — Matériel",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Brûleur grand",
+"categorie": "Matériel durable — Matériel",
+"unite": "unité",
+"quantite": 3.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Brûleur petit",
+"categorie": "Matériel durable — Matériel",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Décamètre",
+"categorie": "Matériel durable — Matériel",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Enrouleur 25m",
+"categorie": "Matériel durable — Matériel",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Enrouleur 40m",
+"categorie": "Matériel durable — Matériel",
+"unite": "unité",
+"quantite": 5.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Escabeau",
+"categorie": "Matériel durable — Matériel",
+"unite": "unité",
+"quantite": 2.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Protection poêle",
+"categorie": "Matériel durable — Matériel",
+"unite": "unité",
+"quantite": 3.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Scotch fort",
+"categorie": "Matériel durable — Matériel",
+"unite": "unité",
+"quantite": 0.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Table 2m20 x 80 x 76",
+"categorie": "Matériel durable — Matériel",
+"unite": "unité",
+"quantite": 33.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Couteau d'office",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 0.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "couteau huîtres",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 4.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "couteau pain",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 3.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Ecumoire",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 3.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Entonoir",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 4.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Etaleur pâte à crêpe",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Fouet",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 2.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Fourchette en inox",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 50.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "goupillon",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Kit barbecue (couteau + pince+spatule+fourchette+6piques)",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Louche",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 5.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "pince",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 3.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "roulette pizza",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "spatule bois",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 2.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Spatule métal",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 2.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Tridents",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Verre doseur",
+"categorie": "Matériel durable — Ustensile",
+"unite": "unité",
+"quantite": null,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Bac gastro Couvercle",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 12.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "couvercle bac gastro",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 6.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Bac gastro fin",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 12.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Bac gastro fin et percé",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 3.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Bac gastro grand",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 6.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Bac gastro moyen",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Casserole Grande",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 3.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Casserole petite",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Couvercle casserole grande",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Eco cup",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 847.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Ecumoire grand",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Marmite avec couvercle",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 4.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Passoire grande",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Planche à découper",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 2.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Plat four avec poignées",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 2.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Plateaux",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 351.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Poêle paëlla (trippes)",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 3.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Pot à vin lyonnias 46cl",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 66.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Thermo 1L",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 4.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Thermo 2,5L",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 1.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Verre à pied",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 88.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "Verres à vin",
+"categorie": "Matériel durable — Vaisselle",
+"unite": "unité",
+"quantite": 157.0,
+"fournisseur": null,
+"observation": null,
+"durable": true
+},
+{
+"nom": "verre à biere",
+"categorie": "Matériel durable — Divers",
+"unite": "unité",
+"quantite": null,
+"fournisseur": null,
+"observation": null,
+"durable": true
+}
+]
