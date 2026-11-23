@@ -477,6 +477,7 @@ const LOGO_RATIO = {
   "emilejob-2026.jpg": 91 / 110,
   "pizzeria-des-templiers.jpg": 144 / 110,
   "arc1950.jpg": 205 / 110,
+  "jaam-immo.jpg": 1,
   "maitresdeboucheurs.jpg": 1146 / 1035,
 };
 

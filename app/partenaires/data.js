@@ -84,12 +84,18 @@ export const PARTNERS = [
       "Spécialistes du débouchage de canalisations, du curage et du nettoyage haute pression, intervenant notamment sur le secteur Beaujolais - Val de Saône.",
     website: "https://www.maitres-deboucheurs.com/",
   },
-  // Nouveaux partenaires (novembre 2026) : logo seulement pour l'instant.
-  // Niveau « Bronze » provisoire, à confirmer par Thomas avant publication.
+  // Nouveaux partenaires (novembre 2026), tous Bronze (confirmé par Thomas) :
+  // logo seulement pour l'instant, sans texte de présentation.
   {
     slug: "pizzeria-des-templiers",
     name: "Pizzeria des Templiers",
     file: "pizzeria-des-templiers.jpg",
+    tier: "Bronze",
+  },
+  {
+    slug: "jaam-immo",
+    name: "Jaam Immo",
+    file: "jaam-immo.jpg",
     tier: "Bronze",
   },
   {
