@@ -66,7 +66,7 @@ export const PARTNERS = [
   {
     slug: "emilejob",
     name: "Emile Job",
-    file: "emilejob.jpg",
+    file: "emilejob-2026.jpg",
     tier: "Silver",
     description:
       "Restaurant familial tenu par Eric et Isabelle Lépine depuis trois générations, au bord de la Saône. Cuisine traditionnelle (volaille de Bresse, grenouilles, poissons de rivière) et terrasse ombragée par des tilleuls centenaires.",
@@ -83,6 +83,26 @@ export const PARTNERS = [
     description:
       "Spécialistes du débouchage de canalisations, du curage et du nettoyage haute pression, intervenant notamment sur le secteur Beaujolais - Val de Saône.",
     website: "https://www.maitres-deboucheurs.com/",
+  },
+  // Nouveaux partenaires (novembre 2026), tous Bronze (confirmé par Thomas) :
+  // logo seulement pour l'instant, sans texte de présentation.
+  {
+    slug: "pizzeria-des-templiers",
+    name: "Pizzeria des Templiers",
+    file: "pizzeria-des-templiers.jpg",
+    tier: "Bronze",
+  },
+  {
+    slug: "jaam-immo",
+    name: "Jaam Immo",
+    file: "jaam-immo.jpg",
+    tier: "Bronze",
+  },
+  {
+    slug: "arc1950",
+    name: "Arc 1950",
+    file: "arc1950.jpg",
+    tier: "Bronze",
   },
 ];
 
