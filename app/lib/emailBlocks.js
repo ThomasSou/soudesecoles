@@ -474,7 +474,9 @@ const LOGO_RATIO = {
   "nicod.jpg": 526 / 333,
   "spar.jpg": 367 / 366,
   "millesime.jpg": 353 / 226,
-  "emilejob.jpg": 196 / 241,
+  "emilejob-2026.jpg": 91 / 110,
+  "pizzeria-des-templiers.jpg": 144 / 110,
+  "arc1950.jpg": 205 / 110,
   "maitresdeboucheurs.jpg": 1146 / 1035,
 };
 
