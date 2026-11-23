@@ -201,3 +201,26 @@ export function consommation(avant, apres, achats) {
   }
   return out;
 }
+
+// Deux articles qui veulent probablement dire la même chose : même catégorie,
+// noms très proches, et mêmes mesures (« 0,5l » ≠ « 1,5l », « L » ≠ « XL »).
+function mesures(nom) {
+  const t = sansAccents(nom).replace(/(\d),(\d)/g, "$1.$2");
+  const nb = (t.match(/\d+(\.\d+)?/g) || []).sort().join(",");
+  const tailles = (t.match(/\b(xs|s|m|l|xl|xxl)\b/g) || []).sort().join(",");
+  return nb + "|" + tailles;
+}
+export function sontDoublons(a, b) {
+  if (a.categorie && b.categorie && a.categorie !== b.categorie) return false;
+  if (mesures(a.nom) !== mesures(b.nom)) return false;
+  return scoreLibelle(a.nom, b.nom) >= 0.7;
+}
+export function trouverDoublons(articles) {
+  const paires = [];
+  for (let i = 0; i < articles.length; i++) {
+    for (let j = i + 1; j < articles.length; j++) {
+      if (sontDoublons(articles[i], articles[j])) paires.push([articles[i], articles[j]]);
+    }
+  }
+  return paires;
+}

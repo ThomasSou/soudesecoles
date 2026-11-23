@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import AdminShell from "../admin-shell";
+import { trouverDoublons, sansAccents } from "../../lib/stockDictee";
 
 const aujourdhui = () => new Date().toISOString().slice(0, 10);
 const fmtDate = (d) => (d ? new Date(d + "T12:00:00").toLocaleDateString("fr-FR") : "");
@@ -16,6 +17,14 @@ async function appeler(token, methode, corps) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Une erreur est survenue.");
   return data;
+}
+
+// Création d'article : si un article proche existe, on prévient avant de créer un doublon.
+async function creerSansDoublon(token, corps) {
+  try { return await appeler(token, "POST", corps); } catch (e) {
+    if (/article proche existe/.test(e.message) && window.confirm(`${e.message}\n\nCréer quand même un nouvel article ?`)) return appeler(token, "POST", { ...corps, forcer: true });
+    throw e;
+  }
 }
 
 // Bouton micro (dictée du navigateur) : facultatif, le clavier du téléphone dicte aussi.
@@ -66,7 +75,7 @@ function Saisie({ token, articles, evenements, mode, manifestation, onFait }) {
     const nom = window.prompt("Nom du nouvel article :", lignes[i].libelle);
     if (!nom) return;
     try {
-      const { article } = await appeler(token, "POST", { action: "article", nom, unite: lignes[i].unite || "unité" });
+      const { article } = await creerSansDoublon(token, { action: "article", nom, unite: lignes[i].unite || "unité" });
       maj(i, { choix: article.id, nouveaux: [...(lignes[i].nouveaux || []), article] });
       onFait(false);
     } catch (e) { setErreur(e.message); }
@@ -189,6 +198,58 @@ function ImportExcel({ token, onFait }) {
 }
 
 
+// Stock estimé : recherche, filtre par catégorie, tri par colonne.
+function StockActuel({ d, nom }) {
+  const [q, setQ] = useState("");
+  const [cat, setCat] = useState("");
+  const [tri, setTri] = useState({ cle: "categorie", sens: 1 });
+  const [tous, setTous] = useState(false);
+  if (d.estime.length === 0) return <p className="text-slate-600">Aucun inventaire pour l&apos;instant : commencez par « Import Excel » ou « Faire un inventaire ».</p>;
+  const estime = Object.fromEntries(d.estime.map((e) => [e.article_id, e]));
+  const limite = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10);
+  let rows = d.articles.filter((a) => a.actif !== false).map((a) => ({ a, quantite: estime[a.id]?.quantite ?? null, peremption: estime[a.id]?.peremption || null, prix: d.dernierPrix[a.id] ?? null }));
+  if (!tous) rows = rows.filter((r) => r.quantite != null);
+  const cats = [...new Set(d.articles.map((a) => a.categorie).filter(Boolean))].sort();
+  if (cat) rows = rows.filter((r) => r.a.categorie === cat);
+  const mots = sansAccents(q).split(/\s+/).filter(Boolean);
+  if (mots.length) rows = rows.filter((r) => { const t = sansAccents(`${r.a.nom} ${(r.a.alias || []).join(" ")} ${r.a.categorie || ""} ${r.a.fournisseur || ""}`); return mots.every((m) => t.includes(m)); });
+  const val = (r) => ({ nom: r.a.nom, categorie: r.a.categorie || "", quantite: r.quantite ?? -1, peremption: r.peremption || "9999", fournisseur: r.a.fournisseur || "", prix: r.prix ?? -1 }[tri.cle]);
+  rows.sort((x, y) => { const u = val(x), v = val(y); return (typeof u === "number" ? u - v : String(u).localeCompare(String(v), "fr")) * tri.sens || x.a.nom.localeCompare(y.a.nom, "fr"); });
+  const Th = ({ cle, children, droite }) => (
+    <th className={`p-2 cursor-pointer select-none ${droite ? "text-right" : ""}`} onClick={() => setTri((t) => ({ cle, sens: t.cle === cle ? -t.sens : 1 }))}>
+      {children}{tri.cle === cle ? (tri.sens > 0 ? " ▲" : " ▼") : ""}
+    </th>
+  );
+  return (
+    <div>
+      <div className="flex flex-wrap gap-2 items-center mb-3">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher : canettes, couverts, gobelets…" className="border rounded-lg px-3 py-2 flex-1 min-w-[14rem]" />
+        <select value={cat} onChange={(e) => setCat(e.target.value)} className="border rounded-lg px-2 py-2"><option value="">Toutes les catégories</option>{cats.map((c) => <option key={c}>{c}</option>)}</select>
+        <label className="text-sm flex items-center gap-1"><input type="checkbox" checked={tous} onChange={(e) => setTous(e.target.checked)} /> aussi les articles pas encore comptés</label>
+      </div>
+      <p className="text-sm text-slate-500 mb-2">{rows.length} article(s). Estimation = dernier inventaire ({fmtDate(d.inventaires.find((i) => i.id === d.dernierInventaire)?.date_inventaire)}) + achats notés depuis. Cliquez sur un titre de colonne pour trier.</p>
+      <table className="w-full text-sm bg-white border rounded-lg">
+        <thead><tr className="text-left bg-slate-100"><Th cle="nom">Article</Th><Th cle="categorie">Catégorie</Th><Th cle="quantite" droite>Quantité</Th><Th cle="peremption">Péremption la + proche</Th><Th cle="fournisseur">Fournisseur</Th><Th cle="prix" droite>Dernier prix</Th></tr></thead>
+        <tbody>
+          {rows.map(({ a, quantite, peremption, prix }) => {
+            const bas = quantite != null && a.seuil_alerte != null && quantite <= a.seuil_alerte;
+            const proche = peremption && peremption <= limite;
+            return (
+              <tr key={a.id} className="border-t">
+                <td className="p-2">{a.nom}</td><td className="p-2 text-slate-500">{a.categorie}</td>
+                <td className={`p-2 text-right font-semibold ${bas ? "text-red-600" : ""}`}>{quantite != null ? <>{fmtNb(quantite)} <span className="font-normal text-slate-500">{a.unite}</span>{bas ? " ⚠" : ""}</> : <span className="font-normal text-slate-400">non compté</span>}</td>
+                <td className={`p-2 ${proche ? "text-red-600 font-semibold" : ""}`}>{peremption ? fmtDate(peremption) : <span className="text-slate-400">—</span>}</td>
+                <td className="p-2 text-slate-500">{a.fournisseur}</td>
+                <td className="p-2 text-right">{prix != null ? `${fmtNb(prix)} €` : ""}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // Besoins d'une manifestation -> liste de courses (besoin − stock estimé), classée par fournisseur.
 function Courses({ token, d, nom, onChange }) {
   const manifs = [...new Set(d.besoins.map((b) => b.manifestation))];
@@ -285,30 +346,7 @@ function Contenu({ token }) {
         {onglets.map(([k, l]) => <button key={k} onClick={() => setVue(k)} className={`px-3 py-1.5 rounded-full text-sm font-semibold ${vue === k ? "bg-sou-blue text-white" : "bg-slate-200 text-slate-700"}`}>{l}</button>)}
       </div>
 
-      {vue === "stock" && (
-        d.estime.length === 0 ? <p className="text-slate-600">Aucun inventaire pour l&apos;instant : commencez par « Import Excel » ou « Faire un inventaire ».</p> : (
-          <div>
-            <p className="text-sm text-slate-500 mb-2">Estimation = dernier inventaire ({fmtDate(d.inventaires.find((i) => i.id === d.dernierInventaire)?.date_inventaire)}) + achats notés depuis.</p>
-            <table className="w-full text-sm bg-white border rounded-lg">
-              <thead><tr className="text-left bg-slate-100"><th className="p-2">Article</th><th className="p-2">Catégorie</th><th className="p-2 text-right">Quantité</th><th className="p-2">Péremption la + proche</th><th className="p-2">Fournisseur</th><th className="p-2 text-right">Dernier prix</th></tr></thead>
-              <tbody>
-                {[...d.estime].sort((a, b) => (nom[a.article_id]?.categorie || "").localeCompare(nom[b.article_id]?.categorie || "") || (nom[a.article_id]?.nom || "").localeCompare(nom[b.article_id]?.nom || "")).map((e) => {
-                  const a = nom[e.article_id]; if (!a) return null;
-                  const bas = a.seuil_alerte != null && e.quantite <= a.seuil_alerte;
-                  const proche = e.peremption && e.peremption <= new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10);
-                  return (
-                    <tr key={e.article_id} className="border-t">
-                      <td className="p-2">{a.nom}</td><td className="p-2 text-slate-500">{a.categorie}</td>
-                      <td className={`p-2 text-right font-semibold ${bas ? "text-red-600" : ""}`}>{fmtNb(e.quantite)} <span className="font-normal text-slate-500">{a.unite}</span>{bas ? " ⚠" : ""}</td>
-                      <td className={`p-2 ${proche ? "text-red-600 font-semibold" : ""}`}>{fmtDate(e.peremption)}</td><td className="p-2 text-slate-500">{a.fournisseur}</td><td className="p-2 text-right">{d.dernierPrix[a.id] != null ? `${fmtNb(d.dernierPrix[a.id])} €` : ""}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )
-      )}
+      {vue === "stock" && <StockActuel d={d} nom={nom} />}
 
       {vue === "courses" && <Courses token={token} d={d} nom={nom} onChange={charger} />}
       {vue === "inventaire" && <Saisie token={token} articles={d.articles} evenements={d.inventaires.map((i) => i.libelle).filter(Boolean)} mode="inventaire" onFait={apresFait} />}
@@ -371,12 +409,47 @@ function Contenu({ token }) {
   );
 }
 
+// Articles qui semblent dire la même chose : on propose de les fusionner (l'historique est conservé).
+function Doublons({ token, articles, onChange }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [msg, setMsg] = useState("");
+  const paires = ouvert ? trouverDoublons(articles.filter((a) => a.actif !== false)) : [];
+  async function fusionner(garde, retire) {
+    if (!window.confirm(`Fusionner « ${retire.nom} » dans « ${garde.nom} » ? Tout l'historique passe sur « ${garde.nom} ».`)) return;
+    try { await appeler(token, "POST", { action: "fusionner", garderId: garde.id, retirerId: retire.id }); onChange(); } catch (e) { setMsg(e.message); }
+  }
+  async function recat() {
+    try { const r = await appeler(token, "POST", { action: "recategoriser_depart" }); setMsg(`${r.modifies} catégorie(s) remises à jour.`); onChange(); } catch (e) { setMsg(e.message); }
+  }
+  return (
+    <div className="border rounded-lg p-3 bg-slate-50 space-y-2">
+      <div className="flex flex-wrap gap-2 items-center">
+        <button onClick={() => setOuvert(!ouvert)} className="px-3 py-1.5 rounded bg-slate-200 text-sm font-semibold">{ouvert ? "Masquer" : "Chercher les doublons possibles"}</button>
+        <button onClick={recat} className="px-3 py-1.5 rounded bg-slate-200 text-sm font-semibold">Corriger les catégories du fichier de départ</button>
+        {msg && <span className="text-sm">{msg}</span>}
+      </div>
+      {ouvert && (paires.length === 0 ? <p className="text-sm text-slate-600">Aucun doublon probable.</p> : (
+        <ul className="text-sm space-y-1">
+          {paires.map(([x, y]) => (
+            <li key={x.id + y.id} className="flex flex-wrap gap-2 items-center bg-white border rounded px-2 py-1">
+              <span>« {x.nom} » ≈ « {y.nom} »</span>
+              <button className="text-sou-blue underline" onClick={() => fusionner(x, y)}>garder le 1er</button>
+              <button className="text-sou-blue underline" onClick={() => fusionner(y, x)}>garder le 2e</button>
+            </li>
+          ))}
+          <li className="text-xs text-slate-500">Si ce sont bien deux choses différentes (ex. couvercle et casserole), ignorez la ligne.</li>
+        </ul>
+      ))}
+    </div>
+  );
+}
+
 function Articles({ token, articles, onChange }) {
   const [nouv, setNouv] = useState({ nom: "", categorie: "", unite: "unité", seuil_alerte: "" });
   const [erreur, setErreur] = useState("");
   async function ajouter(e) {
     e.preventDefault(); setErreur("");
-    try { await appeler(token, "POST", { action: "article", ...nouv }); setNouv({ nom: "", categorie: "", unite: "unité", seuil_alerte: "" }); onChange(); } catch (er) { setErreur(er.message); }
+    try { await creerSansDoublon(token, { action: "article", ...nouv }); setNouv({ nom: "", categorie: "", unite: "unité", seuil_alerte: "" }); onChange(); } catch (er) { setErreur(er.message); }
   }
   async function modifier(a, ch) {
     try { await appeler(token, "POST", { action: "article", id: a.id, nom: a.nom, categorie: a.categorie, unite: a.unite, seuil_alerte: a.seuil_alerte, alias: a.alias, actif: a.actif, ...ch }); onChange(); } catch (er) { setErreur(er.message); }
@@ -391,6 +464,7 @@ function Articles({ token, articles, onChange }) {
         <button className="px-3 py-1.5 rounded bg-sou-blue text-white font-semibold">Ajouter</button>
       </form>
       {erreur && <p className="text-sm text-red-600">{erreur}</p>}
+      <Doublons token={token} articles={articles} onChange={onChange} />
       <table className="w-full text-sm bg-white border rounded-lg">
         <thead><tr className="text-left bg-slate-100"><th className="p-2">Article</th><th className="p-2">Catégorie</th><th className="p-2">Unité</th><th className="p-2">Alerte ≤</th><th className="p-2">Appelé aussi…</th><th /></tr></thead>
         <tbody>
