@@ -858,7 +858,7 @@ function BoutiqueAdmin({ accessToken }) {
           onClick={() => setOnglet("commandes")}
           className={`px-3 py-1.5 rounded-full ${onglet === "commandes" ? "bg-sou-blue text-white" : "bg-slate-100 text-slate-600"}`}
         >
-          Commandes ({commandes.length})
+          Commandes
         </button>
         <button
           onClick={() => setOnglet("boutiques")}
