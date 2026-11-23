@@ -78,7 +78,7 @@ function Saisie({ token, articles, evenements, mode, onFait }) {
       const valides = lignes.filter((l) => l.choix && l.quantite != null);
       const corps = {
         action: inventaire ? "inventaire" : "achats", date, libelle, fournisseur,
-        lignes: valides.map((l) => ({ articleId: l.choix, quantite: l.quantite, datePeremption: l.datePeremption, libelle: l.libelle })),
+        lignes: valides.map((l) => ({ articleId: l.choix, quantite: l.quantite, prix: l.prix, datePeremption: l.datePeremption, libelle: l.libelle })),
       };
       await appeler(token, "POST", corps);
       setTexte(""); setLignes(null);
@@ -119,6 +119,7 @@ function Saisie({ token, articles, evenements, mode, onFait }) {
                 {[...articles, ...(lignes[i].nouveaux || [])].filter((a) => a.actif !== false).map((a) => <option key={a.id} value={a.id}>{a.nom}</option>)}
               </select>
               {!l.choix && <button type="button" onClick={() => creerArticle(i)} className="text-sm text-sou-blue underline">+ nouvel article</button>}
+              {!inventaire && <input type="number" step="any" min="0" value={l.prix ?? ""} onChange={(e) => maj(i, { prix: e.target.value })} placeholder="Prix unitaire €" className="w-32 border rounded px-2 py-1" />}
               {inventaire && <input type="date" value={l.datePeremption || ""} onChange={(e) => maj(i, { datePeremption: e.target.value || null })} title="Date de péremption" className="border rounded px-2 py-1" />}
               <span className="text-xs text-slate-500 basis-full">« {l.brut} »{l.sur ? " · reconnu" : l.candidats?.length ? " · à confirmer" : " · inconnu"}</span>
               <button type="button" onClick={() => setLignes((ls) => ls.filter((_, k) => k !== i))} className="text-xs text-red-600">retirer</button>
@@ -147,11 +148,11 @@ function ImportExcel({ token, onFait }) {
     const ent = rows[0].map(cle);
     const avecEntete = ent.some((c) => /^(nom|article|produit|designation)/.test(c));
     const idx = (re, def) => { const k = ent.findIndex((c) => re.test(c)); return avecEntete ? k : def; };
-    const iNom = idx(/^(nom|article|produit|designation)/, 0), iQte = idx(/^(qte|quantite|stock)/, 1), iPer = idx(/(peremption|dlc|dluo|date)/, 2), iCat = idx(/^(categorie|famille|type)/, 3), iUni = idx(/^(unite)/, 4);
+    const iNom = idx(/^(nom|article|produit|designation)/, 0), iQte = idx(/^(qte|quantite|stock)/, 1), iPer = idx(/(peremption|dlc|dluo|date)/, 2), iCat = idx(/^(categorie|famille|type)/, 3), iUni = idx(/^(unite)/, 4), iFou = idx(/^(fournisseur|magasin)/, -1);
     const date_ = (s) => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(s || ""); if (m) return `${m[3].length === 2 ? 2000 + +m[3] : m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`; return /^\d{4}-\d{2}-\d{2}$/.test(s || "") ? s : null; };
     return (avecEntete ? rows.slice(1) : rows).map((r) => ({
       nom: iNom >= 0 ? r[iNom] : "", quantite: iQte >= 0 ? Number((r[iQte] || "").replace(",", ".")) : NaN,
-      datePeremption: iPer >= 0 ? date_(r[iPer]) : null, categorie: iCat >= 0 ? r[iCat] : "", unite: iUni >= 0 ? r[iUni] : "",
+      datePeremption: iPer >= 0 ? date_(r[iPer]) : null, categorie: iCat >= 0 ? r[iCat] : "", unite: iUni >= 0 ? r[iUni] : "", fournisseur: iFou >= 0 ? r[iFou] : "",
     })).filter((l) => l.nom && Number.isFinite(l.quantite));
   }
   async function envoyer() {
@@ -165,7 +166,7 @@ function ImportExcel({ token, onFait }) {
   }
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-600">Sélectionnez les cellules de votre tableau Excel (avec la ligne de titres si possible), copiez, collez ci-dessous. Colonnes reconnues : Nom, Quantité, Péremption, Catégorie, Unité. Cela crée l&apos;inventaire de départ.</p>
+      <p className="text-sm text-slate-600">Sélectionnez les cellules de votre tableau Excel (avec la ligne de titres si possible), copiez, collez ci-dessous. Colonnes reconnues (grâce à la ligne de titres) : Nom, Quantité, Péremption, Catégorie, Unité, Fournisseur. Les prix de l'ancien fichier ne sont pas repris : ils viendront des factures. Cela crée l&apos;inventaire de départ.</p>
       <label className="text-sm">Date de ce comptage <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="border rounded px-2 py-1 ml-1" /></label>
       <textarea value={texte} onChange={(e) => setTexte(e.target.value)} rows={10} className="w-full border rounded-lg p-3 font-mono text-sm" />
       <p className="text-xs text-slate-500">{texte.trim() ? `${lire().length} ligne(s) lisible(s)` : ""}</p>
@@ -201,7 +202,7 @@ function Contenu({ token }) {
           <div>
             <p className="text-sm text-slate-500 mb-2">Estimation = dernier inventaire ({fmtDate(d.inventaires.find((i) => i.id === d.dernierInventaire)?.date_inventaire)}) + achats notés depuis.</p>
             <table className="w-full text-sm bg-white border rounded-lg">
-              <thead><tr className="text-left bg-slate-100"><th className="p-2">Article</th><th className="p-2">Catégorie</th><th className="p-2 text-right">Quantité</th><th className="p-2">Péremption la + proche</th></tr></thead>
+              <thead><tr className="text-left bg-slate-100"><th className="p-2">Article</th><th className="p-2">Catégorie</th><th className="p-2 text-right">Quantité</th><th className="p-2">Péremption la + proche</th><th className="p-2">Fournisseur</th><th className="p-2 text-right">Dernier prix</th></tr></thead>
               <tbody>
                 {[...d.estime].sort((a, b) => (nom[a.article_id]?.categorie || "").localeCompare(nom[b.article_id]?.categorie || "") || (nom[a.article_id]?.nom || "").localeCompare(nom[b.article_id]?.nom || "")).map((e) => {
                   const a = nom[e.article_id]; if (!a) return null;
@@ -211,7 +212,7 @@ function Contenu({ token }) {
                     <tr key={e.article_id} className="border-t">
                       <td className="p-2">{a.nom}</td><td className="p-2 text-slate-500">{a.categorie}</td>
                       <td className={`p-2 text-right font-semibold ${bas ? "text-red-600" : ""}`}>{fmtNb(e.quantite)} <span className="font-normal text-slate-500">{a.unite}</span>{bas ? " ⚠" : ""}</td>
-                      <td className={`p-2 ${proche ? "text-red-600 font-semibold" : ""}`}>{fmtDate(e.peremption)}</td>
+                      <td className={`p-2 ${proche ? "text-red-600 font-semibold" : ""}`}>{fmtDate(e.peremption)}</td><td className="p-2 text-slate-500">{a.fournisseur}</td><td className="p-2 text-right">{d.dernierPrix[a.id] != null ? `${fmtNb(d.dernierPrix[a.id])} €` : ""}</td>
                     </tr>
                   );
                 })}
@@ -250,11 +251,11 @@ function Contenu({ token }) {
               <div key={inv.id}>
                 <h2 className="font-bold text-sou-blue">{inv.libelle || "Inventaire"} · {fmtDate(inv.date_inventaire)} <span className="text-slate-500 font-normal">(depuis le {fmtDate(prec?.date_inventaire)})</span></h2>
                 <table className="w-full text-sm bg-white border rounded-lg mt-2">
-                  <thead><tr className="text-left bg-slate-100"><th className="p-2">Article</th><th className="p-2 text-right">Avant</th><th className="p-2 text-right">+ Achats</th><th className="p-2 text-right">Après</th><th className="p-2 text-right">Consommé</th></tr></thead>
+                  <thead><tr className="text-left bg-slate-100"><th className="p-2">Article</th><th className="p-2 text-right">Avant</th><th className="p-2 text-right">+ Achats</th><th className="p-2 text-right">Après</th><th className="p-2 text-right">Consommé</th><th className="p-2 text-right">Coût estimé</th></tr></thead>
                   <tbody>
                     {c.lignes.filter((l) => nom[l.articleId]).sort((a, b) => b.consomme - a.consomme).map((l) => (
                       <tr key={l.articleId} className="border-t"><td className="p-2">{nom[l.articleId].nom}</td><td className="p-2 text-right">{fmtNb(l.avant)}</td><td className="p-2 text-right">{fmtNb(l.achats)}</td><td className="p-2 text-right">{fmtNb(l.apres)}</td>
-                        <td className={`p-2 text-right font-semibold ${l.consomme < 0 ? "text-amber-600" : ""}`} title={l.consomme < 0 ? "Négatif : un achat ou un comptage manque probablement" : ""}>{fmtNb(l.consomme)}</td></tr>
+                        <td className={`p-2 text-right font-semibold ${l.consomme < 0 ? "text-amber-600" : ""}`} title={l.consomme < 0 ? "Négatif : un achat ou un comptage manque probablement" : ""}>{fmtNb(l.consomme)}</td><td className="p-2 text-right text-slate-600">{d.dernierPrix[l.articleId] != null && l.consomme > 0 ? `${(l.consomme * d.dernierPrix[l.articleId]).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} €` : ""}</td></tr>
                     ))}
                   </tbody>
                 </table>

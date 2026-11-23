@@ -31,6 +31,7 @@ create table if not exists stock_articles (
   nom text not null,
   categorie text,
   unite text not null default 'unité',
+  fournisseur text,                                -- fournisseur habituel
   alias text[] not null default '{}',
   seuil_alerte numeric check (seuil_alerte is null or seuil_alerte >= 0),
   actif boolean not null default true,
@@ -66,6 +67,7 @@ create table if not exists stock_achats (
   quantite numeric not null check (quantite > 0),
   date_achat date not null,
   fournisseur text,
+  prix_unitaire numeric check (prix_unitaire is null or prix_unitaire >= 0),  -- TTC, par unité de l'article
   ligne_compta_id uuid references compta_lignes(id) on delete set null,
   note text,
   created_by uuid references parents(id) on delete set null,
