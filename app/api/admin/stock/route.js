@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "../../../lib/adminAuth";
 import { createAdminClient } from "../../../lib/supabaseServerAdmin";
 import depart from "../../../lib/stockDepart.json";
-import { analyserDictee, consommation, sansAccents } from "../../../lib/stockDictee";
+import { analyserDictee, consommation, sansAccents, sontDoublons } from "../../../lib/stockDictee";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -121,6 +121,11 @@ export async function POST(request) {
       };
       if (typeof body.durable === "boolean") champs.durable = body.durable;
       if (Array.isArray(body.alias)) champs.alias = body.alias.map((a) => txt(a, 80)).filter(Boolean).slice(0, 20);
+      if (!body.id && !body.forcer) {
+        const { data: existants } = await db.from("stock_articles").select("id, nom, categorie").eq("actif", true);
+        const proches = (existants || []).filter((a) => sontDoublons({ nom, categorie: champs.categorie }, a) || sansAccents(a.nom).trim() === sansAccents(nom).trim());
+        if (proches.length) return NextResponse.json({ error: `Un article proche existe déjà : « ${proches.map((a) => a.nom).join("», «")} ». Utilisez-le, ou confirmez la création.`, similaires: proches }, { status: 409 });
+      }
       const q = body.id ? db.from("stock_articles").update(champs).eq("id", body.id) : db.from("stock_articles").insert(champs);
       const { data, error } = await q.select().single();
       if (error) {
@@ -247,27 +252,70 @@ export async function POST(request) {
     // (feuilles STOCK et Matériel). Les articles existants (même nom) sont réutilisés.
     case "importer_depart": {
       const date = DATE_OK.test(body.date || "") ? body.date : aujourdhuiIso();
+      const { count } = await db.from("stock_inventaires").select("id", { count: "exact", head: true }).like("libelle", "Inventaire de départ%");
+      if (count > 0) return NextResponse.json({ error: "L'inventaire de départ a déjà été chargé (supprimez-le dans « Consommation » pour le recharger)." }, { status: 409 });
       const cat = await catalogue();
       const parNom = new Map(cat.map((a) => [sansAccents(a.nom).trim(), a.id]));
-      const lignes = [];
-      for (const l of depart) {
-        const cle = sansAccents(l.nom).trim();
-        let id = parNom.get(cle);
-        if (!id) {
-          const champs = { nom: l.nom, categorie: l.categorie, unite: l.unite || "unité", fournisseur: l.fournisseur, durable: !!l.durable, observation: l.observation };
-          let { data, error } = await db.from("stock_articles").insert(champs).select("id").single();
-          // migration 0064 pas encore passée : on retente sans les colonnes qui n'existent pas encore
-          if (error && error.code === "42703") ({ data, error } = await db.from("stock_articles").insert({ nom: l.nom, categorie: l.categorie, unite: champs.unite, fournisseur: l.fournisseur }).select("id").single());
-          if (error) return NextResponse.json({ error: `${l.nom} : ${error.message}` }, { status: 500 });
-          id = data.id; parNom.set(cle, id);
-        }
-        if (l.quantite != null) lignes.push({ article_id: id, quantite: l.quantite, date_peremption: null });
+      // Insertion groupée (une seule requête) : l'ancienne boucle, article par article, dépassait le délai.
+      const manquants = depart.filter((l) => !parNom.has(sansAccents(l.nom).trim()));
+      if (manquants.length) {
+        let { data: crees, error } = await db.from("stock_articles")
+          .insert(manquants.map((l) => ({ nom: l.nom, categorie: l.categorie, unite: l.unite || "unité", fournisseur: l.fournisseur, durable: !!l.durable, observation: l.observation }))).select("id, nom");
+        if (error && error.code === "42703") ({ data: crees, error } = await db.from("stock_articles")
+          .insert(manquants.map((l) => ({ nom: l.nom, categorie: l.categorie, unite: l.unite || "unité", fournisseur: l.fournisseur }))).select("id, nom"));
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+        for (const a of crees) parNom.set(sansAccents(a.nom).trim(), a.id);
       }
+      const lignes = depart.filter((l) => l.quantite != null)
+        .map((l) => ({ article_id: parNom.get(sansAccents(l.nom).trim()), quantite: l.quantite, date_peremption: null }));
       const { data: inv, error } = await db.from("stock_inventaires").insert({ date_inventaire: date, libelle: "Inventaire de départ (tableau Excel du Sou)", note: "Partiel : à compléter et mettre à jour avant le Marché de Noël.", created_by: auth.parent.id }).select().single();
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       const { error: e2 } = await db.from("stock_inventaire_lignes").insert(lignes.map((l) => ({ ...l, inventaire_id: inv.id })));
       if (e2) { await db.from("stock_inventaires").delete().eq("id", inv.id); return NextResponse.json({ error: e2.message }, { status: 500 }); }
       return NextResponse.json({ ok: true, articles: depart.length, lignes: lignes.length });
+    }
+
+    // Fusionne deux articles qui désignaient la même chose : tout l'historique
+    // (inventaires, achats, besoins) passe sur l'article gardé, l'ancien nom
+    // devient un alias (la dictée le reconnaîtra), l'autre article disparaît.
+    case "fusionner": {
+      const { garderId, retirerId } = body;
+      if (!garderId || !retirerId || garderId === retirerId) return NextResponse.json({ error: "Choisissez deux articles différents." }, { status: 400 });
+      const { data: deux } = await db.from("stock_articles").select("*").in("id", [garderId, retirerId]);
+      const garde = deux?.find((a) => a.id === garderId), retire = deux?.find((a) => a.id === retirerId);
+      if (!garde || !retire) return NextResponse.json({ error: "Article introuvable." }, { status: 404 });
+      for (const t of ["stock_inventaire_lignes", "stock_achats"]) {
+        const { error } = await db.from(t).update({ article_id: garderId }).eq("article_id", retirerId);
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      // besoins : un seul par (manifestation, article) ; on garde celui de l'article conservé s'il existe
+      const { data: bes, error: eb } = await db.from("stock_besoins").select("*").in("article_id", [garderId, retirerId]);
+      if (!eb && bes) {
+        const dejaGardes = new Set(bes.filter((b) => b.article_id === garderId).map((b) => b.manifestation));
+        for (const b of bes.filter((x) => x.article_id === retirerId)) {
+          if (dejaGardes.has(b.manifestation)) await db.from("stock_besoins").delete().eq("id", b.id);
+          else await db.from("stock_besoins").update({ article_id: garderId }).eq("id", b.id);
+        }
+      }
+      const alias = [...new Set([...(garde.alias || []), retire.nom, ...(retire.alias || [])])].filter((a) => sansAccents(a) !== sansAccents(garde.nom)).slice(-20);
+      await db.from("stock_articles").update({ alias, fournisseur: garde.fournisseur || retire.fournisseur }).eq("id", garderId);
+      const { error } = await db.from("stock_articles").delete().eq("id", retirerId);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true });
+    }
+
+    // Remet les catégories (corrigées) du fichier de départ sur les articles déjà créés.
+    case "recategoriser_depart": {
+      const { data: arts } = await db.from("stock_articles").select("id, nom");
+      const parNom = new Map((arts || []).map((a) => [sansAccents(a.nom).trim(), a.id]));
+      let n = 0;
+      for (const l of depart) {
+        const id = parNom.get(sansAccents(l.nom).trim());
+        if (!id) continue;
+        const { error } = await db.from("stock_articles").update({ categorie: l.categorie }).eq("id", id);
+        if (!error) n++;
+      }
+      return NextResponse.json({ ok: true, modifies: n });
     }
 
     default:

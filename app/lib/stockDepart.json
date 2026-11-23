@@ -10,7 +10,7 @@
 },
 {
 "nom": "Ail semoule 140g",
-"categorie": "Produits frais et viandes",
+"categorie": "Épicerie et condiments",
 "unite": "g",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -154,7 +154,7 @@
 },
 {
 "nom": "Batons pour barbe à papa",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Épicerie et condiments",
 "unite": "unité",
 "quantite": 200.0,
 "fournisseur": "Promocash",
@@ -199,7 +199,7 @@
 },
 {
 "nom": "boite allumettes",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Papeterie et divers",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -217,7 +217,7 @@
 },
 {
 "nom": "boite d'aiguilles",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Papeterie et divers",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -226,7 +226,7 @@
 },
 {
 "nom": "boite de Gaufres (congelées)",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Épicerie et condiments",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -298,7 +298,7 @@
 },
 {
 "nom": "Bouteille gaz Butane (1 couleur)",
-"categorie": "Boissons",
+"categorie": "Papeterie et divers",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -307,7 +307,7 @@
 },
 {
 "nom": "Bouteille gaz propane (bicolore)",
-"categorie": "Boissons",
+"categorie": "Papeterie et divers",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Spar",
@@ -514,7 +514,7 @@
 },
 {
 "nom": "Couverts couteau bois",
-"categorie": "Boissons",
+"categorie": "Emballages et vaisselle jetable",
 "unite": "unité",
 "quantite": 150.0,
 "fournisseur": "Promocash",
@@ -532,7 +532,7 @@
 },
 {
 "nom": "Couverture anti feu",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Papeterie et divers",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -541,7 +541,7 @@
 },
 {
 "nom": "couverture de survie",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Papeterie et divers",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -730,7 +730,7 @@
 },
 {
 "nom": "Film plastifieuse A3",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Papeterie et divers",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -739,7 +739,7 @@
 },
 {
 "nom": "Film plastifieuse A4",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Papeterie et divers",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -811,7 +811,7 @@
 },
 {
 "nom": "Gaufres McCain x9",
-"categorie": "Produits frais et viandes",
+"categorie": "Épicerie et condiments",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -901,7 +901,7 @@
 },
 {
 "nom": "Gobelets Café de 10cl",
-"categorie": "Boissons",
+"categorie": "Emballages et vaisselle jetable",
 "unite": "unité",
 "quantite": 300.0,
 "fournisseur": "Promocash",
@@ -910,7 +910,7 @@
 },
 {
 "nom": "Gobelets Thé de 35cl",
-"categorie": "Boissons",
+"categorie": "Emballages et vaisselle jetable",
 "unite": "unité",
 "quantite": 130.0,
 "fournisseur": "Promocash",
@@ -928,7 +928,7 @@
 },
 {
 "nom": "Haricots rouges en boite",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Épicerie et condiments",
 "unite": "kg",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -1000,7 +1000,7 @@
 },
 {
 "nom": "ju de citron en ML",
-"categorie": "Produits frais et viandes",
+"categorie": "Boissons",
 "unite": "unité",
 "quantite": 1000.0,
 "fournisseur": "Miloud",
@@ -1018,7 +1018,7 @@
 },
 {
 "nom": "LAIT demi écrémé",
-"categorie": "Boissons",
+"categorie": "Produits frais et viandes",
 "unite": "l",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -1054,7 +1054,7 @@
 },
 {
 "nom": "Maïs en boite",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Épicerie et condiments",
 "unite": "kg",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -1162,7 +1162,7 @@
 },
 {
 "nom": "Olives noires à la grecque",
-"categorie": "Épicerie et condiments",
+"categorie": "Produits frais et viandes",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Miloud",
@@ -1261,7 +1261,7 @@
 },
 {
 "nom": "Pic en bois",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Papeterie et divers",
 "unite": "unité",
 "quantite": 500.0,
 "fournisseur": "Promocash",
@@ -1270,7 +1270,7 @@
 },
 {
 "nom": "Pic fouchette frites",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Papeterie et divers",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -1288,7 +1288,7 @@
 },
 {
 "nom": "pique brochette",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Papeterie et divers",
 "unite": "unité",
 "quantite": 150.0,
 "fournisseur": "Promocash",
@@ -1315,7 +1315,7 @@
 },
 {
 "nom": "Pop Corn 30 L",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Épicerie et condiments",
 "unite": "l",
 "quantite": null,
 "fournisseur": "Confiserie foraine",
@@ -1351,7 +1351,7 @@
 },
 {
 "nom": "Rince doigts",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Entretien et hygiène",
 "unite": "unité",
 "quantite": 25.0,
 "fournisseur": "Promocash",
@@ -1378,7 +1378,7 @@
 },
 {
 "nom": "Rubalise (rouleau de 100m)",
-"categorie": "Boissons",
+"categorie": "Papeterie et divers",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -1441,7 +1441,7 @@
 },
 {
 "nom": "Sac poubelles 100L en nb de rouleaux",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Entretien et hygiène",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -1450,7 +1450,7 @@
 },
 {
 "nom": "Sachet bonbon dragibus",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Épicerie et condiments",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -1459,7 +1459,7 @@
 },
 {
 "nom": "Sachet bonbon fraise tagada",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Épicerie et condiments",
 "unite": "unité",
 "quantite": 19.0,
 "fournisseur": "Promocash",
@@ -1468,7 +1468,7 @@
 },
 {
 "nom": "Sachet bonbon schtroumph",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Épicerie et condiments",
 "unite": "unité",
 "quantite": 24.0,
 "fournisseur": "Promocash",
@@ -1477,7 +1477,7 @@
 },
 {
 "nom": "Sachets de sucre 5g (dosette)",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Épicerie et condiments",
 "unite": "unité",
 "quantite": 600.0,
 "fournisseur": "Promocash",
@@ -1486,7 +1486,7 @@
 },
 {
 "nom": "Sacs poubelle 30L en nb de rouleaux",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Entretien et hygiène",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -1720,7 +1720,7 @@
 },
 {
 "nom": "Sucre glace 500gr",
-"categorie": "Boissons",
+"categorie": "Épicerie et condiments",
 "unite": "unité",
 "quantite": 1.0,
 "fournisseur": "Promocash",
@@ -1729,7 +1729,7 @@
 },
 {
 "nom": "Sucre morceau 1kg",
-"categorie": "Boissons",
+"categorie": "Épicerie et condiments",
 "unite": "unité",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -1837,7 +1837,7 @@
 },
 {
 "nom": "Tomate en boite purée",
-"categorie": "Emballages et vaisselle jetable",
+"categorie": "Épicerie et condiments",
 "unite": "kg",
 "quantite": null,
 "fournisseur": "Promocash",
@@ -1855,7 +1855,7 @@
 },
 {
 "nom": "Touillettes pour café",
-"categorie": "Boissons",
+"categorie": "Emballages et vaisselle jetable",
 "unite": "unité",
 "quantite": 1000.0,
 "fournisseur": "Promocash",
