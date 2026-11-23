@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import AdminShell from "../admin-shell";
 
@@ -133,6 +133,81 @@ function NouveauPartenaireForm({ accessToken, onCree }) {
   );
 }
 
+// Crée en une fois les fiches des partenaires affichés sur le site qui n'en ont
+// pas encore (même adresse de page que sur le site). Aucune invitation n'est
+// envoyée : le compte de connexion se crée à l'envoi de l'invitation, fiche par fiche.
+function CreerFichesSite({ accessToken, onFait }) {
+  const [apercu, setApercu] = useState(null);
+  const [message, setMessage] = useState("");
+  const [occupe, setOccupe] = useState(false);
+  const entetes = { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` };
+
+  async function appeler(action) {
+    const res = await fetch("/api/admin/partenaires/depuis-site", {
+      method: "POST",
+      headers: entetes,
+      body: JSON.stringify({ action }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || "Erreur.");
+    return d;
+  }
+  async function voir() {
+    setMessage("");
+    setOccupe(true);
+    try {
+      setApercu(await appeler("apercu"));
+    } catch (e) {
+      setMessage(e.message);
+    }
+    setOccupe(false);
+  }
+  async function creer() {
+    setOccupe(true);
+    try {
+      const d = await appeler("creer");
+      setMessage(
+        `${d.crees.length} fiche(s) créée(s)${d.ignores.length ? `, ${d.ignores.length} refusée(s) : ${d.ignores.map((i) => `${i.nom} (${i.raison})`).join(" ; ")}` : ""}. Aucune invitation envoyée.`
+      );
+      setApercu(null);
+      onFait();
+    } catch (e) {
+      setMessage(e.message);
+    }
+    setOccupe(false);
+  }
+
+  return (
+    <div className="mb-6 border border-slate-200 rounded-xl p-4 text-sm">
+      {!apercu ? (
+        <button onClick={voir} disabled={occupe} className="text-sou-blue underline disabled:opacity-50">
+          Créer les fiches des partenaires du site qui n&apos;en ont pas encore
+        </button>
+      ) : apercu.aCreer.length === 0 ? (
+        <p className="text-slate-600">Tous les partenaires du site ont déjà une fiche ({apercu.dejaPresents}).</p>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-slate-700">
+            {apercu.aCreer.length} fiche(s) à créer, <strong>sans envoyer aucune invitation</strong> :
+          </p>
+          <ul className="list-disc pl-5 text-slate-600">
+            {apercu.aCreer.map((p) => (
+              <li key={p.slug}>
+                {p.nom}
+                <span className="text-xs text-slate-400"> — {p.email ? p.email : "pas d'e-mail connu (à renseigner avant d'inviter)"}</span>
+              </li>
+            ))}
+          </ul>
+          <button onClick={creer} disabled={occupe} className="bg-sou-blue text-white font-semibold px-4 py-2 rounded-full disabled:opacity-50">
+            Créer ces {apercu.aCreer.length} fiches
+          </button>
+        </div>
+      )}
+      {message && <p className="mt-2 text-slate-600">{message}</p>}
+    </div>
+  );
+}
+
 function PartenairesListe({ accessToken }) {
   const [partenaires, setPartenaires] = useState([]);
   const [chargement, setChargement] = useState(true);
@@ -147,12 +222,15 @@ function PartenairesListe({ accessToken }) {
       .catch(() => {});
   }, [accessToken]);
 
-  useEffect(() => {
-    fetch("/api/admin/partenaires", { headers: { Authorization: `Bearer ${accessToken}` } })
+  const recharger = useCallback(() => {
+    return fetch("/api/admin/partenaires", { headers: { Authorization: `Bearer ${accessToken}` } })
       .then((r) => r.json())
       .then((data) => setPartenaires(data.partenaires || []))
       .finally(() => setChargement(false));
   }, [accessToken]);
+  useEffect(() => {
+    recharger();
+  }, [recharger]);
 
   return (
     <div>
@@ -171,6 +249,8 @@ function PartenairesListe({ accessToken }) {
           {nbPages} page{nbPages > 1 ? "s" : ""} publique{nbPages > 1 ? "s" : ""} de partenaire à valider →
         </Link>
       )}
+
+      <CreerFichesSite accessToken={accessToken} onFait={recharger} />
 
       <div className="flex flex-wrap gap-3 mb-6 text-sm">
         <Link href="/admin/partenaires/messages" className="text-sou-blue underline">

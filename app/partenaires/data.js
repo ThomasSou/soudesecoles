@@ -87,13 +87,14 @@ export const PARTNERS = [
       "Spécialistes du débouchage de canalisations, du curage et du nettoyage haute pression, intervenant notamment sur le secteur Beaujolais - Val de Saône.",
     website: "https://www.maitres-deboucheurs.com/",
   },
-  // Nouveaux partenaires (novembre 2026), tous Bronze (confirmé par Thomas) :
-  // logo seulement pour l'instant, sans texte de présentation.
+  // Nouveaux partenaires (novembre 2026), tous Bronze (confirmé par Thomas).
+  // Informations tirées de sources publiques, à faire valider par chaque partenaire.
   {
     slug: "pizzeria-des-templiers",
     name: "Pizzeria des Templiers",
     file: "pizzeria-des-templiers.jpg",
     tier: "Bronze",
+    description: "Pizzeria à Montmerle-sur-Saône.",
   },
   {
     slug: "jaam-immo",
@@ -101,6 +102,12 @@ export const PARTNERS = [
     file: "jaam-immo.jpg",
     tier: "Bronze",
     echelle: 1.25, // texte très fin : agrandi un peu (un logo plus lisible est demandé au partenaire)
+    description:
+      "Agence immobilière de proximité en Beaujolais et Val de Saône : achat, vente et estimation de biens immobiliers.",
+    address: "234 chemin des Mûriers, 01090 Montmerle-sur-Saône",
+    phone: "06 73 40 20 13",
+    email: "aurelie@jaam-immo.fr",
+    website: "https://www.jaam-immo.fr/",
   },
   {
     slug: "arc1950",
