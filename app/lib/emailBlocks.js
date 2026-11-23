@@ -498,7 +498,8 @@ function partenairesHtml() {
   const logos = paliers
     .map((p) => {
       const ratio = LOGO_RATIO[p.file] || 1;
-      let h = LOGO_HAUTEUR_PAR_PALIER[p.tier] || 32;
+      let h = (LOGO_HAUTEUR_PAR_PALIER[p.tier] || 32) * (p.echelle || 1);
+      h = Math.round(h);
       let w = Math.round(h * ratio);
       if (w > LOGO_LARGEUR_MAX) {
         w = LOGO_LARGEUR_MAX;

@@ -33,6 +33,7 @@ export const PARTNERS = [
     name: "Nicod",
     file: "nicod.jpg",
     tier: "Silver",
+    echelle: 0.85, // logo large : un peu réduit pour équilibrer la ligne argent
     description:
       "Boucherie-charcuterie-traiteur-pâtisserie tenue par la famille Nicod depuis 1967. Nicod Traiteur accompagne réceptions, cocktails et mariages dans le Beaujolais et le Val de Saône.",
     address: "6 rue de Mâcon, 01090 Montmerle-sur-Saône",
@@ -68,6 +69,7 @@ export const PARTNERS = [
     name: "Emile Job",
     file: "emilejob-2026.jpg",
     tier: "Silver",
+    echelle: 1.4, // logo en hauteur : agrandi pour équilibrer la ligne argent
     description:
       "Restaurant familial tenu par Eric et Isabelle Lépine depuis trois générations, au bord de la Saône. Cuisine traditionnelle (volaille de Bresse, grenouilles, poissons de rivière) et terrasse ombragée par des tilleuls centenaires.",
     address: "12 rue du Pont, 01090 Montmerle-sur-Saône",
@@ -97,6 +99,7 @@ export const PARTNERS = [
     name: "Jaam Immo",
     file: "jaam-immo.jpg",
     tier: "Bronze",
+    echelle: 1.5, // texte trop petit pour être lu : agrandi
   },
   {
     slug: "arc1950",
@@ -106,6 +109,8 @@ export const PARTNERS = [
   },
 ];
 
+// `echelle` (facultatif) : coefficient d'ajustement visuel du logo dans le bandeau du bas
+// du site et dans les e-mails (1 par défaut).
 export const TIER_ORDER = ["Gold", "Silver", "Bronze"];
 
 export const TIER_STYLES = {
