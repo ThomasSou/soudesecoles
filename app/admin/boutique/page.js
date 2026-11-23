@@ -615,6 +615,11 @@ function BoutiqueAdmin({ accessToken }) {
   const nomBoutique = (id) => boutiques.find((b) => b.id === id)?.name || "";
   const commandesPayees = commandesAffichees.filter((c) => c.status === "paid");
   const totalPayeCents = commandesPayees.reduce((s, c) => s + (c.total_cents || 0), 0);
+  // Nombre total d'articles vendus (quantités des commandes payées).
+  const produitsVendus = commandesPayees.reduce(
+    (s, c) => s + (c.items || []).reduce((n, it) => n + (Number(it.qty) || 0), 0),
+    0
+  );
   const commandesEnAttente = commandesAffichees.filter((c) => c.status === "pending");
   const totalAttenteCents = commandesEnAttente.reduce((s, c) => s + (c.total_cents || 0), 0);
 
@@ -1077,9 +1082,6 @@ function BoutiqueAdmin({ accessToken }) {
               <option value="produit">Trier : par produit</option>
               <option value="acheteur">Trier : par acheteur</option>
             </select>
-            <span className="text-sm text-slate-500">
-              {commandesAffichees.length} commande{commandesAffichees.length > 1 ? "s" : ""}
-            </span>
           </div>
           <div className="flex flex-wrap gap-3">
             <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2">
@@ -1087,7 +1089,8 @@ function BoutiqueAdmin({ accessToken }) {
               <p className="text-lg font-bold text-green-800">
                 {euros(totalPayeCents)}{" "}
                 <span className="text-sm font-normal text-green-700">
-                  · {commandesPayees.length} commande{commandesPayees.length > 1 ? "s" : ""}
+                  · {commandesPayees.length} commande{commandesPayees.length > 1 ? "s" : ""} · {produitsVendus} produit
+                  {produitsVendus > 1 ? "s" : ""} vendu{produitsVendus > 1 ? "s" : ""}
                 </span>
               </p>
             </div>
