@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "../../../lib/adminAuth";
 import { createAdminClient } from "../../../lib/supabaseServerAdmin";
+import depart from "../../../lib/stockDepart.json";
 import { analyserDictee, consommation, sansAccents } from "../../../lib/stockDictee";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,7 @@ export const fetchCache = "force-no-store";
 
 const DATE_OK = /^\d{4}-\d{2}-\d{2}$/;
 const txt = (v, n = 200) => (typeof v === "string" && v.trim() ? v.trim().slice(0, n) : null);
+const aujourdhuiIso = () => new Date().toISOString().slice(0, 10);
 const nombre = (v) => { const x = Number(v); return Number.isFinite(x) ? x : null; };
 
 // Quantité totale par article d'un inventaire.
@@ -25,12 +27,15 @@ export async function GET(request) {
   if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const db = createAdminClient();
 
-  const [art, inv, lig, ach] = await Promise.all([
+  const [art, inv, lig, ach, bes] = await Promise.all([
     db.from("stock_articles").select("*").order("categorie", { nullsFirst: false }).order("nom"),
     db.from("stock_inventaires").select("*").order("date_inventaire", { ascending: false }).order("created_at", { ascending: false }),
     db.from("stock_inventaire_lignes").select("*"),
     db.from("stock_achats").select("*").order("date_achat", { ascending: false }),
+    db.from("stock_besoins").select("*"),
   ]);
+  // stock_besoins peut ne pas exister tant que la migration 0064 n'est pas passée
+  const besoins = bes.error ? [] : bes.data;
   const err = art.error || inv.error || lig.error || ach.error;
   if (err) return NextResponse.json({ error: err.message }, { status: 500 });
 
@@ -48,7 +53,8 @@ export async function GET(request) {
         achatsEntre.set(a.article_id, (achatsEntre.get(a.article_id) || 0) + Number(a.quantite));
       }
     }
-    conso[c.id] = { precedent: p.id, lignes: consommation(totaux(p.lignes), totaux(c.lignes), achatsEntre) };
+    const durables = new Set(art.data.filter((a) => a.durable).map((a) => a.id));
+    conso[c.id] = { precedent: p.id, lignes: consommation(totaux(p.lignes), totaux(c.lignes), achatsEntre).filter((l) => !durables.has(l.articleId)) };
   }
 
   // Stock estimé aujourd'hui = dernier inventaire + achats faits depuis.
@@ -71,7 +77,7 @@ export async function GET(request) {
 
   const dernierPrix = {};
   for (const a of achats) if (a.prix_unitaire != null && !(a.article_id in dernierPrix)) dernierPrix[a.article_id] = Number(a.prix_unitaire); // achats triés du plus récent
-  return NextResponse.json({ dernierPrix, articles: art.data, inventaires, achats, conso, estime, dernierInventaire: dernier ? dernier.id : null });
+  return NextResponse.json({ besoins, besoinsDispo: !bes.error, dernierPrix, articles: art.data, inventaires, achats, conso, estime, dernierInventaire: dernier ? dernier.id : null });
 }
 
 // Actions : analyser (dictée) · article · supprimer_article · inventaire ·
@@ -113,6 +119,7 @@ export async function POST(request) {
         seuil_alerte: body.seuil_alerte === "" || body.seuil_alerte == null ? null : Math.max(0, nombre(body.seuil_alerte) ?? 0),
         actif: body.actif !== false,
       };
+      if (typeof body.durable === "boolean") champs.durable = body.durable;
       if (Array.isArray(body.alias)) champs.alias = body.alias.map((a) => txt(a, 80)).filter(Boolean).slice(0, 20);
       const q = body.id ? db.from("stock_articles").update(champs).eq("id", body.id) : db.from("stock_articles").insert(champs);
       const { data, error } = await q.select().single();
@@ -213,6 +220,54 @@ export async function POST(request) {
       const { error: e2 } = await db.from("stock_inventaire_lignes").insert(lignes.map((l) => ({ ...l, inventaire_id: inv.id })));
       if (e2) { await db.from("stock_inventaires").delete().eq("id", inv.id); return NextResponse.json({ error: e2.message }, { status: 500 }); }
       return NextResponse.json({ ok: true, articles: new Set(lignes.map((l) => l.article_id)).size, lignes: lignes.length });
+    }
+
+    // Besoin d'une manifestation pour un ou plusieurs articles (remplace la valeur existante).
+    case "besoins": {
+      const manif = txt(body.manifestation, 120);
+      if (!manif) return NextResponse.json({ error: "Nom de la manifestation obligatoire." }, { status: 400 });
+      const lignes = (Array.isArray(body.lignes) ? body.lignes : []).slice(0, 500)
+        .map((l) => ({ manifestation: manif, article_id: l.articleId, quantite: nombre(l.quantite), updated_at: new Date().toISOString(), libelle: l.libelle }))
+        .filter((l) => l.article_id && l.quantite != null && l.quantite >= 0);
+      if (!lignes.length) return NextResponse.json({ error: "Aucune ligne valide à enregistrer." }, { status: 400 });
+      const { error } = await db.from("stock_besoins").upsert(lignes.map(({ libelle, ...l }) => l), { onConflict: "manifestation,article_id" });
+      if (error) return NextResponse.json({ error: error.code === "42P01" ? "La migration 0064 (besoins) n'est pas encore passée." : error.message }, { status: 500 });
+      const cat = await catalogue();
+      for (const l of lignes) await apprendreAlias(l.article_id, l.libelle, cat);
+      return NextResponse.json({ ok: true });
+    }
+
+    case "supprimer_besoin": {
+      const { error } = await db.from("stock_besoins").delete().eq("id", body.id);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true });
+    }
+
+    // Charge l'inventaire de départ préparé à partir du tableau Excel du Sou
+    // (feuilles STOCK et Matériel). Les articles existants (même nom) sont réutilisés.
+    case "importer_depart": {
+      const date = DATE_OK.test(body.date || "") ? body.date : aujourdhuiIso();
+      const cat = await catalogue();
+      const parNom = new Map(cat.map((a) => [sansAccents(a.nom).trim(), a.id]));
+      const lignes = [];
+      for (const l of depart) {
+        const cle = sansAccents(l.nom).trim();
+        let id = parNom.get(cle);
+        if (!id) {
+          const champs = { nom: l.nom, categorie: l.categorie, unite: l.unite || "unité", fournisseur: l.fournisseur, durable: !!l.durable, observation: l.observation };
+          let { data, error } = await db.from("stock_articles").insert(champs).select("id").single();
+          // migration 0064 pas encore passée : on retente sans les colonnes qui n'existent pas encore
+          if (error && error.code === "42703") ({ data, error } = await db.from("stock_articles").insert({ nom: l.nom, categorie: l.categorie, unite: champs.unite, fournisseur: l.fournisseur }).select("id").single());
+          if (error) return NextResponse.json({ error: `${l.nom} : ${error.message}` }, { status: 500 });
+          id = data.id; parNom.set(cle, id);
+        }
+        if (l.quantite != null) lignes.push({ article_id: id, quantite: l.quantite, date_peremption: null });
+      }
+      const { data: inv, error } = await db.from("stock_inventaires").insert({ date_inventaire: date, libelle: "Inventaire de départ (tableau Excel du Sou)", note: "Partiel : à compléter et mettre à jour avant le Marché de Noël.", created_by: auth.parent.id }).select().single();
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      const { error: e2 } = await db.from("stock_inventaire_lignes").insert(lignes.map((l) => ({ ...l, inventaire_id: inv.id })));
+      if (e2) { await db.from("stock_inventaires").delete().eq("id", inv.id); return NextResponse.json({ error: e2.message }, { status: 500 }); }
+      return NextResponse.json({ ok: true, articles: depart.length, lignes: lignes.length });
     }
 
     default:
