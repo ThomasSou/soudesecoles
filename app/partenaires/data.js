@@ -11,6 +11,7 @@ export const PARTNERS = [
     name: "Barrels",
     file: "barrels.png",
     tier: "Gold",
+    echelle: 1.2, // seul sur la ligne Or : un peu plus gros
     description:
       "Métallerie haut de gamme fondée en 2018 par Thibaut et Aurélia. L'atelier conçoit et fabrique sur mesure garde-corps, verrières, escaliers métalliques et mobilier en acier, inox, laiton ou aluminium.",
     address: "181 chemin des Vernailles, 69830 Saint-Georges-de-Reneins",
@@ -69,7 +70,7 @@ export const PARTNERS = [
     name: "Emile Job",
     file: "emilejob-2026.jpg",
     tier: "Silver",
-    echelle: 1.4, // logo en hauteur : agrandi pour équilibrer la ligne argent
+    echelle: 1.2, // logo en hauteur : agrandi un peu pour équilibrer la ligne argent
     description:
       "Restaurant familial tenu par Eric et Isabelle Lépine depuis trois générations, au bord de la Saône. Cuisine traditionnelle (volaille de Bresse, grenouilles, poissons de rivière) et terrasse ombragée par des tilleuls centenaires.",
     address: "12 rue du Pont, 01090 Montmerle-sur-Saône",
@@ -99,13 +100,14 @@ export const PARTNERS = [
     name: "Jaam Immo",
     file: "jaam-immo.jpg",
     tier: "Bronze",
-    echelle: 1.5, // texte trop petit pour être lu : agrandi
+    echelle: 1.25, // texte très fin : agrandi un peu (un logo plus lisible est demandé au partenaire)
   },
   {
     slug: "arc1950",
     name: "Arc 1950",
     file: "arc1950.jpg",
     tier: "Bronze",
+    echelle: 0.8, // logo large : réduit pour ne pas égaler la largeur des logos Argent
   },
 ];
 

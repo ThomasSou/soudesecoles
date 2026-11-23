@@ -101,20 +101,20 @@ export function Footer() {
             {/* Une ligne par palier : or, puis argent, puis bronze. Chaque logo peut
                 être légèrement agrandi ou réduit (`echelle` dans data.js) pour
                 un équilibre visuel : un logo en hauteur paraît plus petit qu'un
-                logo large dans une même boîte. L'échelle part du bas de la
-                boîte, les logos restent alignés. */}
+                logo large dans une même boîte. Les logos d'une ligne sont centrés
+                en hauteur, l'échelle part du centre de la boîte. */}
             <div className="space-y-8">
               {TIER_ORDER.map((palier) => {
                 const ligne = PARTNERS.filter((p) => p.tier === palier);
                 return ligne.length === 0 ? null : (
-                  <div key={palier} className="flex flex-wrap items-end justify-center gap-x-10 gap-y-8">
+                  <div key={palier} className="flex flex-wrap items-center justify-center gap-x-10 gap-y-8">
                     {ligne.map((p) => (
                       <div
                         key={p.slug}
                         className={`relative ${BANNER_SIZES[p.tier] || BANNER_SIZES.Bronze}`}
                         style={
                           p.echelle && p.echelle !== 1
-                            ? { transform: `scale(${p.echelle})`, transformOrigin: "bottom center" }
+                            ? { transform: `scale(${p.echelle})`, transformOrigin: "center" }
                             : undefined
                         }
                       >
