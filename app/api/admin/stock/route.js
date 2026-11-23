@@ -69,7 +69,9 @@ export async function GET(request) {
     estime = [...base.entries()].map(([article_id, quantite]) => ({ article_id, quantite, peremption: peremption.get(article_id) || null }));
   }
 
-  return NextResponse.json({ articles: art.data, inventaires, achats, conso, estime, dernierInventaire: dernier ? dernier.id : null });
+  const dernierPrix = {};
+  for (const a of achats) if (a.prix_unitaire != null && !(a.article_id in dernierPrix)) dernierPrix[a.article_id] = Number(a.prix_unitaire); // achats triés du plus récent
+  return NextResponse.json({ dernierPrix, articles: art.data, inventaires, achats, conso, estime, dernierInventaire: dernier ? dernier.id : null });
 }
 
 // Actions : analyser (dictée) · article · supprimer_article · inventaire ·
@@ -107,6 +109,7 @@ export async function POST(request) {
         nom,
         categorie: txt(body.categorie, 60),
         unite: txt(body.unite, 30) || "unité",
+        fournisseur: txt(body.fournisseur, 120),
         seuil_alerte: body.seuil_alerte === "" || body.seuil_alerte == null ? null : Math.max(0, nombre(body.seuil_alerte) ?? 0),
         actif: body.actif !== false,
       };
@@ -165,11 +168,11 @@ export async function POST(request) {
       const date = DATE_OK.test(body.date || "") ? body.date : null;
       if (!date) return NextResponse.json({ error: "Date d'achat obligatoire." }, { status: 400 });
       const lignes = (Array.isArray(body.lignes) ? body.lignes : []).slice(0, 300)
-        .map((l) => ({ article_id: l.articleId, quantite: nombre(l.quantite), libelle: l.libelle }))
+        .map((l) => ({ article_id: l.articleId, quantite: nombre(l.quantite), prix: l.prix === "" || l.prix == null ? null : nombre(l.prix), libelle: l.libelle }))
         .filter((l) => l.article_id && l.quantite != null && l.quantite > 0);
       if (!lignes.length) return NextResponse.json({ error: "Aucune ligne valide à enregistrer." }, { status: 400 });
       const { error } = await db.from("stock_achats").insert(lignes.map((l) => ({
-        article_id: l.article_id, quantite: l.quantite, date_achat: date,
+        article_id: l.article_id, quantite: l.quantite, prix_unitaire: l.prix != null && l.prix >= 0 ? l.prix : null, date_achat: date,
         fournisseur: txt(body.fournisseur, 120), note: txt(body.note, 300), created_by: auth.parent.id,
       })));
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -190,7 +193,7 @@ export async function POST(request) {
       const date = DATE_OK.test(body.date || "") ? body.date : null;
       if (!date) return NextResponse.json({ error: "Date de l'inventaire de départ obligatoire." }, { status: 400 });
       const brut = (Array.isArray(body.lignes) ? body.lignes : []).slice(0, 1000)
-        .map((l) => ({ nom: txt(l.nom, 120), categorie: txt(l.categorie, 60), unite: txt(l.unite, 30), quantite: nombre(l.quantite), datePeremption: DATE_OK.test(l.datePeremption || "") ? l.datePeremption : null }))
+        .map((l) => ({ nom: txt(l.nom, 120), categorie: txt(l.categorie, 60), unite: txt(l.unite, 30), fournisseur: txt(l.fournisseur, 120), quantite: nombre(l.quantite), datePeremption: DATE_OK.test(l.datePeremption || "") ? l.datePeremption : null }))
         .filter((l) => l.nom && l.quantite != null && l.quantite >= 0);
       if (!brut.length) return NextResponse.json({ error: "Aucune ligne exploitable dans l'import." }, { status: 400 });
       const cat = await catalogue();
@@ -199,7 +202,7 @@ export async function POST(request) {
       for (const l of brut) {
         let id = parNom.get(sansAccents(l.nom).trim());
         if (!id) {
-          const { data, error } = await db.from("stock_articles").insert({ nom: l.nom, categorie: l.categorie, unite: l.unite || "unité" }).select("id").single();
+          const { data, error } = await db.from("stock_articles").insert({ nom: l.nom, categorie: l.categorie, unite: l.unite || "unité", fournisseur: l.fournisseur }).select("id").single();
           if (error) return NextResponse.json({ error: `${l.nom} : ${error.message}` }, { status: 500 });
           id = data.id; parNom.set(sansAccents(l.nom).trim(), id);
         }
