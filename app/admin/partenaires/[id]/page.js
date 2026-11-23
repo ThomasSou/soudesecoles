@@ -176,12 +176,20 @@ function SectionPeriodes({ accessToken, partenaireId, periodes, onRecharger }) {
   const [montant, setMontant] = useState("");
   const [note, setNote] = useState("");
   const [erreur, setErreur] = useState("");
+  const [editId, setEditId] = useState(null);
+
+  function modifier(p) {
+    setEditId(p.id); setDebut(p.debut || ""); setFin(p.fin || ""); setNiveau(p.niveau || "");
+    setMontant(p.montant_annonce_cents != null ? String(p.montant_annonce_cents / 100) : ""); setNote(p.note || "");
+    setErreur("");
+  }
+  function finModification() { setEditId(null); setDebut(""); setFin(""); setNiveau(""); setMontant(""); setNote(""); }
 
   async function ajouter(e) {
     e.preventDefault();
     setErreur("");
-    const res = await fetch(`/api/admin/partenaires/${partenaireId}/periodes`, {
-      method: "POST",
+    const res = await fetch(`/api/admin/partenaires/${partenaireId}/periodes${editId ? `/${editId}` : ""}`, {
+      method: editId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ debut, fin, niveau, montantAnnonceEuros: montant, note }),
     });
@@ -190,7 +198,7 @@ function SectionPeriodes({ accessToken, partenaireId, periodes, onRecharger }) {
       setErreur(data.error || "Erreur.");
       return;
     }
-    setDebut(""); setFin(""); setNiveau(""); setMontant(""); setNote("");
+    finModification();
     onRecharger();
   }
 
@@ -204,16 +212,19 @@ function SectionPeriodes({ accessToken, partenaireId, periodes, onRecharger }) {
   }
   async function supprimer(id) {
     if (!confirm("Supprimer cette période ?")) return;
-    await fetch(`/api/admin/partenaires/${partenaireId}/periodes/${id}`, {
+    const res = await fetch(`/api/admin/partenaires/${partenaireId}/periodes/${id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
+    // Un refus (paiement rattaché) doit se voir, sinon la page semble bloquée.
+    if (!res.ok) setErreur((await res.json().catch(() => ({}))).error || "Suppression impossible.");
     onRecharger();
   }
 
   return (
     <div className="border border-slate-200 rounded-xl p-5">
       <h2 className="font-semibold text-sou-blue mb-3">Période de partenariat</h2>
+      {erreur && !editId && <p className="text-sm text-red-600 mb-2">{erreur}</p>}
       {periodes.length === 0 ? (
         <p className="text-slate-500 text-sm mb-4">Aucune période enregistrée.</p>
       ) : (
@@ -227,6 +238,7 @@ function SectionPeriodes({ accessToken, partenaireId, periodes, onRecharger }) {
                 {p.note ? ` · ${p.note}` : ""}
               </span>
               <span className="flex gap-3 text-xs">
+                <button onClick={() => modifier(p)} className="underline text-sou-blue">Modifier</button>
                 <button onClick={() => annuler(p.id, !p.annulee)} className="underline text-slate-500">
                   {p.annulee ? "Rétablir" : "Annuler"}
                 </button>
@@ -273,8 +285,9 @@ function SectionPeriodes({ accessToken, partenaireId, periodes, onRecharger }) {
         </label>
         <div className="sm:col-span-2">
           <button className="bg-sou-blue text-white text-sm font-semibold px-4 py-2 rounded-full">
-            Ajouter la période
+            {editId ? "Enregistrer la modification" : "Ajouter la période"}
           </button>
+          {editId && <button type="button" onClick={finModification} className="ml-3 text-sm underline text-slate-500">Annuler la modification</button>}
         </div>
       </form>
     </div>
