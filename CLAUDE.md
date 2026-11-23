@@ -57,7 +57,7 @@ Dépôt : `github.com/ThomasSou/soudesecoles`, branche `main`.
   pour qu'elle apparaisse automatiquement dans l'écran de gestion des accès.
 
 Permissions actuelles : `familles`, `demandes`, `messages`, `emails`, `boutique`,
-`statistiques`, `acces`.
+`statistiques`, `acces`, `stock`.
 
 **Ne jamais faire confiance à un identifiant envoyé par le client** (`parentId`,
 `familyId`...). Toujours le déduire du jeton d'authentification.
@@ -75,6 +75,7 @@ Permissions actuelles : `familles`, `demandes`, `messages`, `emails`, `boutique`
 | `anneeScolaire.js` | Année scolaire courante et validité d'une adhésion |
 | `adminAuth.js` | Authentification et permissions du back-office |
 | `facturesEmises.js` | Factures émises par le Sou : séries PA/MN, numérotation continue sans trou (une facture s'annule, ne se supprime jamais), recette liée en compta, refus de facturer un don |
+| `stockDictee.js` | Stock du local : lit une saisie dictée (nombres en lettres, unités, dates de péremption) et la rapproche des articles connus (noms + alias appris) ; calcul de la consommation entre deux inventaires |
 | `facturePdf.js` | PDF d'une facture (bibliothèque `pdf-lib`, ajoutée pour cet export) : logo, mentions légales, « acquittée le… par… », signature du président |
 
 ### Base de données
@@ -162,7 +163,6 @@ des membres du bureau sont opérationnels et testés.
 - Pages dédiées pour chaque manifestation (seule la Foire en a une).
 - Réservation de créneaux bénévoles.
 - Segmentation plus fine des destinataires d'e-mails.
-- Programmation de l'envoi des e-mails (date et heure) ; aujourd'hui un envoi part dès qu'il est lancé.
 - Intégration SumUp pour la buvette et le rapprochement des cotisations (reportée).
 
 ## Préférence de Thomas : automatiser au maximum, et orchestrer
