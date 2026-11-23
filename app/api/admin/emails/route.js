@@ -151,6 +151,8 @@ function resumeSegment(segment) {
   if (segment?.sansCompte) parts.push("compte non activé uniquement");
   if (inclutContacts(segment)) parts.push("+ contacts hors familles");
   if (segment?.exclureToutPsMs) parts.push("hors familles dont tous les enfants sont en PS/MS");
+  if (segment?.sansCommandeBoutiqueId) parts.push("n'ayant pas encore commandé dans la boutique choisie");
+  if (segment?.sansBenevolatEvenementId) parts.push("pas encore inscrits comme bénévoles");
   if (segment?.exclureDejaServis) parts.push("hors déjà destinataires");
   return parts.join(" — ");
 }
@@ -326,6 +328,48 @@ function destinatairesDe(familles, comptesActives = null) {
   return destinataires;
 }
 
+// Adresses des personnes ayant une commande PAYÉE dans cette boutique. On
+// retient aussi les autres parents de la même famille : si l'un a commandé,
+// l'autre n'a pas à être relancé. La boutique d'une commande se déduit de ses
+// produits (même règle que l'écran Commandes, pas de colonne dédiée).
+async function emailsAyantCommande(admin, boutiqueId) {
+  const { data: produits } = await admin.from("shop_products").select("id").eq("boutique_id", boutiqueId);
+  const ids = new Set((produits || []).map((p) => p.id));
+  const emails = new Set();
+  const familles = new Set();
+  const { data: commandes } = await admin
+    .from("shop_orders")
+    .select("buyer_email, family_id, parent_id, items")
+    .eq("status", "paid")
+    .limit(5000);
+  const parentsDirects = new Set();
+  for (const o of commandes || []) {
+    if (!(o.items || []).some((it) => ids.has(it.productId))) continue;
+    if (o.buyer_email) emails.add(o.buyer_email.toLowerCase());
+    if (o.family_id) familles.add(o.family_id);
+    if (o.parent_id) parentsDirects.add(o.parent_id);
+  }
+  if (familles.size || parentsDirects.size) {
+    const { data: parents } = await admin.from("parents").select("id, email, family_id");
+    for (const p of parents || []) {
+      if (p.email && (familles.has(p.family_id) || parentsDirects.has(p.id))) emails.add(p.email.toLowerCase());
+    }
+  }
+  return emails;
+}
+
+// Adresses de ceux qui ont au moins un créneau bénévole sur cet événement.
+async function emailsInscritsBenevoles(admin, evenementId) {
+  const { data: ateliers } = await admin.from("benevolat_ateliers").select("id").eq("evenement_id", evenementId);
+  const atelierIds = (ateliers || []).map((a) => a.id);
+  if (!atelierIds.length) return new Set();
+  const { data: creneaux } = await admin.from("benevolat_creneaux").select("id").in("atelier_id", atelierIds);
+  const creneauIds = (creneaux || []).map((c) => c.id);
+  if (!creneauIds.length) return new Set();
+  const { data: inscriptions } = await admin.from("benevolat_inscriptions").select("email").in("creneau_id", creneauIds);
+  return new Set((inscriptions || []).map((i) => (i.email || "").toLowerCase()).filter(Boolean));
+}
+
 // Liste des destinataires d'un segment, avec l'exclusion éventuelle des
 // adresses déjà servies. Commune à l'envoi immédiat, à l'aperçu et au
 // lancement d'une campagne programmée (calculée au moment de l'envoi).
@@ -346,6 +390,16 @@ async function calculerDestinataires(admin, segment) {
       const dejaPris = new Set(destinataires.map((d) => d.email.toLowerCase()));
       destinataires.push(...contactsDestinataires(contacts, dejaPris));
     }
+  }
+
+  // Relances : on retire ceux qui ont déjà commandé / déjà un créneau bénévole.
+  if (segment?.sansCommandeBoutiqueId) {
+    const dejaCommande = await emailsAyantCommande(admin, segment.sansCommandeBoutiqueId);
+    destinataires = destinataires.filter((d) => !dejaCommande.has((d.email || "").toLowerCase()));
+  }
+  if (segment?.sansBenevolatEvenementId) {
+    const inscrits = await emailsInscritsBenevoles(admin, segment.sansBenevolatEvenementId);
+    destinataires = destinataires.filter((d) => !inscrits.has((d.email || "").toLowerCase()));
   }
 
   let exclusDejaServis = 0;
@@ -433,7 +487,10 @@ export async function GET(request) {
     .select("id")
     .eq("email_opt_out", false);
 
+  const { data: boutiques } = await auth.admin.from("boutiques").select("id, name, active").order("position");
+
   return NextResponse.json({
+    boutiques: boutiques || [],
     campagnes: data || [],
     classes,
     benevolesEvenements: evenementsBenevoles || [],

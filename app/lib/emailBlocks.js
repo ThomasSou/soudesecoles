@@ -241,6 +241,89 @@ export const TEMPLATES = [
     ],
   },
   {
+    key: "noel-derniers-jours-commande",
+    label: "Marché de Noël — derniers jours pour commander (parents n'ayant pas commandé)",
+    blocks: () => [
+      { ...newBlock("heading"), text: "Bonjour {{prenom}}, derniers jours pour commander vos sapins, tartiflettes et poutine !" },
+      {
+        ...newBlock("image"),
+        url: `${SITE_URL}/evenements/sapins-du-morvan.jpg`,
+        alt: "Affiche : sapins de Noël du Morvan, Marché de Noël du Sou des Écoles, samedi 28 novembre 2026",
+        link: `${SITE_URL}/boutique`,
+      },
+      {
+        ...newBlock("paragraph"),
+        text: "Le Marché de Noël, c'est samedi 28 novembre, et les commandes en ligne se terminent bientôt : **il ne reste que quelques jours** pour réserver, sans file d'attente le jour J.
+
+• 🎄 Les **sapins du Morvan**, à choisir dans notre forêt de sapins
+• 😋 La **tartiflette**
+• 🍟 La **poutine**
+• Et aussi pain d'épices, panettones, boules de Noël…
+
+Le paiement est sécurisé, et toute la recette finance les projets des écoles de Montmerle-Lurcy.",
+      },
+      { ...newBlock("button"), text: "Je commande maintenant", url: `${SITE_URL}/boutique` },
+      {
+        ...newBlock("paragraph"),
+        text: "Vous avez déjà commandé ? Merci, et ignorez ce message !
+À samedi, place du Marché, de 11h à 20h.
+Le bureau du Sou des Écoles",
+      },
+    ],
+  },
+  {
+    key: "noel-relance-benevoles-psms",
+    label: "Marché de Noël — relance bénévoles ferme mais amicale (parents PS/MS pas encore inscrits)",
+    blocks: () => [
+      { ...newBlock("heading"), text: "Bonjour {{prenom}}, on compte vraiment sur vous pour le Marché de Noël !" },
+      {
+        ...newBlock("paragraph"),
+        text: "Le Marché de Noël a lieu **samedi 28 novembre**, et son organisation repose cette année sur les familles de petite et moyenne section. Nous n'avons pas encore reçu votre inscription.
+
+Soyons francs : sans votre aide, nous ne pourrons pas tenir tous les postes. Nous demandons à **un parent par famille** de se positionner sur **au moins un créneau**, dès aujourd'hui :
+
+• **Vendredi 27 novembre, en soirée** : montage
+• **Samedi 28 novembre** : buvette, restauration, stands, animations
+• **Samedi soir** : démontage et rangement
+
+Même une heure fait la différence, aucune compétence n'est nécessaire, et l'ambiance est sympathique. Cela prend deux minutes :",
+      },
+      { ...newBlock("button"), text: "Je choisis mon créneau", url: `${SITE_URL}/benevoles` },
+      {
+        ...newBlock("paragraph"),
+        text: "Une difficulté, une question, un empêchement ? Répondez simplement à ce message : nous trouverons une solution ensemble.
+
+Merci d'avance, c'est grâce à vous que ce marché existe !
+La commission du marché de Noël et le bureau du Sou des Écoles",
+      },
+    ],
+  },
+  {
+    key: "noel-relance-benevoles-autres",
+    label: "Marché de Noël — relance bénévoles aimable (autres parents pas encore inscrits)",
+    blocks: () => [
+      { ...newBlock("heading"), text: "Bonjour {{prenom}}, un petit coup de main pour le Marché de Noël ?" },
+      {
+        ...newBlock("paragraph"),
+        text: "Le Marché de Noël du Sou des Écoles a lieu **samedi 28 novembre**. Les familles de petite et moyenne section en portent l'organisation, et elles ont besoin de renforts : **chaque heure donnée compte**.
+
+Si vous le pouvez, inscrivez-vous sur un créneau qui vous arrange :
+
+• **Vendredi 27 novembre au soir** : montage
+• **Samedi 28 novembre** : buvette, restauration, stands, animations
+• **Samedi soir** : démontage et rangement
+
+Aucune compétence particulière, juste de la bonne humeur. Merci d'avance !",
+      },
+      { ...newBlock("button"), text: "Je m'inscris sur un créneau", url: `${SITE_URL}/benevoles` },
+      {
+        ...newBlock("paragraph"),
+        text: "Vous êtes déjà inscrit(e) ? Un grand merci, et ignorez ce message.
+Le bureau du Sou des Écoles",
+      },
+    ],
+  },
+  {
     key: "noel-relance-boutique",
     label: "Marché de Noël — relance de la boutique (tous les parents)",
     blocks: () => [
