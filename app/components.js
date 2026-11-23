@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { PARTNERS } from "./partenaires/data";
+import { PARTNERS, TIER_ORDER } from "./partenaires/data";
 
 const BANNER_SIZES = {
   Gold: "w-40 h-20 sm:w-48 sm:h-24",
@@ -28,8 +28,14 @@ const SOUTIENS = [
     alt: "La Région Auvergne-Rhône-Alpes soutient votre projet",
   },
   {
+    nom: "Mairie de Montmerle-sur-Saône",
+    src: "/partenaires/mairie-montmerle.png",
+    alt: "Mairie de Montmerle-sur-Saône",
+    href: "https://www.mairie-montmerle.fr/",
+  },
+  {
     nom: "Mairie de Lurcy",
-    src: "/partenaires/mairie-lurcy.jpg",
+    src: "/partenaires/mairie-lurcy.png",
     alt: "Mairie de Lurcy",
     href: "https://lurcy.fr/",
   },
@@ -92,18 +98,25 @@ export function Footer() {
             <p className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400 mb-4">
               Merci à nos partenaires
             </p>
-            {/* Première ligne : or et argent ; les bronzes passent dessous. */}
-            <div className="space-y-5">
-              {[
-                PARTNERS.filter((p) => p.tier === "Gold" || p.tier === "Silver"),
-                PARTNERS.filter((p) => p.tier !== "Gold" && p.tier !== "Silver"),
-              ].map((ligne, i) =>
-                ligne.length === 0 ? null : (
-                  <div key={i} className="flex flex-wrap items-end justify-center gap-x-10 gap-y-5">
+            {/* Une ligne par palier : or, puis argent, puis bronze. Chaque logo peut
+                être légèrement agrandi ou réduit (`echelle` dans data.js) pour
+                un équilibre visuel : un logo en hauteur paraît plus petit qu'un
+                logo large dans une même boîte. L'échelle part du bas de la
+                boîte, les logos restent alignés. */}
+            <div className="space-y-8">
+              {TIER_ORDER.map((palier) => {
+                const ligne = PARTNERS.filter((p) => p.tier === palier);
+                return ligne.length === 0 ? null : (
+                  <div key={palier} className="flex flex-wrap items-end justify-center gap-x-10 gap-y-8">
                     {ligne.map((p) => (
                       <div
                         key={p.slug}
                         className={`relative ${BANNER_SIZES[p.tier] || BANNER_SIZES.Bronze}`}
+                        style={
+                          p.echelle && p.echelle !== 1
+                            ? { transform: `scale(${p.echelle})`, transformOrigin: "bottom center" }
+                            : undefined
+                        }
                       >
                         <Image
                           src={`/partenaires/${p.file}`}
@@ -114,8 +127,8 @@ export function Footer() {
                       </div>
                     ))}
                   </div>
-                )
-              )}
+                );
+              })}
             </div>
           </Link>
           <div className="hidden sm:block w-px self-stretch bg-slate-200" aria-hidden="true" />

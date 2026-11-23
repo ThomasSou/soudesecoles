@@ -12,6 +12,13 @@ const IMAGES_PAR_DEFAUT = {
   "marche-de-noel": "/evenements/marche-de-noel.jpg",
 };
 
+// Image de l'accueil quand elle diffère de celle de la page Événements : la
+// carte d'accueil est étroite et haute, l'affiche (portrait) y rend mieux que
+// la bannière large. Remplacée, comme l'autre, par une image téléversée.
+const IMAGES_ACCUEIL_PAR_DEFAUT = {
+  "marche-de-noel": "/evenements/marche-de-noel-affiche.jpg",
+};
+
 // Événements du calendrier public (accueil + /evenements), gérés depuis le
 // back-office (table site_evenements). Tant que la table n'existe pas (la
 // migration n'est pas passée), on retombe sur la liste figée de
@@ -32,6 +39,7 @@ export async function chargerEvenements() {
       place: e.lieu || "",
       desc: e.description || "",
       image: e.image_url || IMAGES_PAR_DEFAUT[e.slug] || undefined,
+      imageAccueil: e.image_url || IMAGES_ACCUEIL_PAR_DEFAUT[e.slug] || IMAGES_PAR_DEFAUT[e.slug] || undefined,
       hasPage: Boolean(e.page_dediee) || PAGES_DEDIEES.has(e.slug),
     }));
   } catch {
