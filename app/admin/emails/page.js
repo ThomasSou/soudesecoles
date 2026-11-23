@@ -84,6 +84,7 @@ function EnvoiEmails({ token, parent }) {
   const [boutiques, setBoutiques] = useState([]);
   const [sansCommandeBoutiqueId, setSansCommandeBoutiqueId] = useState("");
   const [sansBenevolatEvenementId, setSansBenevolatEvenementId] = useState("");
+  const [filtreListe, setFiltreListe] = useState("tous");
   const [subject, setSubject] = useState("");
   const [blocks, setBlocks] = useState(() => TEMPLATES[0].blocks());
   const [previewChoix, setPreviewChoix] = useState("generique-adherent");
@@ -1021,23 +1022,9 @@ function EnvoiEmails({ token, parent }) {
       <div>
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h2 className="text-lg font-semibold text-sou-blue">Message</h2>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Commencer avec un modèle :</span>
-            {TEMPLATES.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => {
-                  setBlocks(t.blocks());
-                  // Choisir un modèle = commencer un nouveau message : l'envoi
-                  // précédent continue seul en arrière-plan.
-                  setEnvoiEditeurId(null);
-                }}
-                className="text-xs px-2.5 py-1 rounded-full border border-slate-300 text-slate-600 hover:border-sou-blue hover:text-sou-blue"
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+          <a href="#liste-modeles" className="text-xs px-3 py-1.5 rounded-full border border-slate-300 text-slate-600 hover:border-sou-blue hover:text-sou-blue">
+            Choisir un modèle ou un brouillon ↓ (liste en bas de page)
+          </a>
         </div>
 
         <p className="text-xs text-slate-500 mb-3">
@@ -1359,13 +1346,45 @@ function EnvoiEmails({ token, parent }) {
         )}
       </div>
 
-      <div>
-        <h2 className="text-lg font-semibold text-sou-blue mb-4">Historique et brouillons</h2>
-        {campagnes.length === 0 ? (
+      <div id="liste-modeles" className="scroll-mt-4">
+        <h2 className="text-lg font-semibold text-sou-blue mb-3">Modèles, brouillons et historique</h2>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {[["tous", "Tout"], ["modeles", "Modèles"], ["brouillon", "Brouillons"], ["programme", "Programmés"], ["envoye", "Envoyés"]].map(([k, l]) => (
+            <button key={k} onClick={() => setFiltreListe(k)}
+              className={`text-xs font-semibold rounded-full px-3 py-1.5 ${filtreListe === k ? "bg-sou-blue text-white" : "bg-slate-100 text-slate-600"}`}>{l}</button>
+          ))}
+        </div>
+
+        {(filtreListe === "tous" || filtreListe === "modeles") && (
+          <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 mb-4 overflow-hidden">
+            {TEMPLATES.map((t) => (
+              <div key={t.key} className="flex items-start justify-between gap-3 p-3 text-sm">
+                <div className="min-w-0">
+                  <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5 mr-2">modèle</span>
+                  <span className="text-slate-700 break-words">{t.label}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setBlocks(t.blocks());
+                    // Choisir un modèle = commencer un nouveau message : l'envoi
+                    // précédent continue seul en arrière-plan.
+                    setEnvoiEditeurId(null);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="shrink-0 text-xs font-semibold text-sou-blue underline"
+                >
+                  Utiliser
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {filtreListe === "modeles" ? null : campagnes.length === 0 ? (
           <p className="text-slate-400 italic">Aucune campagne ni brouillon pour l&apos;instant.</p>
         ) : (
           <div className="space-y-3">
-            {campagnes.map((c) => (
+            {campagnes.filter((c) => filtreListe === "tous" || (filtreListe === "envoye" ? ["termine", "en_cours"].includes(c.status) : c.status === filtreListe)).map((c) => (
               <div key={c.id} className="border border-slate-200 rounded-xl p-4 text-sm">
                <div className="flex items-start justify-between gap-3">
                 <div>
