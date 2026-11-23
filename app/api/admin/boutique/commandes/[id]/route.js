@@ -163,7 +163,8 @@ export async function POST(request, { params }) {
       <p style="text-align: center; margin: 24px 0;">
         <a href="${lien}" style="background: #1F3864; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 999px; font-weight: bold;">Payer ma commande</a>
       </p>
-      <p style="font-size: 13px; color: #64748b;">Le paiement est sécurisé (HelloAsso). Si vous ne souhaitez plus cette commande, ignorez simplement ce message. Une question ? Répondez à cet e-mail.</p>
+      <p style="font-size: 13px; color: #64748b;">Le paiement est sécurisé (HelloAsso). Sur sa page de paiement, HelloAsso peut proposer une contribution volontaire à son service : elle est facultative, vous pouvez la modifier ou la supprimer (« autre montant »). Si votre téléphone ne vous le permet pas, ouvrez le lien depuis un ordinateur ou avec un autre navigateur.</p>
+      <p style="font-size: 13px; color: #64748b;">Si vous ne souhaitez plus cette commande, ignorez simplement ce message. Une question ? Répondez à cet e-mail.</p>
     </div>`;
   const texte = [
     `Bonjour ${order.buyer_first_name},`,
@@ -173,6 +174,8 @@ export async function POST(request, { params }) {
     `Total : ${total}`,
     "",
     `Payer ma commande : ${lien}`,
+    "",
+    "Sur sa page de paiement, HelloAsso peut proposer une contribution volontaire à son service : elle est facultative, vous pouvez la modifier ou la supprimer (« autre montant »). Si votre téléphone ne vous le permet pas, ouvrez le lien depuis un ordinateur ou avec un autre navigateur.",
     "",
     "Si vous ne souhaitez plus cette commande, ignorez simplement ce message. Une question ? Répondez à cet e-mail.",
     "Le Sou des Écoles",
