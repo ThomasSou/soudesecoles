@@ -59,27 +59,35 @@ export default async function HomePage() {
         </h2>
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
           {EVENTS_PREVIEW.map((e) => {
+            // Image de la manifestation quand on en a une (affiche, photo) ; sinon
+            // la carte reste textuelle. Balise <img> simple : l'adresse peut être
+            // locale ou venir du stockage du back-office.
             const contenu = (
               <>
-                <p className="font-semibold text-sou-blue">{e.name}</p>
-                <p className="text-sm text-slate-500 mt-1">
-                  {formatEventDates(e)}
-                </p>
+                {(e.imageAccueil || e.image) && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={e.imageAccueil || e.image}
+                    alt={e.name}
+                    loading="lazy"
+                    className="w-full h-44 object-cover object-top"
+                  />
+                )}
+                <div className="p-5">
+                  <p className="font-semibold text-sou-blue">{e.name}</p>
+                  <p className="text-sm text-slate-500 mt-1">
+                    {formatEventDates(e)}
+                  </p>
+                </div>
               </>
             );
+            const classes = "border border-slate-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow";
             return e.hasPage ? (
-              <Link
-                key={e.slug}
-                href={`/evenements/${e.slug}`}
-                className="border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow"
-              >
+              <Link key={e.slug} href={`/evenements/${e.slug}`} className={classes}>
                 {contenu}
               </Link>
             ) : (
-              <div
-                key={e.slug}
-                className="border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow"
-              >
+              <div key={e.slug} className={classes}>
                 {contenu}
               </div>
             );
