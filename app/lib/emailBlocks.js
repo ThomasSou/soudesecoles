@@ -282,6 +282,40 @@ export const TEMPLATES = [
     ],
   },
   {
+    key: "partenaires-espace",
+    label: "Partenaires — votre espace partenaire vous attend (avantages, table, mange-debout, QR code)",
+    blocks: () => [
+      { ...newBlock("heading"), text: "Bonjour, votre espace partenaire vous attend" },
+      {
+        ...newBlock("paragraph"),
+        text: "Le Sou des Écoles a ouvert un espace réservé à ses partenaires. Vous y retrouvez, au même endroit : vos avantages pour nos adhérents, vos messages aux familles, vos factures, les documents du bureau, et la page qui vous présente sur notre site, que vous pouvez modifier vous-même (le bureau la relit avant publication).",
+      },
+      { ...newBlock("button"), text: "Accéder à mon espace partenaire", url: `${SITE_URL}/connexion` },
+      { type: "divider", id: "pe1" },
+      { ...newBlock("heading"), text: "📣 Une actualité à partager avec les familles", size: "sm" },
+      {
+        ...newBlock("paragraph"),
+        text: "Chaque mois, nous envoyons aux familles l'e-mail « Les nouveautés de nos partenaires ». La **première parution aura lieu le 1er décembre**. Votre message (titre, texte, lien et, si vous le souhaitez, une image) est à déposer depuis votre espace **avant le 28 novembre**. Passé cette date, il paraîtra le mois suivant.",
+      },
+      { type: "divider", id: "pe2" },
+      { ...newBlock("heading"), text: "🪑 Une table et deux mange-debout pour vous", size: "sm" },
+      {
+        ...newBlock("paragraph"),
+        text: "À chacune de nos manifestations, une **table partenaires** vous attend : vous pouvez y poser vos prospectus, cartes de visite et bons de réduction. Vous pouvez aussi nous les faire passer avant, et nous les installerons pour vous (répondez à ce message pour convenir de la remise).\n\nNous réservons également **deux mange-debout pour l'ensemble de nos partenaires**.",
+      },
+      { type: "divider", id: "pe3" },
+      { ...newBlock("heading"), text: "🎟️ Des avantages pour nos adhérents, grâce au QR code", size: "sm" },
+      {
+        ...newBlock("paragraph"),
+        text: "Vous pouvez proposer aux adhérents du Sou des avantages **utilisables une seule fois ou plusieurs fois** : l'adhérent présente sa carte d'adhérent avec son QR code, et l'avantage se valide en quelques secondes. Vous les créez **vous-même, directement depuis votre espace**.\n\nBesoin d'une démonstration ? N'hésitez pas à nous le demander, nous vous montrerons comment faire.",
+      },
+      {
+        ...newBlock("paragraph"),
+        text: "Merci pour votre soutien aux écoles de Montmerle-Lurcy !\nLe bureau du Sou des Écoles",
+      },
+    ],
+  },
+  {
     key: "activer-compte",
     label: "Relance — activer son espace famille (à envoyer aux « sans compte »)",
     blocks: () => [
