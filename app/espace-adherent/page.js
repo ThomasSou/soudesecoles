@@ -212,10 +212,6 @@ function AdhesionPaiement({ accessToken, onPaid }) {
         {envoi ? "Préparation du paiement..." : `Payer ${montant ? montant + " €" : ""}`}
       </button>
       <p className="text-xs text-slate-400 mt-2">Paiement sécurisé HelloAsso.</p>
-      <p className="text-xs text-slate-500 mt-1">
-        HelloAsso peut proposer une contribution volontaire à son service : elle est facultative et modifiable
-        (« autre montant »).
-      </p>
       <AvertissementHelloAsso className="mt-2" />
     </div>
   );
