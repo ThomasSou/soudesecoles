@@ -2,10 +2,36 @@ import Link from "next/link";
 import Image from "next/image";
 import { formatEventDates, sortEvents } from "./evenements/data";
 import { chargerEvenements } from "./lib/evenementsSite";
+import ImageEvenement from "./ImageEvenement";
 
 // Les prochains temps forts viennent du calendrier géré dans le back-office.
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
+
+// Visuel par défaut d'une manifestation sans image : aplat de couleur et titre,
+// dans l'esprit des affiches de l'an dernier (Loto rose, Vide-greniers bleu nuit
+// et saumon, Fête de l'école jaune et rose). Remplacé dès qu'une image est
+// téléversée dans l'onglet Événements du back-office.
+const VISUELS = {
+  loto: { fond: "#ec2a73", texte: "#ffffff" },
+  "vide-greniers": { fond: "#2b2a6e", texte: "#f98b72" },
+  "fete-de-l-ecole": { fond: "#fff1c9", texte: "#e0218a" },
+  "montmerle-part-en-live": { fond: "#f98b5a", texte: "#ffffff" },
+};
+const VISUEL_DEFAUT = { fond: "#1F3864", texte: "#ffffff" };
+
+function VisuelSansImage({ slug, name }) {
+  const v = VISUELS[slug] || VISUEL_DEFAUT;
+  return (
+    <div
+      className="w-full h-44 flex items-center justify-center text-center px-4"
+      style={{ backgroundColor: v.fond, color: v.texte }}
+      aria-hidden="true"
+    >
+      <span className="text-2xl font-extrabold uppercase leading-tight tracking-tight">{name}</span>
+    </div>
+  );
+}
 
 export default async function HomePage() {
   const EVENTS_PREVIEW = sortEvents(await chargerEvenements()).slice(0, 5);
@@ -64,14 +90,10 @@ export default async function HomePage() {
             // locale ou venir du stockage du back-office.
             const contenu = (
               <>
-                {(e.imageAccueil || e.image) && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={e.imageAccueil || e.image}
-                    alt={e.name}
-                    loading="lazy"
-                    className="w-full h-44 object-cover object-top"
-                  />
+                {e.imageAccueil || e.image ? (
+                  <ImageEvenement src={e.imageAccueil || e.image} alt={e.name} />
+                ) : (
+                  <VisuelSansImage slug={e.slug} name={e.name} />
                 )}
                 <div className="p-5">
                   <p className="font-semibold text-sou-blue">{e.name}</p>

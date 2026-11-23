@@ -3,7 +3,7 @@ import Image from "next/image";
 import { PARTNERS, TIER_ORDER } from "./partenaires/data";
 
 const BANNER_SIZES = {
-  Gold: "w-40 h-20 sm:w-48 sm:h-24",
+  Gold: "w-40 h-12 sm:w-48 sm:h-14", // hauteur serrée sur le logo Barrels (très large) : pas de vide au-dessus et au-dessous
   Silver: "w-28 h-14 sm:w-32 sm:h-16",
   Bronze: "w-16 h-8 sm:w-20 sm:h-10",
 };
