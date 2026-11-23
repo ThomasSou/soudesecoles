@@ -81,6 +81,9 @@ function EnvoiEmails({ token, parent }) {
   // communication en plusieurs jours sans jamais écrire deux fois à quelqu'un.
   const [exclureDejaServis, setExclureDejaServis] = useState(false);
   const [exclureToutPsMs, setExclureToutPsMs] = useState(false);
+  const [boutiques, setBoutiques] = useState([]);
+  const [sansCommandeBoutiqueId, setSansCommandeBoutiqueId] = useState("");
+  const [sansBenevolatEvenementId, setSansBenevolatEvenementId] = useState("");
   const [subject, setSubject] = useState("");
   const [blocks, setBlocks] = useState(() => TEMPLATES[0].blocks());
   const [previewChoix, setPreviewChoix] = useState("generique-adherent");
@@ -160,6 +163,7 @@ function EnvoiEmails({ token, parent }) {
     setClassesDisponibles(data.classes || []);
     setCampagnes(data.campagnes || []);
     setBenevolesEvenements(data.benevolesEvenements || []);
+    setBoutiques(data.boutiques || []);
     setContactsCount(data.contactsCount || 0);
     setContacts(dataContacts.contacts || []);
     setLoading(false);
@@ -252,6 +256,8 @@ function EnvoiEmails({ token, parent }) {
       inclureContacts: inclureContacts && !sansCompte,
       exclureDejaServis,
       exclureToutPsMs,
+      sansCommandeBoutiqueId: sansCommandeBoutiqueId || null,
+      sansBenevolatEvenementId: sansBenevolatEvenementId || null,
     };
   }
 
@@ -723,6 +729,8 @@ function EnvoiEmails({ token, parent }) {
     setInclureContacts(!!seg.inclureContacts);
     setExclureDejaServis(!!seg.exclureDejaServis);
     setExclureToutPsMs(!!seg.exclureToutPsMs);
+    setSansCommandeBoutiqueId(seg.sansCommandeBoutiqueId || "");
+    setSansBenevolatEvenementId(seg.sansBenevolatEvenementId || "");
     setBrouillonId(c.status === "brouillon" ? c.id : null);
     setBrouillonMsg("");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -922,6 +930,26 @@ function EnvoiEmails({ token, parent }) {
           </label>
         )}
 
+        {scope !== "liste" && (
+          <div className="mb-4 space-y-2 text-sm text-slate-600">
+            <label className="block">
+              Relance commandes : seulement ceux qui <strong>n&apos;ont pas encore commandé</strong> dans{" "}
+              <select value={sansCommandeBoutiqueId} onChange={(e) => setSansCommandeBoutiqueId(e.target.value)} className="border rounded px-2 py-1">
+                <option value="">— (pas de filtre) —</option>
+                {boutiques.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+              <span className="block text-xs text-slate-400">Une commande payée par un des parents de la famille suffit à l&apos;écarter.</span>
+            </label>
+            <label className="block">
+              Relance bénévoles : seulement ceux <strong>pas encore inscrits</strong> sur{" "}
+              <select value={sansBenevolatEvenementId} onChange={(e) => setSansBenevolatEvenementId(e.target.value)} className="border rounded px-2 py-1">
+                <option value="">— (pas de filtre) —</option>
+                {benevolesEvenements.map((ev) => <option key={ev.id} value={ev.id}>{ev.nom}</option>)}
+              </select>
+              <span className="block text-xs text-slate-400">Repéré par l&apos;adresse e-mail : un bénévole inscrit avec une autre adresse sera relancé quand même.</span>
+            </label>
+          </div>
+        )}
         {scope !== "liste" && (
           <label className="flex items-start gap-2 text-sm mb-4">
             <input
