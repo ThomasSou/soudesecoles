@@ -1,5 +1,6 @@
 "use client";
 
+import AvertissementHelloAsso from "../AvertissementHelloAsso";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
@@ -213,8 +214,9 @@ function AdhesionPaiement({ accessToken, onPaid }) {
       <p className="text-xs text-slate-400 mt-2">Paiement sécurisé HelloAsso.</p>
       <p className="text-xs text-slate-500 mt-1">
         HelloAsso peut proposer une contribution volontaire à son service : elle est facultative et modifiable
-        (« autre montant »). Si votre téléphone ne le permet pas, essayez depuis un ordinateur ou un autre navigateur.
+        (« autre montant »).
       </p>
+      <AvertissementHelloAsso className="mt-2" />
     </div>
   );
 }
