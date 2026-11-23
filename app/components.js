@@ -18,6 +18,23 @@ const NAV_LINKS = [
   { href: "/contact", label: "Contact" },
 ];
 
+// Soutiens institutionnels affichés en bas du site (« Avec le soutien de »),
+// avec un lien vers leur site quand il y en a un. Les mairies de Montmerle-sur-Saône
+// et de Lurcy sont les communes des écoles.
+const SOUTIENS = [
+  {
+    nom: "La Région Auvergne-Rhône-Alpes",
+    src: "/partenaires/region-auvergne-rhone-alpes.png",
+    alt: "La Région Auvergne-Rhône-Alpes soutient votre projet",
+  },
+  {
+    nom: "Mairie de Lurcy",
+    src: "/partenaires/mairie-lurcy.jpg",
+    alt: "Mairie de Lurcy",
+    href: "https://lurcy.fr/",
+  },
+];
+
 export function Header() {
   return (
     <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200">
@@ -106,13 +123,28 @@ export function Footer() {
             <p className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400 mb-4">
               Avec le soutien de
             </p>
-            <div className="relative w-20 h-20 mx-auto">
-              <Image
-                src="/partenaires/region-auvergne-rhone-alpes.png"
-                alt="La Région Auvergne-Rhône-Alpes soutient votre projet"
-                fill
-                className="object-contain"
-              />
+            <div className="flex flex-wrap items-center justify-center gap-6">
+              {SOUTIENS.map((so) => {
+                const logo = (
+                  <div className="relative w-20 h-20">
+                    <Image src={so.src} alt={so.alt} fill className="object-contain" />
+                  </div>
+                );
+                return so.href ? (
+                  <a
+                    key={so.nom}
+                    href={so.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${so.nom} (nouvel onglet)`}
+                    className="block hover:opacity-80 transition-opacity"
+                  >
+                    {logo}
+                  </a>
+                ) : (
+                  <div key={so.nom}>{logo}</div>
+                );
+              })}
             </div>
           </div>
         </div>
