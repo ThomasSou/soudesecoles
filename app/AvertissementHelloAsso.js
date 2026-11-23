@@ -1,43 +1,23 @@
-"use client";
-
-// Avertissement (au conditionnel) affiché uniquement aux visiteurs de Firefox sur
-// Android : sur la page de paiement HelloAsso, la « contribution volontaire à
-// HelloAsso » n'a pas pu être modifiée sur UN téléphone (Pixel 8, Firefox à jour),
-// alors que tout fonctionne avec Chrome, avec Firefox en mode ordinateur, sur
-// PC et sur un autre téléphone Android (Samsung) avec Firefox. Cause inconnue :
-// appareil, réglage ou page de HelloAsso. D'où un message prudent, qui ne
-// prétend pas que Firefox sur Android est en cause partout.
-//
-// Détection côté navigateur après affichage (pas à l'hébergement) pour éviter
-// tout écart entre ce que le serveur et le navigateur affichent. En « mode
-// ordinateur », Firefox ne se présente plus comme Android : l'avertissement
-// disparaît, ce qui est voulu puisque cela fonctionne alors.
-import { useEffect, useState } from "react";
-
+// Conseil affiché à tout le monde avant le départ vers la page de paiement
+// HelloAsso. HelloAsso ajoute automatiquement une « contribution volontaire à
+// HelloAsso » ; elle est facultative et modifiable. Sur un téléphone, elle ne
+// s'est pas laissé modifier à cause du cache du navigateur (le même paiement
+// fonctionnait en navigation privée) : rien ne permet de dire que cela ne
+// concerne qu'un navigateur ou qu'un appareil, d'où un message général, sans
+// détection du navigateur, qui renvoie vers la navigation privée ou un autre
+// navigateur.
 export default function AvertissementHelloAsso({ className = "" }) {
-  const [concerne, setConcerne] = useState(false);
-
-  useEffect(() => {
-    try {
-      const ua = navigator.userAgent || "";
-      setConcerne(/Android/i.test(ua) && /Firefox\//i.test(ua));
-    } catch {
-      setConcerne(false);
-    }
-  }, []);
-
-  if (!concerne) return null;
   return (
     <div className={`text-sm bg-amber-50 border border-amber-300 text-amber-900 rounded-lg px-3 py-2 ${className}`} role="note">
-      <p className="font-semibold">Un petit conseil si vous utilisez Firefox sur téléphone</p>
+      <p className="font-semibold">Bon à savoir sur la page de paiement</p>
       <p className="mt-1">
-        Sur la page de paiement de HelloAsso, la contribution volontaire à HelloAsso (facultative) pourrait ne pas se laisser
-        modifier avec certains téléphones sous Firefox. Si c'est votre cas, ouvrez cette page avec <strong>Chrome</strong>, depuis{" "}
-        <strong>un ordinateur</strong>, ou activez le <strong>mode ordinateur</strong> de Firefox (menu ⋮ puis « Version pour
-        ordinateur »).
+        HelloAsso ajoute <strong>automatiquement</strong> une contribution volontaire à son propre service. Elle n&apos;est{" "}
+        <strong>pas obligatoire</strong> : vous pouvez la modifier ou la supprimer (« autre montant »).
       </p>
-      <p className="mt-1 text-xs">
-        Cela dépend de la page de paiement de HelloAsso et de votre appareil, pas du site du Sou des Écoles.
+      <p className="mt-1">
+        Si la modification ne fonctionne pas, c&apos;est probablement un souci de votre navigateur (par exemple son cache) :
+        essayez en <strong>navigation privée</strong>, ou avec un <strong>autre navigateur</strong>. Une question ?
+        contact@sou-montmerle.fr
       </p>
     </div>
   );
