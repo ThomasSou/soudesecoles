@@ -1,5 +1,6 @@
 "use client";
 
+import AvertissementHelloAsso from "../AvertissementHelloAsso";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "../components";
 import { createClient } from "../lib/supabaseClient";
@@ -462,9 +463,9 @@ export default function BoutiquePage() {
                     <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
                       Sur la page de paiement, HelloAsso peut vous proposer en plus une <strong>contribution volontaire à
                       HelloAsso</strong> : elle est facultative, vous pouvez la modifier ou la supprimer (« autre montant »).
-                      Si votre téléphone ne vous laisse pas la modifier, essayez depuis un ordinateur ou avec un autre
-                      navigateur. Une question ? contact@sou-montmerle.fr
+                      Une question ? contact@sou-montmerle.fr
                     </p>
+                    <AvertissementHelloAsso />
                   </form>
                 )}
               </div>
@@ -490,9 +491,9 @@ export default function BoutiquePage() {
               </p>
               <p className="mt-3 text-xs text-slate-500">
                 Sur la page HelloAsso, la contribution volontaire à HelloAsso est <strong>facultative</strong> : vous
-                pouvez la modifier ou la supprimer. Si votre téléphone ne vous le permet pas, ouvrez cette page depuis un
-                ordinateur ou un autre navigateur.
+                pouvez la modifier ou la supprimer.
               </p>
+              <AvertissementHelloAsso className="mt-3" />
             </div>
           </div>
         )}

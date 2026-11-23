@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "../components";
+import AvertissementHelloAsso from "../AvertissementHelloAsso";
 
 const TARIFS = [
   { id: "jaime", label: "J'aime", montant: 17 },
@@ -204,6 +205,7 @@ export default function CotisationPage() {
               <p className="text-xs text-slate-400 mt-2">
                 Paiement sécurisé par HelloAsso. La cotisation est familiale : une seule par famille et par an.
               </p>
+              <AvertissementHelloAsso className="mt-3" />
             </div>
           </form>
         )}
