@@ -94,7 +94,10 @@ export const PARTNERS = [
     name: "Pizzeria des Templiers",
     file: "pizzeria-des-templiers.jpg",
     tier: "Bronze",
-    description: "Pizzeria à Montmerle-sur-Saône.",
+    description:
+      "Pizzeria de Montmerle-sur-Saône, rue de Lyon : un large choix de pizzas à emporter ou en livraison, à partager en famille ou entre amis. Ouverte midi et soir ; appelez pour connaître les horaires du moment et passer commande.",
+    address: "8 rue de Lyon, 01090 Montmerle-sur-Saône",
+    phone: "04 74 06 21 94",
   },
   {
     slug: "jaam-immo",
@@ -115,6 +118,10 @@ export const PARTNERS = [
     file: "arc1950.jpg",
     tier: "Bronze",
     echelle: 0.8, // logo large : réduit pour ne pas égaler la largeur des logos Argent
+    description:
+      "Arc 1950 Le Village, en Savoie : le plus récent des sites des Arcs, un village de montagne 100 % piéton créé au début des années 2000. On y chausse les skis devant sa résidence pour rejoindre Paradiski, l'un des plus grands domaines skiables du monde. Résidences haut de gamme, spa, bars et restaurants, et des animations toute l'année, été comme hiver. Le village est géré et animé par l'ASL Arc 1950.",
+    address: "Arc 1950 Le Village, Les Arcs (Savoie)",
+    website: "https://www.arc1950.com/",
   },
 ];
 
