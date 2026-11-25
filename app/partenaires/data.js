@@ -119,7 +119,7 @@ export const PARTNERS = [
     tier: "Bronze",
     echelle: 0.8, // logo large : réduit pour ne pas égaler la largeur des logos Argent
     description:
-      "Arc 1950 Le Village, en Savoie : le plus récent des sites des Arcs, un village de montagne 100 % piéton créé au début des années 2000. On y chausse les skis devant sa résidence pour rejoindre Paradiski, l'un des plus grands domaines skiables du monde. Résidences haut de gamme, spa, bars et restaurants, et des animations toute l'année, été comme hiver. Le village est géré et animé par l'ASL Arc 1950.",
+      "Arc 1950 Le Village, en Savoie : le plus récent des sites des Arcs, un village de montagne 100 % piéton créé au début des années 2000. On y chausse les skis devant sa résidence pour rejoindre Paradiski, l'un des plus grands domaines skiables du monde. Résidences haut de gamme, spa, bars et restaurants, et des animations toute l'année, été comme hiver. Le village est géré et animé par l'ASL Arc 1950. Arc 1950 fournit le matériel du biathlon laser de notre Marché de Noël : un grand merci !",
     address: "Arc 1950 Le Village, Les Arcs (Savoie)",
     website: "https://www.arc1950.com/",
   },
