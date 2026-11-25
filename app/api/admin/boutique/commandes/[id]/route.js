@@ -12,7 +12,10 @@ export const fetchCache = "force-no-store";
 // Charge la commande et vérifie qu'elle est bien « en attente » ET qu'elle n'a
 // pas été réglée chez HelloAsso entre-temps (sans quoi on perdrait ou on
 // doublerait une vraie vente). Renvoie { order } ou { reponse } (à renvoyer).
-async function chargerCommandeEnAttente(admin, id) {
+// tolerant : si HelloAsso tarde ou ne répond pas, on n'empêche pas l'action
+// (utilisé pour la relance : le lien de paiement revérifie de toute façon le
+// statut avant de renvoyer vers HelloAsso, cf. /api/boutique/reprendre).
+async function chargerCommandeEnAttente(admin, id, { tolerant = false } = {}) {
   const { data: order } = await admin.from("shop_orders").select("*").eq("id", id).maybeSingle();
   if (!order) return { reponse: NextResponse.json({ error: "Commande introuvable." }, { status: 404 }) };
   if (order.status !== "pending") {
@@ -23,8 +26,16 @@ async function chargerCommandeEnAttente(admin, id) {
   if (order.checkout_intent_id) {
     let intent;
     try {
-      intent = await getCheckoutIntent(order.checkout_intent_id);
+      let minuterie;
+      intent = await Promise.race([
+        getCheckoutIntent(order.checkout_intent_id),
+        new Promise((_, rejeter) => {
+          minuterie = setTimeout(() => rejeter(new Error("HelloAsso trop lent")), 4000);
+        }),
+      ]);
+      clearTimeout(minuterie);
     } catch {
+      if (tolerant) return { order };
       return {
         reponse: NextResponse.json(
           { error: "Impossible de vérifier le paiement auprès de HelloAsso pour le moment. Réessayez dans un instant." },
@@ -54,7 +65,8 @@ export async function DELETE(request, { params }) {
   const auth = await requirePermission(request, "boutique");
   if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const garde = await chargerCommandeEnAttente(auth.admin, params.id);
+  const debutRequete = Date.now();
+  const garde = await chargerCommandeEnAttente(auth.admin, params.id, { tolerant: action === "relancer" });
   if (garde.reponse) return garde.reponse;
   const { order } = garde;
 
@@ -190,7 +202,18 @@ export async function POST(request, { params }) {
     text,
     replyTo: CONTACT_EMAIL,
     viaSmtpDabord: true,
+    // Netlify coupe la requête vers 10 s : on garde de la marge.
+    delaiMaxMs: Math.max(2000, 8500 - (Date.now() - debutRequete)),
   });
+  if (!mail.sent && mail.reason === "delai_depasse") {
+    return NextResponse.json(
+      {
+        error:
+          "Le serveur de messagerie met trop de temps à répondre (il est peut-être occupé par une campagne en cours). L'e-mail est peut-être parti quand même : attendez quelques minutes avant de réessayer.",
+      },
+      { status: 504 }
+    );
+  }
   if (!mail.sent) {
     return NextResponse.json({ error: "L'e-mail n'a pas pu être envoyé. Réessayez dans un instant." }, { status: 502 });
   }
