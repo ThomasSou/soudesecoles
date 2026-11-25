@@ -538,6 +538,7 @@ export default function EspaceAdherentPage() {
   const [accessToken, setAccessToken] = useState(null);
   const [userEmail, setUserEmail] = useState("");
   const [estAdmin, setEstAdmin] = useState(false);
+  const [estPartenaire, setEstPartenaire] = useState(false);
   const [creneauxBenevoles, setCreneauxBenevoles] = useState([]);
   // Filet de sécurité : on ne relance la revérification d'une cotisation
   // "en attente" qu'une seule fois par chargement de page (jamais en rafale).
@@ -621,7 +622,10 @@ export default function EspaceAdherentPage() {
       fetch("/api/admin/moi", {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-        .then((r) => setEstAdmin(r.ok))
+        .then(async (r) => {
+          setEstAdmin(r.ok);
+          if (r.ok) setEstPartenaire(!!(await r.json().catch(() => ({}))).estPartenaire);
+        })
         .catch(() => setEstAdmin(false));
 
       fetch("/api/benevoles/mes-inscriptions", {
@@ -699,6 +703,11 @@ export default function EspaceAdherentPage() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold text-sou-blue">Mon espace famille</h1>
         <div className="flex items-center gap-4">
+          {estPartenaire && (
+            <a href="/partenaire" className="text-sm font-semibold text-sou-blue hover:text-sou-gold">
+              Espace partenaire →
+            </a>
+          )}
           {estAdmin && (
             <a
               href="/admin"

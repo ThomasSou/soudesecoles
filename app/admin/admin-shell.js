@@ -72,7 +72,7 @@ export default function AdminShell({ title, children }) {
       }
 
       const data = await res.json();
-      setParent(data.parent);
+      setParent({ ...data.parent, estPartenaire: !!data.estPartenaire });
       setAccessToken(session.access_token);
       setState("ok");
     }
@@ -139,6 +139,11 @@ export default function AdminShell({ title, children }) {
             <Link href="/espace-adherent" className="text-sou-blue hover:underline">
               Mon espace famille
             </Link>
+            {parent?.estPartenaire && (
+              <Link href="/partenaire" className="text-sou-blue hover:underline">
+                Mon espace partenaire
+              </Link>
+            )}
             <button type="button" onClick={seDeconnecter} className="underline hover:text-sou-blue">
               Se déconnecter
             </button>
