@@ -152,6 +152,9 @@ function EnvoiEmails({ token, parent }) {
 
   // Détail par destinataire d'une campagne de l'historique, replié par défaut.
   const [detailCampagne, setDetailCampagne] = useState(null);
+  // Campagne dont on affiche le message (aperçu dans la liste).
+  const [apercuCampagneId, setApercuCampagneId] = useState(null);
+  const [modifProgMsg, setModifProgMsg] = useState("");
 
   const charger = useCallback(async () => {
     if (!token) return;
@@ -573,6 +576,7 @@ function EnvoiEmails({ token, parent }) {
       nouvelEmailPendantEnvoi();
       setProgrammerOuvert(false);
       setProgrammeLe("");
+      setModifProgMsg("");
       setResultat({ programme: true, quand });
       charger();
     } catch {
@@ -580,6 +584,32 @@ function EnvoiEmails({ token, parent }) {
     } finally {
       setBusyProg(false);
     }
+  }
+
+  // Modifier un envoi programmé : on le repasse en brouillon (sinon il
+  // pourrait partir pendant qu'on le modifie), on le charge dans l'éditeur et
+  // on rouvre la programmation avec la même date, à reconfirmer.
+  async function modifierProgrammation(c) {
+    const res = await fetch("/api/admin/emails", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ id: c.id, action: "annuler_programmation" }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || "Impossible de modifier : l'envoi a peut-être déjà démarré.");
+      charger();
+      return;
+    }
+    reprendreCampagne({ ...c, status: "brouillon" });
+    const d = new Date(c.programme_le);
+    const pad = (n) => String(n).padStart(2, "0");
+    setProgrammeLe(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+    setProgrammerOuvert(true);
+    setModifProgMsg(
+      "Envoi suspendu pendant la modification. Une fois vos changements faits, cliquez sur « Confirmer la programmation » (en bas du message) : sinon il ne partira pas."
+    );
+    charger();
   }
 
   async function annulerProgrammation(id) {
@@ -1027,6 +1057,9 @@ function EnvoiEmails({ token, parent }) {
           </a>
         </div>
 
+        {modifProgMsg && (
+          <p className="mb-3 text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{modifProgMsg}</p>
+        )}
         <p className="text-xs text-slate-500 mb-3">
           Logo, statut d&apos;adhésion et logos des partenaires sont ajoutés automatiquement en haut et en bas de
           chaque e-mail.
@@ -1474,6 +1507,20 @@ function EnvoiEmails({ token, parent }) {
                   >
                     {c.status === "brouillon" ? "Modifier ce brouillon" : "Réutiliser le contenu"}
                   </button>
+                  <button
+                    onClick={() => setApercuCampagneId(apercuCampagneId === c.id ? null : c.id)}
+                    className="text-xs font-semibold text-sou-blue hover:text-sou-gold"
+                  >
+                    {apercuCampagneId === c.id ? "Masquer le message" : "Voir le message"}
+                  </button>
+                  {c.status === "programme" && (
+                    <button
+                      onClick={() => modifierProgrammation(c)}
+                      className="text-xs font-semibold text-sou-blue hover:text-sou-gold"
+                    >
+                      Modifier
+                    </button>
+                  )}
                   {c.status === "programme" && (
                     <button
                       onClick={() => annulerProgrammation(c.id)}
@@ -1492,6 +1539,17 @@ function EnvoiEmails({ token, parent }) {
                   )}
                 </div>
                </div>
+
+               {apercuCampagneId === c.id && (
+                 <div className="mt-3 border border-slate-200 rounded-xl overflow-hidden bg-slate-100" style={{ height: 520 }}>
+                   <iframe
+                     title={`Message « ${c.subject || ""} »`}
+                     srcDoc={renderBlocksToHtml(c.content_blocks || [], { subject: c.subject, recipient: previewRecipient })}
+                     className="w-full h-full"
+                     style={{ border: "none" }}
+                   />
+                 </div>
+               )}
 
                {detailCampagne?.id === c.id && (
                  <div className="mt-3 border-t border-slate-100 pt-3">
