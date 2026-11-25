@@ -92,6 +92,11 @@ export async function sendMail({
   // true pour les campagnes : SMTP en tête, Sender en secours. false (défaut)
   // pour les envois unitaires : Sender en tête, SMTP en secours.
   viaSmtpDabord = false,
+  // Temps total accordé (ms), pour les envois faits pendant une requête du
+  // back-office : au-delà, Netlify coupe la fonction et l'écran ne reçoit
+  // aucune réponse. Un circuit trop lent est abandonné SANS essayer le
+  // suivant : il a pu partir quand même, un 2e circuit ferait un doublon.
+  delaiMaxMs = null,
 }) {
   const msg = { to, subject, text, html, replyTo, headers };
   const smtpDispo = isSmtpConfigured();
@@ -105,10 +110,22 @@ export async function sendMail({
     ? [smtpDispo && envoyerViaSmtp, senderDispo && envoyerViaSender]
     : [senderDispo && envoyerViaSender, smtpDispo && envoyerViaSmtp];
 
+  const debut = Date.now();
   for (const circuit of circuits) {
     if (!circuit) continue;
     try {
-      return await circuit(msg);
+      if (!delaiMaxMs) return await circuit(msg);
+      const reste = delaiMaxMs - (Date.now() - debut);
+      if (reste < 1500) return { sent: false, reason: "delai_depasse" };
+      let minuterie;
+      const resultat = await Promise.race([
+        circuit(msg),
+        new Promise((resolve) => {
+          minuterie = setTimeout(() => resolve({ sent: false, reason: "delai_depasse" }), reste);
+        }),
+      ]);
+      clearTimeout(minuterie);
+      return resultat;
     } catch (error) {
       // Aucune supposition : un circuit qui n'aboutit pas (time-out, refus,
       // erreur) ne compte pas comme envoyé. On tente le circuit suivant.
