@@ -70,5 +70,13 @@ export const JOUR_LIMITE_MESSAGE = 28;
 // 1er du mois suivant, un message plus tardif attend le mois d'après.
 export function moisParution(date = new Date()) {
   const j = jourParis(date);
-  return ajouterMois(`${j.y}-${pad(j.m)}`, j.d <= JOUR_LIMITE_MESSAGE ? 1 : 2);
+  return ajouterMois(`${j.y}-${pad(j.m)}`, j.d <= jourLimiteMessage(`${j.y}-${pad(j.m)}`) ? 1 : 2);
+}
+
+// Jour limite de dépôt pour un mois donné (AAAA-MM). Exception : pour la
+// toute première parution (1er décembre 2026), l'espace partenaire a ouvert
+// tard, la limite est repoussée au 30 novembre (décision du bureau).
+const LIMITES_EXCEPTIONNELLES = { "2026-11": 30 };
+export function jourLimiteMessage(mois) {
+  return LIMITES_EXCEPTIONNELLES[mois] || JOUR_LIMITE_MESSAGE;
 }

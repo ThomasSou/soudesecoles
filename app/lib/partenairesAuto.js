@@ -3,6 +3,7 @@ import { statutPeriodePartenaire } from "./partenaires";
 import { BLUE, GOLD, SITE_URL } from "./emailBlocks";
 import {
   JOUR_LIMITE_MESSAGE,
+  jourLimiteMessage,
   ajouterJours,
   ajouterMois,
   dateLongue,
@@ -73,7 +74,7 @@ const texteDe = (paragraphes, bouton) =>
 // du mois précédent.
 export function rappelMensuel({ nom, parution }) {
   const moisLimite = ajouterMois(parution, -1);
-  const limite = `${JOUR_LIMITE_MESSAGE} ${nomDuMois(moisLimite)}`;
+  const limite = `${jourLimiteMessage(moisLimite)} ${nomDuMois(moisLimite)}`;
   const parutionTexte = `1er ${nomDuMois(parution)}`;
   const sujet = `Plus qu'une semaine pour votre actualité de ${nomDuMois(parution)} (avant le ${limite})`;
   const paragraphes = [

@@ -344,12 +344,20 @@ export const TEMPLATES = [
         ...newBlock("paragraph"),
         text: "Le Sou des Écoles a ouvert un espace réservé à ses partenaires. Vous y retrouvez, au même endroit : vos avantages pour nos adhérents, vos messages aux familles, vos factures, les documents du bureau, et la page qui vous présente sur notre site, que vous pouvez modifier vous-même (le bureau la relit avant publication).",
       },
+      {
+        ...newBlock("paragraph"),
+        text: "Pour votre première connexion, utilisez le lien reçu dans l'e-mail d'invitation pour créer votre mot de passe. Ensuite, connectez-vous ici :",
+      },
       { ...newBlock("button"), text: "Accéder à mon espace partenaire", url: `${SITE_URL}/connexion` },
+      {
+        ...newBlock("paragraph"),
+        text: "🧪 **Cet espace est tout nouveau et encore en version bêta.** Il peut y avoir des erreurs, ou des choses qui ne fonctionnent pas comme prévu. N'hésitez surtout pas à nous signaler tout problème ou toute suggestion, en répondant simplement à cet e-mail : vos retours nous aideront à l'améliorer.",
+      },
       { type: "divider", id: "pe1" },
       { ...newBlock("heading"), text: "📣 Une actualité à partager avec les familles", size: "sm" },
       {
         ...newBlock("paragraph"),
-        text: "Chaque mois, nous envoyons aux familles l'e-mail « Les nouveautés de nos partenaires ». La **première parution aura lieu le 1er décembre**. Votre message (titre, texte, lien et, si vous le souhaitez, une image) est à déposer depuis votre espace **avant le 28 novembre**. Passé cette date, il paraîtra le mois suivant.",
+        text: "Chaque mois, nous envoyons aux familles l'e-mail « Les nouveautés de nos partenaires ». La **première parution aura lieu le 1er décembre**. Votre message (titre, texte, lien et, si vous le souhaitez, une image) est à déposer depuis votre espace **au plus tard le 30 novembre**. Passé cette date, il paraîtra le mois suivant.",
       },
       { type: "divider", id: "pe2" },
       { ...newBlock("heading"), text: "🪑 Une table et deux mange-debout pour vous", size: "sm" },
