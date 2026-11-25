@@ -11,8 +11,17 @@ export async function GET(request) {
   if (auth.error) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
+  // Un membre du bureau peut aussi être partenaire (même compte) : on lui
+  // affiche alors un lien vers son espace partenaire.
+  const { data: moi } = await auth.admin.from("parents").select("auth_user_id").eq("id", auth.parent.id).maybeSingle();
+  let estPartenaire = false;
+  if (moi?.auth_user_id) {
+    const { data: fiche } = await auth.admin.from("partenaires").select("id").eq("auth_user_id", moi.auth_user_id).maybeSingle();
+    estPartenaire = Boolean(fiche);
+  }
   return NextResponse.json({
     ok: true,
+    estPartenaire,
     parent: {
       firstName: auth.parent.first_name,
       lastName: auth.parent.last_name,
