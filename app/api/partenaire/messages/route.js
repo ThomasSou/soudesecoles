@@ -4,7 +4,7 @@ import {
   niveauActifPartenaire,
   compterMessagesMois,
 } from "../../../lib/partenaires";
-import { JOUR_LIMITE_MESSAGE, ajouterMois, moisLibelle, moisParution, nomDuMois } from "../../../lib/datesParis";
+import { jourLimiteMessage, ajouterMois, moisLibelle, moisParution, nomDuMois } from "../../../lib/datesParis";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -47,7 +47,7 @@ export async function GET(request) {
       moisCible: mois,
       moisCibleLibelle: moisLibelle(mois),
       parutionLe: `1er ${nomDuMois(mois)}`,
-      limiteLe: `${JOUR_LIMITE_MESSAGE} ${nomDuMois(ajouterMois(mois, -1))}`,
+      limiteLe: `${jourLimiteMessage(ajouterMois(mois, -1))} ${nomDuMois(ajouterMois(mois, -1))}`,
       quotaEmail: config?.quota_email ?? 0,
       utilisesEmail,
       restantEmail: Math.max(0, (config?.quota_email ?? 0) - utilisesEmail),
