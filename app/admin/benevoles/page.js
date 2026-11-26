@@ -541,7 +541,9 @@ function BenevolesAdmin({ accessToken }) {
   const [descriptionEvenement, setDescriptionEvenement] = useState("");
   const [onglet, setOnglet] = useState("planning"); // planning | inscrits
   const [afficherNoms, setAfficherNoms] = useState(false);
-  const [atelierFeuille, setAtelierFeuille] = useState(""); // "" = tous les ateliers
+  // Impression des feuilles d'atelier : panneau à part, sans effet sur l'écran.
+  const [impressionOuverte, setImpressionOuverte] = useState(false);
+  const [ateliersAImprimer, setAteliersAImprimer] = useState(null); // null = tous
   const [editionDescription, setEditionDescription] = useState(false);
   const [descriptionEnEdition, setDescriptionEnEdition] = useState("");
 
@@ -622,7 +624,10 @@ function BenevolesAdmin({ accessToken }) {
         {evenements.map((ev) => (
           <button
             key={ev.id}
-            onClick={() => setEvenementActifId(ev.id)}
+            onClick={() => {
+              setEvenementActifId(ev.id);
+              setAteliersAImprimer(null);
+            }}
             className={`px-3 py-1.5 rounded-full text-sm font-semibold ${
               evenementActifId === ev.id ? "bg-sou-blue text-white" : "bg-slate-100 text-slate-600"
             } ${!ev.actif ? "opacity-50" : ""}`}
@@ -679,10 +684,55 @@ function BenevolesAdmin({ accessToken }) {
                 Bénévoles inscrits
               </button>
             </div>
-            <button onClick={() => basculerActifEvenement(evenementActif)} className="text-sm text-slate-500 underline">
-              {evenementActif.actif ? "Désactiver l'événement" : "Réactiver l'événement"}
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setImpressionOuverte(!impressionOuverte)}
+                className="text-sm font-semibold text-sou-blue border border-sou-blue rounded-full px-3 py-1.5 hover:bg-sou-blue hover:text-white"
+              >
+                🖨️ Imprimer les feuilles d&apos;atelier
+              </button>
+              <button onClick={() => basculerActifEvenement(evenementActif)} className="text-sm text-slate-500 underline">
+                {evenementActif.actif ? "Désactiver l'événement" : "Réactiver l'événement"}
+              </button>
+            </div>
           </div>
+
+          {impressionOuverte && (() => {
+            const choisis = ateliersAImprimer || evenementActif.ateliers.map((a) => a.id);
+            const basculer = (id) =>
+              setAteliersAImprimer(choisis.includes(id) ? choisis.filter((x) => x !== id) : [...choisis, id]);
+            return (
+              <div className="print:hidden border-2 border-amber-300 bg-amber-50 rounded-xl p-4 text-sm space-y-3">
+                <p className="font-semibold text-slate-800">
+                  Impression des feuilles à afficher sur les ateliers
+                  <span className="block font-normal text-slate-600">
+                    Une page par atelier : horaires, cases remplies avec les inscrits, cases vides pour s&apos;inscrire sur place.
+                    Ce choix ne change rien à l&apos;affichage de l&apos;écran.
+                  </span>
+                </p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {evenementActif.ateliers.map((a) => (
+                    <label key={a.id} className="flex items-center gap-1.5">
+                      <input type="checkbox" checked={choisis.includes(a.id)} onChange={() => basculer(a.id)} />
+                      {a.nom}
+                    </label>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button onClick={() => setAteliersAImprimer(null)} className="text-xs underline text-slate-600">Tout cocher</button>
+                  <button onClick={() => setAteliersAImprimer([])} className="text-xs underline text-slate-600">Tout décocher</button>
+                  <button
+                    disabled={choisis.length === 0}
+                    onClick={() => imprimerFeuilles(evenementActif, evenementActif.ateliers.filter((a) => choisis.includes(a.id)))}
+                    className="bg-sou-blue text-white font-semibold px-4 py-2 rounded-full disabled:opacity-50"
+                  >
+                    Imprimer {choisis.length} feuille{choisis.length > 1 ? "s" : ""}
+                  </button>
+                  <button onClick={() => setImpressionOuverte(false)} className="text-slate-500">Fermer</button>
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="print:hidden">
             {editionDescription ? (
@@ -719,24 +769,10 @@ function BenevolesAdmin({ accessToken }) {
 
           {onglet === "planning" ? (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3 text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-                <label className="flex items-center gap-1.5">
-                  <input type="checkbox" checked={afficherNoms} onChange={(e) => setAfficherNoms(e.target.checked)} />
-                  Afficher les noms des inscrits
-                </label>
-                <span className="text-slate-300">|</span>
-                <span className="text-slate-600">Feuilles à afficher sur les ateliers :</span>
-                <select value={atelierFeuille} onChange={(e) => setAtelierFeuille(e.target.value)} className="border border-slate-300 rounded-lg px-2 py-1">
-                  <option value="">Tous les ateliers (une page par atelier)</option>
-                  {evenementActif.ateliers.map((a) => <option key={a.id} value={a.id}>{a.nom}</option>)}
-                </select>
-                <button
-                  onClick={() => imprimerFeuilles(evenementActif, atelierFeuille ? evenementActif.ateliers.filter((a) => a.id === atelierFeuille) : evenementActif.ateliers)}
-                  className="font-semibold text-sou-blue underline"
-                >
-                  Imprimer les feuilles
-                </button>
-              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" checked={afficherNoms} onChange={(e) => setAfficherNoms(e.target.checked)} />
+                Afficher à l&apos;écran les noms des inscrits sous chaque créneau
+              </label>
               {evenementActif.ateliers.map((atelier) => (
                 <AtelierBloc key={atelier.id} atelier={atelier} accessToken={accessToken} onChange={charger} afficherNoms={afficherNoms} />
               ))}
