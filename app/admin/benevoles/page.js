@@ -130,7 +130,79 @@ function suggestionProchainCreneau(creneaux) {
   return { debut: debut.toISOString(), fin: fin.toISOString(), places: dernier.places };
 }
 
-function AtelierBloc({ atelier, accessToken, onChange }) {
+// Événement ouvert par défaut : celui (actif) dont le prochain créneau est le
+// plus proche ; à défaut le premier actif, puis le premier tout court.
+function prochainEvenement(liste) {
+  const maintenant = Date.now() - 12 * 3600 * 1000; // la journée en cours compte encore
+  let meilleur = null;
+  let meilleurDebut = Infinity;
+  for (const ev of liste) {
+    if (!ev.actif) continue;
+    for (const a of ev.ateliers || []) {
+      for (const c of a.creneaux || []) {
+        const t = new Date(c.fin || c.debut).getTime();
+        if (t >= maintenant && t < meilleurDebut) {
+          meilleurDebut = t;
+          meilleur = ev;
+        }
+      }
+    }
+  }
+  return meilleur || liste.find((e) => e.actif) || liste[0] || null;
+}
+
+const echapper = (t) =>
+  String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+// Feuilles à afficher sur chaque atelier : une page par atelier, une ligne par
+// place, remplie avec le prénom et le nom de l'inscrit ou laissée vide pour
+// s'inscrire sur place. Jamais d'e-mail ni de téléphone (confidentiels).
+function imprimerFeuilles(evenement, ateliers) {
+  const pages = ateliers
+    .map((a) => {
+      const lignes = (a.creneaux || [])
+        .map((c) => {
+          const noms = c.noms || [];
+          const n = Math.max(c.places || 1, noms.length);
+          const horaire = `${c.nom ? `<strong>${echapper(c.nom)}</strong><br>` : ""}${echapper(formatCreneau(c.debut, c.fin))}`;
+          return Array.from({ length: n }, (_, k) =>
+            `<tr>${k === 0 ? `<td class="h" rowspan="${n}">${horaire}<br><span class="p">${noms.length}/${c.places} inscrit${noms.length > 1 ? "s" : ""}</span></td>` : ""}<td class="nom">${echapper(noms[k] || "")}</td></tr>`
+          ).join("");
+        })
+        .join("");
+      return `<section><h1>${echapper(a.nom)}</h1><h2>${echapper(evenement.nom)} — bénévoles</h2>
+<table><thead><tr><th class="h">Créneau</th><th>Prénom et nom</th></tr></thead><tbody>${lignes || `<tr><td colspan="2">Aucun créneau.</td></tr>`}</tbody></table>
+<p class="pied">Une case vide ? Inscrivez-vous en écrivant votre prénom et votre nom. Merci pour votre aide !</p></section>`;
+    })
+    .join("");
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${echapper(evenement.nom)} — feuilles bénévoles</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;color:#1e293b;margin:0}
+section{padding:12mm;page-break-after:always;break-after:page}
+section:last-child{page-break-after:auto;break-after:auto}
+h1{font-size:26px;color:#1F3864;margin:0 0 2px}
+h2{font-size:14px;color:#64748b;font-weight:normal;margin:0 0 12px}
+table{width:100%;border-collapse:collapse}
+th,td{border:1px solid #94a3b8;padding:6px 8px;font-size:14px;text-align:left;vertical-align:middle}
+th{background:#e2e8f0}
+td.h,th.h{width:34%}
+td.nom{height:30px}
+tr{page-break-inside:avoid;break-inside:avoid}
+.p{font-size:11px;color:#64748b}
+.pied{font-size:12px;color:#64748b;margin-top:10px}
+@page{size:A4;margin:8mm}
+</style></head><body>${pages}<script>window.onload=function(){window.print()}</script></body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) {
+    alert("Le navigateur a bloqué la nouvelle fenêtre : autorisez les fenêtres pop-up pour ce site, puis recommencez.");
+    return;
+  }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+function AtelierBloc({ atelier, accessToken, onChange, afficherNoms }) {
   const [nouveauCreneau, setNouveauCreneau] = useState(false);
   const [creneauEnEdition, setCreneauEnEdition] = useState(null);
   const [renommage, setRenommage] = useState(false);
@@ -248,10 +320,15 @@ function AtelierBloc({ atelier, accessToken, onChange }) {
               onCancel={() => setCreneauEnEdition(null)}
             />
           ) : (
-            <div key={c.id} className="flex items-center justify-between text-sm bg-white border border-slate-100 rounded-lg px-3 py-2">
+            <div key={c.id} className="flex flex-wrap items-center justify-between gap-x-3 text-sm bg-white border border-slate-100 rounded-lg px-3 py-2">
               <span>
                 {c.nom && <span className="font-medium">{c.nom} — </span>}
                 {formatCreneau(c.debut, c.fin)}
+                {afficherNoms && (
+                  <span className="block text-xs text-slate-600 mt-0.5">
+                    {(c.noms || []).length ? c.noms.join(", ") : <span className="text-slate-400 italic">personne pour l&apos;instant</span>}
+                  </span>
+                )}
               </span>
               <span className="text-slate-500">
                 {c.inscrits}/{c.places} inscrit{c.inscrits > 1 ? "s" : ""}
@@ -429,6 +506,8 @@ function BenevolesAdmin({ accessToken }) {
   const [nomEvenement, setNomEvenement] = useState("");
   const [descriptionEvenement, setDescriptionEvenement] = useState("");
   const [onglet, setOnglet] = useState("planning"); // planning | inscrits
+  const [afficherNoms, setAfficherNoms] = useState(false);
+  const [atelierFeuille, setAtelierFeuille] = useState(""); // "" = tous les ateliers
   const [editionDescription, setEditionDescription] = useState(false);
   const [descriptionEnEdition, setDescriptionEnEdition] = useState("");
 
@@ -439,7 +518,7 @@ function BenevolesAdmin({ accessToken }) {
     const data = await res.json();
     const liste = data.evenements || [];
     setEvenements(liste);
-    setEvenementActifId((courant) => courant || liste[0]?.id || null);
+    setEvenementActifId((courant) => courant || prochainEvenement(liste)?.id || null);
     setChargement(false);
   }, [accessToken]);
 
@@ -606,8 +685,26 @@ function BenevolesAdmin({ accessToken }) {
 
           {onglet === "planning" ? (
             <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3 text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                <label className="flex items-center gap-1.5">
+                  <input type="checkbox" checked={afficherNoms} onChange={(e) => setAfficherNoms(e.target.checked)} />
+                  Afficher les noms des inscrits
+                </label>
+                <span className="text-slate-300">|</span>
+                <span className="text-slate-600">Feuilles à afficher sur les ateliers :</span>
+                <select value={atelierFeuille} onChange={(e) => setAtelierFeuille(e.target.value)} className="border border-slate-300 rounded-lg px-2 py-1">
+                  <option value="">Tous les ateliers (une page par atelier)</option>
+                  {evenementActif.ateliers.map((a) => <option key={a.id} value={a.id}>{a.nom}</option>)}
+                </select>
+                <button
+                  onClick={() => imprimerFeuilles(evenementActif, atelierFeuille ? evenementActif.ateliers.filter((a) => a.id === atelierFeuille) : evenementActif.ateliers)}
+                  className="font-semibold text-sou-blue underline"
+                >
+                  Imprimer les feuilles
+                </button>
+              </div>
               {evenementActif.ateliers.map((atelier) => (
-                <AtelierBloc key={atelier.id} atelier={atelier} accessToken={accessToken} onChange={charger} />
+                <AtelierBloc key={atelier.id} atelier={atelier} accessToken={accessToken} onChange={charger} afficherNoms={afficherNoms} />
               ))}
               {!nouvelAtelier ? (
                 <button

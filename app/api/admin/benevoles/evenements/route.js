@@ -16,20 +16,24 @@ export async function GET(request) {
       auth.admin.from("benevolat_evenements").select("*").order("created_at", { ascending: false }),
       auth.admin.from("benevolat_ateliers").select("*").order("position").order("created_at"),
       auth.admin.from("benevolat_creneaux").select("*").order("debut"),
-      auth.admin.from("benevolat_inscriptions").select("creneau_id"),
+      // Prénom et nom seulement (affichage du planning, feuilles à afficher) :
+      // e-mail et téléphone restent dans l'onglet « Bénévoles inscrits ».
+      auth.admin.from("benevolat_inscriptions").select("creneau_id, first_name, last_name, created_at").order("created_at"),
     ]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const inscritsParCreneau = {};
+  const nomsParCreneau = {};
   for (const i of inscriptions || []) {
     inscritsParCreneau[i.creneau_id] = (inscritsParCreneau[i.creneau_id] || 0) + 1;
+    (nomsParCreneau[i.creneau_id] ||= []).push(`${i.first_name || ""} ${i.last_name || ""}`.trim());
   }
 
   const creneauxParAtelier = {};
   for (const c of creneaux || []) {
     if (!creneauxParAtelier[c.atelier_id]) creneauxParAtelier[c.atelier_id] = [];
-    creneauxParAtelier[c.atelier_id].push({ ...c, inscrits: inscritsParCreneau[c.id] || 0 });
+    creneauxParAtelier[c.atelier_id].push({ ...c, inscrits: inscritsParCreneau[c.id] || 0, noms: nomsParCreneau[c.id] || [] });
   }
 
   const ateliersParEvenement = {};
