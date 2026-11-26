@@ -174,12 +174,14 @@ function imprimerFeuilles(evenement, ateliers) {
       // Date(s) de l'atelier dans le titre, sauf si son nom la contient déjà.
       const jours = [...new Set(creneaux.map((c) => jourDe(c.debut)))];
       const dateTitre = jours.join(" et ");
-      const titre = jours.length && !jours.every((j) => sansAccent(a.nom).includes(sansAccent(j)))
-        ? `${echapper(a.nom)}<span class="date"> — ${echapper(dateTitre)}</span>`
-        : echapper(a.nom);
+      // Date(s) sous le titre, en plus petit, sauf si le nom de l'atelier la contient déjà.
+      const dateDejaDansNom = jours.length && jours.every((j) => sansAccent(a.nom).includes(sansAccent(j)));
+      const titre = echapper(a.nom);
       const plusieursJours = jours.length > 1;
       const nbCol = Math.min(MAX_COL, Math.max(1, ...creneaux.map((c) => Math.max(c.places || 1, (c.noms || []).length))));
-      const entete = `<tr><th class="h">Horaire</th>${Array.from({ length: nbCol }, (_, k) => `<th>Bénévole ${k + 1}</th>`).join("")}</tr>`;
+      // Le numéro du bénévole est écrit dans chaque case (et non en tête de
+      // colonne) : sur un créneau à plusieurs lignes, la case 11 dit « 11 ».
+      const entete = `<tr><th class="h">Horaire</th><th colspan="${nbCol}">Bénévoles (prénom et nom)</th></tr>`;
       const lignes = creneaux
         .map((c) => {
           const noms = c.noms || [];
@@ -189,14 +191,16 @@ function imprimerFeuilles(evenement, ateliers) {
           return Array.from({ length: nbLignes }, (_, r) => {
             const cases = Array.from({ length: nbCol }, (_, k) => {
               const i = r * nbCol + k;
-              return i < places ? `<td class="case">${echapper(noms[i] || "")}</td>` : `<td class="sans"></td>`;
+              return i < places
+                ? `<td class="case"><span class="num">Bénévole ${i + 1}</span>${echapper(noms[i] || "")}</td>`
+                : `<td class="sans"></td>`;
             }).join("");
             const tete = r === 0 ? `<td class="h" rowspan="${nbLignes}">${horaire}</td>` : "";
             return `<tr class="${r === nbLignes - 1 ? "fin" : ""}">${tete}${cases}</tr>`;
           }).join("");
         })
         .join("");
-      return `<section><div class="titre">${titre}</div><div class="sous">${echapper(evenement.nom)} — planning des bénévoles</div>
+      return `<section><div class="titre">${titre}</div><div class="sous">${dateTitre && !dateDejaDansNom ? `<span class="date">${echapper(dateTitre.charAt(0).toUpperCase() + dateTitre.slice(1))}</span> · ` : ""}${echapper(evenement.nom)} — planning des bénévoles</div>
 <table><thead>${entete}</thead><tbody>${lignes || `<tr><td>Aucun créneau.</td></tr>`}</tbody></table>
 <p class="pied">Une case blanche vide ? Inscrivez-vous en écrivant votre prénom et votre nom. Les cases grisées ne sont pas à remplir. Merci pour votre aide !</p></section>`;
     })
@@ -208,7 +212,7 @@ body{font-family:Arial,Helvetica,sans-serif;color:#1e293b;margin:0}
 section{page-break-after:always;break-after:page}
 section:last-child{page-break-after:auto;break-after:auto}
 .titre{font-size:34px;font-weight:bold;color:#1F3864;text-align:center;text-transform:uppercase;letter-spacing:1px;border-bottom:4px solid #1F3864;padding-bottom:6px;margin-bottom:4px}
-.date{color:#b45309}
+.date{color:#b45309;font-weight:bold;font-size:20px}
 .sous{font-size:14px;color:#64748b;text-align:center;margin-bottom:12px}
 table{width:100%;border-collapse:collapse;table-layout:fixed}
 th,td{border:1.5px solid #475569;padding:6px;font-size:13px;text-align:center;vertical-align:middle;word-wrap:break-word}
@@ -217,7 +221,8 @@ th.h,td.h{width:150px;text-align:left;background:#f1f5f9}
 th.h{background:#1F3864}
 .heure{font-size:15px;font-weight:bold}
 .tache{font-size:11px;color:#475569}
-td.case{height:52px;font-size:14px;font-weight:bold}
+td.case{height:56px;font-size:14px;font-weight:bold;position:relative;padding-top:16px}
+.num{position:absolute;top:2px;left:4px;font-size:9px;font-weight:normal;color:#94a3b8}
 td.sans{background:repeating-linear-gradient(45deg,#e2e8f0,#e2e8f0 4px,#f8fafc 4px,#f8fafc 8px)}
 tr{page-break-inside:avoid;break-inside:avoid}
 tr.fin td{border-bottom:3px solid #1F3864}
