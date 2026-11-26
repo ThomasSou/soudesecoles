@@ -154,43 +154,55 @@ function prochainEvenement(liste) {
 const echapper = (t) =>
   String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-// Feuilles à afficher sur chaque atelier : une page par atelier, une ligne par
-// place, remplie avec le prénom et le nom de l'inscrit ou laissée vide pour
-// s'inscrire sur place. Jamais d'e-mail ni de téléphone (confidentiels).
+// Feuilles à afficher sur chaque atelier : une page par atelier, son nom en
+// gros en tête ; une ligne par créneau, une colonne par bénévole nécessaire
+// (3 places = 3 colonnes « Bénévole 1, 2, 3 »). Case remplie avec le prénom et
+// le nom de l'inscrit, ou vide pour s'inscrire sur place. Les places qui
+// n'existent pas sur un créneau plus court sont grisées. Jamais d'e-mail ni de
+// téléphone (confidentiels).
 function imprimerFeuilles(evenement, ateliers) {
   const pages = ateliers
     .map((a) => {
-      const lignes = (a.creneaux || [])
+      const creneaux = a.creneaux || [];
+      const nbCol = Math.max(1, ...creneaux.map((c) => Math.max(c.places || 1, (c.noms || []).length)));
+      const entete = `<tr><th class="h">Horaire</th>${Array.from({ length: nbCol }, (_, k) => `<th>Bénévole ${k + 1}</th>`).join("")}</tr>`;
+      const lignes = creneaux
         .map((c) => {
           const noms = c.noms || [];
-          const n = Math.max(c.places || 1, noms.length);
-          const horaire = `${c.nom ? `<strong>${echapper(c.nom)}</strong><br>` : ""}${echapper(formatCreneau(c.debut, c.fin))}`;
-          return Array.from({ length: n }, (_, k) =>
-            `<tr>${k === 0 ? `<td class="h" rowspan="${n}">${horaire}<br><span class="p">${noms.length}/${c.places} inscrit${noms.length > 1 ? "s" : ""}</span></td>` : ""}<td class="nom">${echapper(noms[k] || "")}</td></tr>`
+          const places = Math.max(c.places || 1, noms.length);
+          const horaire = `<span class="heure">${echapper(formatCreneau(c.debut, c.fin))}</span>${c.nom ? `<br><span class="tache">${echapper(c.nom)}</span>` : ""}`;
+          const cases = Array.from({ length: nbCol }, (_, k) =>
+            k < places ? `<td class="case">${echapper(noms[k] || "")}</td>` : `<td class="sans"></td>`
           ).join("");
+          return `<tr><td class="h">${horaire}</td>${cases}</tr>`;
         })
         .join("");
-      return `<section><h1>${echapper(a.nom)}</h1><h2>${echapper(evenement.nom)} — bénévoles</h2>
-<table><thead><tr><th class="h">Créneau</th><th>Prénom et nom</th></tr></thead><tbody>${lignes || `<tr><td colspan="2">Aucun créneau.</td></tr>`}</tbody></table>
-<p class="pied">Une case vide ? Inscrivez-vous en écrivant votre prénom et votre nom. Merci pour votre aide !</p></section>`;
+      return `<section><div class="titre">${echapper(a.nom)}</div><div class="sous">${echapper(evenement.nom)} — planning des bénévoles</div>
+<table><thead>${entete}</thead><tbody>${lignes || `<tr><td>Aucun créneau.</td></tr>`}</tbody></table>
+<p class="pied">Une case blanche vide ? Inscrivez-vous en écrivant votre prénom et votre nom. Les cases grisées ne sont pas à remplir. Merci pour votre aide !</p></section>`;
     })
     .join("");
   const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${echapper(evenement.nom)} — feuilles bénévoles</title>
 <style>
+@page{size:A4 landscape;margin:8mm}
 body{font-family:Arial,Helvetica,sans-serif;color:#1e293b;margin:0}
-section{padding:12mm;page-break-after:always;break-after:page}
+section{page-break-after:always;break-after:page}
 section:last-child{page-break-after:auto;break-after:auto}
-h1{font-size:26px;color:#1F3864;margin:0 0 2px}
-h2{font-size:14px;color:#64748b;font-weight:normal;margin:0 0 12px}
-table{width:100%;border-collapse:collapse}
-th,td{border:1px solid #94a3b8;padding:6px 8px;font-size:14px;text-align:left;vertical-align:middle}
-th{background:#e2e8f0}
-td.h,th.h{width:34%}
-td.nom{height:30px}
+.titre{font-size:40px;font-weight:bold;color:#1F3864;text-align:center;text-transform:uppercase;letter-spacing:1px;border-bottom:4px solid #1F3864;padding-bottom:6px;margin-bottom:4px}
+.sous{font-size:14px;color:#64748b;text-align:center;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+th,td{border:1.5px solid #475569;padding:6px;font-size:13px;text-align:center;vertical-align:middle;word-wrap:break-word}
+th{background:#1F3864;color:#fff;font-size:13px}
+th.h,td.h{width:150px;text-align:left;background:#f1f5f9}
+th.h{background:#1F3864}
+.heure{font-size:15px;font-weight:bold}
+.tache{font-size:11px;color:#475569}
+td.case{height:52px;font-size:14px;font-weight:bold}
+td.sans{background:repeating-linear-gradient(45deg,#e2e8f0,#e2e8f0 4px,#f8fafc 4px,#f8fafc 8px)}
 tr{page-break-inside:avoid;break-inside:avoid}
-.p{font-size:11px;color:#64748b}
-.pied{font-size:12px;color:#64748b;margin-top:10px}
-@page{size:A4;margin:8mm}
+thead{display:table-header-group}
+.pied{font-size:12px;color:#64748b;margin-top:8px}
+*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 </style></head><body>${pages}<script>window.onload=function(){window.print()}</script></body></html>`;
   const w = window.open("", "_blank");
   if (!w) {
