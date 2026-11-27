@@ -584,7 +584,7 @@ function TicketsNominatifs({ commandesPayees, nomBoutiqueChoisie }) {
         Tickets nominatifs à remettre aux acheteurs
         <span className="block font-normal text-slate-600">
           Commandes payées de la boutique choisie au-dessus. Un ticket par unité achetée (3 tartiflettes = 3 tickets, « 3 tours » de biathlon = 3 tickets), 12 par page.
-          Les sapins portent la couleur de leur taille, la même que les étiquettes des sapins.
+          Les sapins portent la couleur de leur taille, la même que les étiquettes des sapins. Pleine page, sans bordure extérieure : seules les lignes de découpe intérieures sont tracées. Si l'adresse du site ou la date apparaissent quand même en haut ou en bas, dans la fenêtre d'impression mettez « Marges : aucune » et décochez « En-têtes et pieds de page ».
         </span>
       </p>
       <div className="flex flex-wrap gap-x-4 gap-y-1">
