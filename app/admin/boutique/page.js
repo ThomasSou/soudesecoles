@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { genererTickets, pageTicketsHtml } from "../../lib/ticketsNominatifs";
+import { genererTickets, modeleTicket, pageTicketsHtml } from "../../lib/ticketsNominatifs";
 import AdminShell from "../admin-shell";
 
 const VIDE_PRODUIT = {
@@ -546,8 +546,20 @@ td.nom,td.tel{background:#f8fafc}
 
 // Tickets nominatifs à remettre aux acheteurs (12 par page), un par unité
 // achetée, avec le visuel du produit ; sapins aux couleurs des étiquettes.
-function TicketsNominatifs({ commandesPayees, nomBoutiqueChoisie }) {
+function TicketsNominatifs({ commandesPayees, nomBoutiqueChoisie, boutiqueId, accessToken }) {
   const [ouvert, setOuvert] = useState(false);
+  // "nominatifs" : depuis les commandes payées ; "libres" : vente sur place,
+  // sans nom, quantités saisies à la main produit par produit.
+  const [mode, setMode] = useState("nominatifs");
+  const [catalogue, setCatalogue] = useState([]);
+  const [quantites, setQuantites] = useState({});
+  useEffect(() => {
+    if (!ouvert || mode !== "libres" || !boutiqueId || boutiqueId === "tous" || boutiqueId === "autres") return;
+    fetch(`/api/admin/boutique/produits?boutiqueId=${boutiqueId}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then((r) => r.json())
+      .then((d) => setCatalogue((d.products || []).map((p) => p.name).sort((a, b) => a.localeCompare(b, "fr"))))
+      .catch(() => setCatalogue([]));
+  }, [ouvert, mode, boutiqueId, accessToken]);
   const [exclus, setExclus] = useState([]);
   const [ordre, setOrdre] = useState("produit");
   const produits = (() => {
@@ -556,7 +568,15 @@ function TicketsNominatifs({ commandesPayees, nomBoutiqueChoisie }) {
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "fr"));
   })();
   const choisis = produits.map(([n]) => n).filter((n) => !exclus.includes(n));
-  const tickets = ouvert ? genererTickets(commandesPayees, choisis, ordre) : [];
+  const ticketsLibres = Object.entries(quantites)
+    .filter(([, q]) => Number(q) > 0)
+    .sort(([a], [b]) => a.localeCompare(b, "fr"))
+    .flatMap(([nom, q]) => {
+      const m = modeleTicket({ name: nom, qty: 1 });
+      return Array.from({ length: Number(q) * m.nombre }, () => ({ ...m, acheteur: "Nom : ………………………" }));
+    })
+    .sort((a, b) => (a.groupe || "").localeCompare(b.groupe || "", "fr"));
+  const tickets = !ouvert ? [] : mode === "libres" ? ticketsLibres : genererTickets(commandesPayees, choisis, ordre);
 
   function imprimer() {
     const html = pageTicketsHtml(tickets, window.location.origin, `Tickets — ${nomBoutiqueChoisie || "boutique"}`);
@@ -573,7 +593,7 @@ function TicketsNominatifs({ commandesPayees, nomBoutiqueChoisie }) {
   if (!ouvert) {
     return (
       <button onClick={() => setOuvert(true)} className="text-sm font-semibold text-sou-blue border border-sou-blue rounded-full px-3 py-1.5 hover:bg-sou-blue hover:text-white">
-        🎟️ Tickets nominatifs
+        🎟️ Tickets (nominatifs ou vente sur place)
       </button>
     );
   }
@@ -587,6 +607,28 @@ function TicketsNominatifs({ commandesPayees, nomBoutiqueChoisie }) {
           Les sapins portent la couleur de leur taille, la même que les étiquettes des sapins. Pleine page, sans bordure extérieure : seules les lignes de découpe intérieures sont tracées. Si l'adresse du site ou la date apparaissent quand même en haut ou en bas, dans la fenêtre d'impression mettez « Marges : aucune » et décochez « En-têtes et pieds de page ».
         </span>
       </p>
+      <div className="flex gap-2">
+        {[["nominatifs", "Nominatifs (commandes en ligne)"], ["libres", "Non nominatifs (vente sur place)"]].map(([k, l]) => (
+          <button key={k} onClick={() => setMode(k)} className={`px-3 py-1.5 rounded-full text-xs font-semibold ${mode === k ? "bg-sou-blue text-white" : "bg-white text-slate-600 border border-slate-300"}`}>{l}</button>
+        ))}
+      </div>
+      {mode === "libres" ? (
+        <div className="space-y-2">
+          <p className="text-slate-600">Indiquez le nombre de tickets voulus par produit. Une ligne « Nom : …… » remplace le nom de l&apos;acheteur.</p>
+          {!boutiqueId || boutiqueId === "tous" || boutiqueId === "autres" ? (
+            <p className="text-amber-700">Choisissez d&apos;abord une boutique précise dans le menu au-dessus.</p>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1">
+              {catalogue.map((n) => (
+                <label key={n} className="flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1">
+                  <span>{n}</span>
+                  <input type="number" min="0" value={quantites[n] ?? ""} onChange={(e) => setQuantites({ ...quantites, [n]: e.target.value })} className="w-16 border border-slate-300 rounded px-1 py-0.5 text-right" />
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         {produits.map(([n, q]) => (
           <label key={n} className="flex items-center gap-1.5">
@@ -595,13 +637,17 @@ function TicketsNominatifs({ commandesPayees, nomBoutiqueChoisie }) {
           </label>
         ))}
       </div>
+      )}
       <div className="flex flex-wrap items-center gap-3">
+        {mode === "nominatifs" && (<>
         <button onClick={() => setExclus([])} className="text-xs underline text-slate-600">Tout cocher</button>
         <button onClick={() => setExclus(produits.map(([n]) => n))} className="text-xs underline text-slate-600">Tout décocher</button>
-        <select value={ordre} onChange={(e) => setOrdre(e.target.value)} className="border border-slate-300 rounded-lg px-2 py-1">
+        </>)}
+        {mode === "libres" && <button onClick={() => setQuantites({})} className="text-xs underline text-slate-600">Tout remettre à zéro</button>}
+        {mode === "nominatifs" && <select value={ordre} onChange={(e) => setOrdre(e.target.value)} className="border border-slate-300 rounded-lg px-2 py-1">
           <option value="produit">Classer par produit (un paquet par stand)</option>
           <option value="acheteur">Classer par acheteur (tous ses tickets ensemble)</option>
-        </select>
+        </select>}
         <span className="text-slate-600">{tickets.length} ticket{tickets.length > 1 ? "s" : ""} · {pages} page{pages > 1 ? "s" : ""}</span>
         <button disabled={!tickets.length} onClick={imprimer} className="bg-sou-blue text-white font-semibold px-4 py-2 rounded-full disabled:opacity-50">Imprimer les tickets</button>
         <button onClick={() => setOuvert(false)} className="text-slate-500">Fermer</button>
@@ -1307,6 +1353,8 @@ function BoutiqueAdmin({ accessToken }) {
             />
             <TicketsNominatifs
               commandesPayees={commandesPayees}
+              boutiqueId={filtreCommandes}
+              accessToken={accessToken}
               nomBoutiqueChoisie={filtreCommandes === "tous" ? "toutes boutiques" : nomBoutique(filtreCommandes)}
             />
           </div>
