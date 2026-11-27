@@ -109,8 +109,20 @@ export function rappelEvenement({ nom, evenement }) {
 // --- 3. E-mail mensuel aux familles ---------------------------------------
 const ORDRE_NIVEAU = { or: 1, argent: 2, bronze: 3 };
 
+const LIBELLE_NIVEAU = { 1: "Or", 2: "Argent", 3: "Bronze" };
+
+// Tirage au sort reproductible pour un mois donné : le même partenaire ne se
+// retrouve pas toujours en tête, mais l'aperçu et l'envoi d'un même mois
+// donnent le même ordre.
+function tirageDuMois(mois, partenaireId) {
+  let h = 2166136261;
+  for (const ch of `${mois}:${partenaireId}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return h >>> 0;
+}
+
 // Messages validés du mois, dans l'ordre Or -> Argent -> Bronze ; à niveau
-// égal, le partenaire publié le moins récemment passe en premier (rotation).
+// égal, le partenaire publié le moins récemment passe en premier (rotation),
+// puis tirage au sort du mois en cas d'égalité.
 async function messagesValidesDuMois(admin, mois) {
   const { data: messages } = await admin
     .from("partenaire_messages")
@@ -143,9 +155,10 @@ async function messagesValidesDuMois(admin, mois) {
         partenaireNom: p?.nom || "Partenaire",
         rang: ORDRE_NIVEAU[periodeCourante?.niveau] || 9,
         derniere: dernierePub[m.partenaire_id] || "",
+        tirage: tirageDuMois(mois, m.partenaire_id),
       };
     })
-    .sort((a, b) => a.rang - b.rang || a.derniere.localeCompare(b.derniere) || (a.valide_le || "").localeCompare(b.valide_le || ""));
+    .sort((a, b) => a.rang - b.rang || a.derniere.localeCompare(b.derniere) || a.tirage - b.tirage);
 }
 
 // Image du message rendue accessible depuis n'importe quel client mail : copie
@@ -210,8 +223,16 @@ export async function construireNewsletter(admin, mois, { copierImages = false, 
     size: "md",
     color: null,
   });
+  let rangCourant = null;
   for (const m of messages) {
-    blocs.push({ id: id(), type: "divider" });
+    // Un titre par niveau : « Nos partenaires Or », puis Argent, puis Bronze.
+    if (!estExemple && m.rang !== rangCourant && LIBELLE_NIVEAU[m.rang]) {
+      rangCourant = m.rang;
+      blocs.push({ id: id(), type: "divider" });
+      blocs.push({ id: id(), type: "heading", text: `Messages de nos partenaires ${LIBELLE_NIVEAU[m.rang]}`, size: "lg", color: BLUE });
+    } else {
+      blocs.push({ id: id(), type: "divider" });
+    }
     blocs.push({ id: id(), type: "heading", text: m.partenaireNom, size: "sm", color: GOLD });
     blocs.push({ id: id(), type: "heading", text: m.titre, size: "md", color: null });
     blocs.push({ id: id(), type: "paragraph", text: m.texte, size: "md", color: null });
