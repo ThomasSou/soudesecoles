@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { genererTickets, pageTicketsHtml } from "../../lib/ticketsNominatifs";
 import AdminShell from "../admin-shell";
 
 const VIDE_PRODUIT = {
@@ -511,7 +512,7 @@ td.nom,td.tel{background:#f8fafc}
   }
   const nb = lignes().length;
   return (
-    <div className="border-2 border-amber-300 bg-amber-50 rounded-xl p-4 text-sm space-y-3">
+    <div className="w-full border-2 border-amber-300 bg-amber-50 rounded-xl p-4 text-sm space-y-3">
       <p className="font-semibold text-slate-800">
         Feuille de retrait par acheteur
         <span className="block font-normal text-slate-600">
@@ -537,6 +538,72 @@ td.nom,td.tel{background:#f8fafc}
         <span className="text-slate-600">{nb} acheteur{nb > 1 ? "s" : ""} concerné{nb > 1 ? "s" : ""}</span>
         <button disabled={!nb} onClick={imprimer} className="bg-sou-blue text-white font-semibold px-4 py-2 rounded-full disabled:opacity-50">Imprimer</button>
         <button disabled={!nb} onClick={exporterCsv} className="font-semibold text-sou-blue underline disabled:opacity-50">Exporter pour Excel</button>
+        <button onClick={() => setOuvert(false)} className="text-slate-500">Fermer</button>
+      </div>
+    </div>
+  );
+}
+
+// Tickets nominatifs à remettre aux acheteurs (12 par page), un par unité
+// achetée, avec le visuel du produit ; sapins aux couleurs des étiquettes.
+function TicketsNominatifs({ commandesPayees, nomBoutiqueChoisie }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [exclus, setExclus] = useState([]);
+  const [ordre, setOrdre] = useState("produit");
+  const produits = (() => {
+    const m = new Map();
+    for (const c of commandesPayees) for (const it of c.items || []) m.set(it.name, (m.get(it.name) || 0) + (Number(it.qty) || 0));
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "fr"));
+  })();
+  const choisis = produits.map(([n]) => n).filter((n) => !exclus.includes(n));
+  const tickets = ouvert ? genererTickets(commandesPayees, choisis, ordre) : [];
+
+  function imprimer() {
+    const html = pageTicketsHtml(tickets, window.location.origin, `Tickets — ${nomBoutiqueChoisie || "boutique"}`);
+    const w = window.open("", "_blank");
+    if (!w) {
+      alert("Le navigateur a bloqué la nouvelle fenêtre : autorisez les fenêtres pop-up pour ce site, puis recommencez.");
+      return;
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  }
+
+  if (!ouvert) {
+    return (
+      <button onClick={() => setOuvert(true)} className="text-sm font-semibold text-sou-blue border border-sou-blue rounded-full px-3 py-1.5 hover:bg-sou-blue hover:text-white">
+        🎟️ Tickets nominatifs
+      </button>
+    );
+  }
+  const pages = Math.ceil(tickets.length / 12);
+  return (
+    <div className="w-full border-2 border-emerald-300 bg-emerald-50 rounded-xl p-4 text-sm space-y-3">
+      <p className="font-semibold text-slate-800">
+        Tickets nominatifs à remettre aux acheteurs
+        <span className="block font-normal text-slate-600">
+          Commandes payées de la boutique choisie au-dessus. Un ticket par unité achetée (3 tartiflettes = 3 tickets, « 3 tours » de biathlon = 3 tickets), 12 par page.
+          Les sapins portent la couleur de leur taille, la même que les étiquettes des sapins.
+        </span>
+      </p>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {produits.map(([n, q]) => (
+          <label key={n} className="flex items-center gap-1.5">
+            <input type="checkbox" checked={!exclus.includes(n)} onChange={() => setExclus(exclus.includes(n) ? exclus.filter((x) => x !== n) : [...exclus, n])} />
+            {n} <span className="text-slate-400">({q})</span>
+          </label>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <button onClick={() => setExclus([])} className="text-xs underline text-slate-600">Tout cocher</button>
+        <button onClick={() => setExclus(produits.map(([n]) => n))} className="text-xs underline text-slate-600">Tout décocher</button>
+        <select value={ordre} onChange={(e) => setOrdre(e.target.value)} className="border border-slate-300 rounded-lg px-2 py-1">
+          <option value="produit">Classer par produit (un paquet par stand)</option>
+          <option value="acheteur">Classer par acheteur (tous ses tickets ensemble)</option>
+        </select>
+        <span className="text-slate-600">{tickets.length} ticket{tickets.length > 1 ? "s" : ""} · {pages} page{pages > 1 ? "s" : ""}</span>
+        <button disabled={!tickets.length} onClick={imprimer} className="bg-sou-blue text-white font-semibold px-4 py-2 rounded-full disabled:opacity-50">Imprimer les tickets</button>
         <button onClick={() => setOuvert(false)} className="text-slate-500">Fermer</button>
       </div>
     </div>
@@ -1233,10 +1300,16 @@ function BoutiqueAdmin({ accessToken }) {
               <option value="acheteur">Trier : par acheteur</option>
             </select>
           </div>
-          <FeuilleRetrait
-            commandesPayees={commandesPayees}
-            nomBoutiqueChoisie={filtreCommandes === "tous" ? "toutes boutiques" : nomBoutique(filtreCommandes)}
-          />
+          <div className="flex flex-wrap items-start gap-3">
+            <FeuilleRetrait
+              commandesPayees={commandesPayees}
+              nomBoutiqueChoisie={filtreCommandes === "tous" ? "toutes boutiques" : nomBoutique(filtreCommandes)}
+            />
+            <TicketsNominatifs
+              commandesPayees={commandesPayees}
+              nomBoutiqueChoisie={filtreCommandes === "tous" ? "toutes boutiques" : nomBoutique(filtreCommandes)}
+            />
+          </div>
           <div className="flex flex-wrap gap-3">
             <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2">
               <p className="text-xs text-green-700">Total encaissé (commandes payées)</p>
