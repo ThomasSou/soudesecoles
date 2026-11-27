@@ -110,20 +110,23 @@ export function pageTicketsHtml(tickets, origine, titre) {
   for (let i = 0; i < tickets.length; i += 12) {
     pages.push(`<div class="page">${tickets.slice(i, i + 12).map((t) => ticketHtml(t, origine)).join("")}</div>`);
   }
-  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${esc(titre)}</title><style>
-@page{size:A4 portrait;margin:6mm}
-body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#1e293b}
-.page{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(4,1fr);height:284mm;page-break-after:always;break-after:page}
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title> </title><style>
+@page{size:210mm 297mm;margin:0}
+html,body{margin:0;padding:0}
+body{font-family:Arial,Helvetica,sans-serif;color:#1e293b}
+.page{display:grid;grid-template-columns:repeat(3,70mm);grid-template-rows:repeat(4,74.25mm);width:210mm;height:297mm;overflow:hidden;page-break-after:always;break-after:page}
 .page:last-child{page-break-after:auto;break-after:auto}
-.t{border:1px dashed #94a3b8;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:3mm 2mm;text-align:center;overflow:hidden}
-.titre{font-weight:bold;font-size:13px;line-height:1.25;letter-spacing:.3px}
+.t{box-sizing:border-box;border-right:1px dashed #94a3b8;border-bottom:1px dashed #94a3b8;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6mm 4mm 5mm;text-align:center;overflow:hidden}
+.t:nth-child(3n){border-right:none}
+.t:nth-child(n+10){border-bottom:none}
+.titre{font-weight:bold;font-size:14px;line-height:1.25;letter-spacing:.3px}
 .produit{font-size:14px;margin-top:2px;text-transform:none}
 .extra{font-size:10px;font-weight:bold;color:#b45309;margin-top:1px}
-.photo{max-width:92%;max-height:34mm;object-fit:contain;border-radius:4px}
-.motif{font-size:48px;line-height:1}
-.nom{font-weight:bold;font-size:14px}
+.photo{max-width:92%;max-height:38mm;object-fit:contain;border-radius:4px}
+.motif{font-size:56px;line-height:1}
+.nom{font-weight:bold;font-size:15px}
 .taille{font-weight:bold;font-size:22px;padding:1mm 4mm;border-radius:2px}
-.sapin{max-height:42mm;max-width:80%;object-fit:contain}
+.sapin{max-height:46mm;max-width:80%;object-fit:contain}
 *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 </style></head><body>${pages.join("")}<script>window.onload=function(){window.print()}</script></body></html>`;
 }
