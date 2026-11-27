@@ -400,6 +400,12 @@ function boutiqueParDefaut(liste) {
 const echapperHtml = (t) =>
   String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+// « 0674038140 » ou « 06.74.03.81.40 » -> « 06 74 03 81 40 » ; autre format laissé tel quel.
+function formaterTel(t) {
+  const chiffres = String(t || "").replace(/\D/g, "").replace(/^33(?=\d{9}$)/, "0");
+  return /^0\d{9}$/.test(chiffres) ? chiffres.replace(/(\d{2})(?=\d)/g, "$1 ") : String(t || "");
+}
+
 function FeuilleRetrait({ commandesPayees, nomBoutiqueChoisie }) {
   const [ouvert, setOuvert] = useState(false);
   const [titre, setTitre] = useState("");
@@ -436,8 +442,19 @@ function FeuilleRetrait({ commandesPayees, nomBoutiqueChoisie }) {
   function imprimer() {
     const ls = lignes();
     const totaux = choisis.map((n) => `${produits.find((p) => p[0] === n)?.[1] || 0} × ${n}`).join(" · ");
+    // Une ligne par produit, chacune avec sa case : un acheteur peut prendre
+    // sa tartiflette sans sa poutine. Nom et téléphone sont fusionnés sur ses lignes.
     const corps = ls
-      .map((l) => `<tr><td class="nom"><strong>${echapperHtml(l.nom)}</strong> ${echapperHtml(l.prenom)}</td><td class="tel">${echapperHtml(l.tel)}</td><td>${l.achats.map(echapperHtml).join("<br>")}</td><td class="ok"><span class="box"></span></td></tr>`)
+      .map((l) =>
+        l.achats
+          .map((a, k) => {
+            const tete = k === 0
+              ? `<td class="nom" rowspan="${l.achats.length}"><strong>${echapperHtml(l.nom)}</strong> ${echapperHtml(l.prenom)}</td><td class="tel" rowspan="${l.achats.length}">${echapperHtml(formaterTel(l.tel))}</td>`
+              : "";
+            return `<tr class="${k === 0 ? "premier" : ""}">${tete}<td>${echapperHtml(a)}</td><td class="ok"><span class="box"></span></td></tr>`;
+          })
+          .join("")
+      )
       .join("");
     const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${echapperHtml(titreFinal)}</title><style>
 @page{size:A4;margin:10mm}
@@ -445,12 +462,14 @@ body{font-family:Arial,Helvetica,sans-serif;color:#1e293b;margin:0}
 h1{font-size:26px;color:#1F3864;margin:0 0 4px;text-align:center;text-transform:uppercase}
 .sous{text-align:center;color:#64748b;font-size:12px;margin-bottom:10px}
 table{width:100%;border-collapse:collapse}
-th,td{border:1px solid #475569;padding:6px;font-size:13px;vertical-align:middle;text-align:left}
+th,td{border:1.5px solid #475569;padding:6px;font-size:13px;vertical-align:middle;text-align:left}
 th{background:#1F3864;color:#fff}
 td.nom{width:28%}td.tel{width:18%;white-space:nowrap}td.ok{width:12%;text-align:center}
 .box{display:inline-block;width:20px;height:20px;border:2px solid #1e293b;border-radius:3px}
 tr{page-break-inside:avoid;break-inside:avoid}thead{display:table-header-group}
-tbody tr:nth-child(even) td{background:#f1f5f9}
+tr.premier td{border-top:3px solid #1F3864}
+table{border-bottom:3px solid #1F3864}
+td.nom,td.tel{background:#f8fafc}
 *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 </style></head><body><h1>${echapperHtml(titreFinal)}</h1>
 <div class="sous">${ls.length} acheteur${ls.length > 1 ? "s" : ""} · commandes payées · ${echapperHtml(totaux)}</div>
@@ -469,7 +488,10 @@ tbody tr:nth-child(even) td{background:#f1f5f9}
   function exporterCsv() {
     const ls = lignes();
     // Le téléphone est précédé d'une apostrophe-guillemet pour qu'Excel garde le 0 initial.
-    const tab = [["Nom", "Prénom", "Téléphone", "À remettre", "Récupéré"], ...ls.map((l) => [l.nom, l.prenom, l.tel ? `="${l.tel}"` : "", l.achats.join(" + "), ""])];
+    const tab = [
+      ["Nom", "Prénom", "Téléphone", "À remettre", "Récupéré"],
+      ...ls.flatMap((l) => l.achats.map((a) => [l.nom, l.prenom, l.tel ? `="${formaterTel(l.tel)}"` : "", a, ""])),
+    ];
     const csv = tab.map((r) => r.map((v) => (String(v).startsWith('="') ? v : `"${String(v).replace(/"/g, '""')}"`)).join(";")).join("\n");
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
