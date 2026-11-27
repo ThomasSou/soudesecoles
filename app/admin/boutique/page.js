@@ -393,6 +393,134 @@ function boutiqueParDefaut(liste) {
   return (enCours[0] || liste[0])?.id || null;
 }
 
+// Feuille de retrait : un tableau par acheteur (commandes payées), avec ses
+// achats, son téléphone et une case « récupéré ». On choisit les produits à
+// y faire figurer : une feuille pour la buvette, une autre pour le stand du
+// Sou… L'e-mail n'y figure jamais.
+const echapperHtml = (t) =>
+  String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+function FeuilleRetrait({ commandesPayees, nomBoutiqueChoisie }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [titre, setTitre] = useState("");
+  const [exclus, setExclus] = useState([]); // produits décochés
+  const produits = (() => {
+    const m = new Map();
+    for (const c of commandesPayees) for (const it of c.items || []) m.set(it.name, (m.get(it.name) || 0) + (Number(it.qty) || 0));
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "fr"));
+  })();
+  const choisis = produits.map(([n]) => n).filter((n) => !exclus.includes(n));
+
+  // Regroupe par acheteur (même e-mail, sinon même nom) les produits choisis.
+  function lignes() {
+    const parAcheteur = new Map();
+    for (const c of commandesPayees) {
+      const items = (c.items || []).filter((it) => choisis.includes(it.name));
+      if (!items.length) continue;
+      const cle = (c.buyer_email || `${c.buyer_first_name} ${c.buyer_last_name}`).trim().toLowerCase();
+      const g = parAcheteur.get(cle) || { nom: (c.buyer_last_name || "").toUpperCase(), prenom: c.buyer_first_name || "", tel: "", achats: new Map() };
+      if (!g.tel && c.buyer_phone) g.tel = c.buyer_phone;
+      for (const it of items) {
+        const opt = Array.isArray(it.options) && it.options.length ? ` (${it.options.map((o) => `${o.label} : ${o.value}`).join(", ")})` : "";
+        const k = `${it.name}${opt}`;
+        g.achats.set(k, (g.achats.get(k) || 0) + (Number(it.qty) || 0));
+      }
+      parAcheteur.set(cle, g);
+    }
+    return [...parAcheteur.values()]
+      .map((g) => ({ ...g, achats: [...g.achats.entries()].map(([k, q]) => `${q} × ${k}`) }))
+      .sort((a, b) => a.nom.localeCompare(b.nom, "fr") || a.prenom.localeCompare(b.prenom, "fr"));
+  }
+  const titreFinal = titre.trim() || `Retraits — ${nomBoutiqueChoisie || "boutique"}`;
+
+  function imprimer() {
+    const ls = lignes();
+    const totaux = choisis.map((n) => `${produits.find((p) => p[0] === n)?.[1] || 0} × ${n}`).join(" · ");
+    const corps = ls
+      .map((l) => `<tr><td class="nom"><strong>${echapperHtml(l.nom)}</strong> ${echapperHtml(l.prenom)}</td><td class="tel">${echapperHtml(l.tel)}</td><td>${l.achats.map(echapperHtml).join("<br>")}</td><td class="ok"><span class="box"></span></td></tr>`)
+      .join("");
+    const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${echapperHtml(titreFinal)}</title><style>
+@page{size:A4;margin:10mm}
+body{font-family:Arial,Helvetica,sans-serif;color:#1e293b;margin:0}
+h1{font-size:26px;color:#1F3864;margin:0 0 4px;text-align:center;text-transform:uppercase}
+.sous{text-align:center;color:#64748b;font-size:12px;margin-bottom:10px}
+table{width:100%;border-collapse:collapse}
+th,td{border:1px solid #475569;padding:6px;font-size:13px;vertical-align:middle;text-align:left}
+th{background:#1F3864;color:#fff}
+td.nom{width:28%}td.tel{width:18%;white-space:nowrap}td.ok{width:12%;text-align:center}
+.box{display:inline-block;width:20px;height:20px;border:2px solid #1e293b;border-radius:3px}
+tr{page-break-inside:avoid;break-inside:avoid}thead{display:table-header-group}
+tbody tr:nth-child(even) td{background:#f1f5f9}
+*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+</style></head><body><h1>${echapperHtml(titreFinal)}</h1>
+<div class="sous">${ls.length} acheteur${ls.length > 1 ? "s" : ""} · commandes payées · ${echapperHtml(totaux)}</div>
+<table><thead><tr><th>Acheteur</th><th>Téléphone</th><th>À remettre</th><th>Récupéré</th></tr></thead><tbody>${corps || `<tr><td colspan="4">Aucune commande pour ces produits.</td></tr>`}</tbody></table>
+<script>window.onload=function(){window.print()}</script></body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) {
+      alert("Le navigateur a bloqué la nouvelle fenêtre : autorisez les fenêtres pop-up pour ce site, puis recommencez.");
+      return;
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  }
+
+  function exporterCsv() {
+    const ls = lignes();
+    // Le téléphone est précédé d'une apostrophe-guillemet pour qu'Excel garde le 0 initial.
+    const tab = [["Nom", "Prénom", "Téléphone", "À remettre", "Récupéré"], ...ls.map((l) => [l.nom, l.prenom, l.tel ? `="${l.tel}"` : "", l.achats.join(" + "), ""])];
+    const csv = tab.map((r) => r.map((v) => (String(v).startsWith('="') ? v : `"${String(v).replace(/"/g, '""')}"`)).join(";")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${titreFinal.replace(/[^\p{L}\p{N} -]/gu, "").trim() || "retraits"}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  if (!ouvert) {
+    return (
+      <button onClick={() => setOuvert(true)} className="text-sm font-semibold text-sou-blue border border-sou-blue rounded-full px-3 py-1.5 hover:bg-sou-blue hover:text-white">
+        🖨️ Feuille de retrait par acheteur
+      </button>
+    );
+  }
+  const nb = lignes().length;
+  return (
+    <div className="border-2 border-amber-300 bg-amber-50 rounded-xl p-4 text-sm space-y-3">
+      <p className="font-semibold text-slate-800">
+        Feuille de retrait par acheteur
+        <span className="block font-normal text-slate-600">
+          Commandes payées de la boutique choisie au-dessus. Une ligne par acheteur : nom, téléphone, ce qu&apos;il faut lui remettre, case « récupéré ». Pas d&apos;e-mail.
+          Cochez seulement les produits retirés à cet endroit (ex. une feuille pour la buvette, une autre pour le stand du Sou).
+        </span>
+      </p>
+      <label className="block">
+        <span className="text-xs font-semibold text-slate-600">Titre de la feuille</span>
+        <input value={titre} onChange={(e) => setTitre(e.target.value)} placeholder={`Ex. : Retraits à la buvette — ${nomBoutiqueChoisie || ""}`} className="block w-full border border-slate-300 rounded-lg px-3 py-1.5 mt-1 bg-white" />
+      </label>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {produits.map(([n, q]) => (
+          <label key={n} className="flex items-center gap-1.5">
+            <input type="checkbox" checked={!exclus.includes(n)} onChange={() => setExclus(exclus.includes(n) ? exclus.filter((x) => x !== n) : [...exclus, n])} />
+            {n} <span className="text-slate-400">({q})</span>
+          </label>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <button onClick={() => setExclus([])} className="text-xs underline text-slate-600">Tout cocher</button>
+        <button onClick={() => setExclus(produits.map(([n]) => n))} className="text-xs underline text-slate-600">Tout décocher</button>
+        <span className="text-slate-600">{nb} acheteur{nb > 1 ? "s" : ""} concerné{nb > 1 ? "s" : ""}</span>
+        <button disabled={!nb} onClick={imprimer} className="bg-sou-blue text-white font-semibold px-4 py-2 rounded-full disabled:opacity-50">Imprimer</button>
+        <button disabled={!nb} onClick={exporterCsv} className="font-semibold text-sou-blue underline disabled:opacity-50">Exporter pour Excel</button>
+        <button onClick={() => setOuvert(false)} className="text-slate-500">Fermer</button>
+      </div>
+    </div>
+  );
+}
+
 function BoutiqueAdmin({ accessToken }) {
   const [boutiques, setBoutiques] = useState([]);
   const [boutiqueFiltre, setBoutiqueFiltre] = useState(null);
@@ -1083,6 +1211,10 @@ function BoutiqueAdmin({ accessToken }) {
               <option value="acheteur">Trier : par acheteur</option>
             </select>
           </div>
+          <FeuilleRetrait
+            commandesPayees={commandesPayees}
+            nomBoutiqueChoisie={filtreCommandes === "tous" ? "toutes boutiques" : nomBoutique(filtreCommandes)}
+          />
           <div className="flex flex-wrap gap-3">
             <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2">
               <p className="text-xs text-green-700">Total encaissé (commandes payées)</p>
